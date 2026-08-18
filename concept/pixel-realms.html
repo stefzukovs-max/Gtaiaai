@@ -1,0 +1,2164 @@
+<title>Pixel Realms</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@400;500;600;700&family=Silkscreen:wght@400;700&display=swap">
+<style>
+/* ============================================================
+   PIXEL REALMS — concept art bible
+   Deliberately single-theme: this page is a game screen, and a
+   neon sandbox MMO does not have a light mode. Every color is
+   painted explicitly so the page holds on any host ground.
+   ============================================================ */
+:root{
+  --void:#07060F;
+  --deep:#0D0B1A;
+  --panel:#151228;
+  --panel2:#1D1936;
+  --panel3:#262046;
+  --line:#2E2850;
+  --line2:#413876;
+
+  --text:#EFEBFF;
+  --dim:#9C95C0;
+  --faint:#6E6799;
+
+  --pink:#FF3DA6;
+  --cyan:#31E8DF;
+  --gold:#FFC24B;
+  --violet:#A45CFF;
+  --lime:#7DF06A;
+  --red:#FF5470;
+  --blue:#4DA8FF;
+
+  --r-common:#A8B0C8;
+  --r-rare:#4DA8FF;
+  --r-epic:#B45CFF;
+  --r-legendary:#FFB13D;
+  --r-mythic:#FF4757;
+  --r-ancient:#2EE6C5;
+
+  --disp:"Bungee", "Arial Black", sans-serif;
+  --ui:"Chakra Petch", "Trebuchet MS", sans-serif;
+  --pix:"Silkscreen", "Courier New", monospace;
+
+  --maxw:1280px;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--void);
+  color:var(--text);
+  font-family:var(--ui);
+  font-size:16px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+img,canvas{max-width:100%}
+canvas{image-rendering:pixelated;image-rendering:crisp-edges}
+a{color:var(--cyan)}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;border-radius:2px}
+
+/* ---------- page ground: pixel grid + aurora ---------- */
+.bg{position:fixed;inset:0;z-index:0;pointer-events:none;background:var(--void)}
+.bg::before{
+  content:"";position:absolute;inset:0;
+  background:
+    radial-gradient(60vw 50vh at 12% 0%, rgba(164,92,255,.22), transparent 62%),
+    radial-gradient(55vw 45vh at 92% 14%, rgba(255,61,166,.16), transparent 60%),
+    radial-gradient(70vw 60vh at 50% 108%, rgba(49,232,223,.12), transparent 64%);
+}
+.bg::after{
+  content:"";position:absolute;inset:0;opacity:.5;
+  background-image:
+    linear-gradient(rgba(120,105,190,.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120,105,190,.07) 1px, transparent 1px);
+  background-size:32px 32px;
+  mask-image:radial-gradient(90vw 90vh at 50% 30%, #000 20%, transparent 78%);
+}
+
+.wrap{position:relative;z-index:1;max-width:var(--maxw);margin:0 auto;padding:0 24px 96px}
+
+/* ---------- shared bits ---------- */
+.eyebrow{
+  font-family:var(--pix);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--faint);
+}
+.rule{height:1px;background:linear-gradient(90deg,var(--line2),transparent);border:0;margin:0}
+
+.plate{margin-top:96px;scroll-margin-top:24px}
+.plate-head{display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;margin-bottom:28px}
+.plate-num{
+  font-family:var(--pix);font-size:11px;letter-spacing:.16em;color:var(--void);
+  background:var(--gold);padding:5px 9px 4px;border-radius:2px;white-space:nowrap;margin-top:6px;
+  box-shadow:0 0 0 3px rgba(255,194,75,.14);
+}
+.plate-title{font-family:var(--disp);font-size:clamp(22px,3.4vw,38px);line-height:1;margin:0;letter-spacing:.01em;text-wrap:balance}
+.plate-sub{color:var(--dim);font-size:14.5px;max-width:62ch;margin:0}
+.plate-head .grow{flex:1 1 260px;display:flex;flex-direction:column;gap:8px}
+
+.card{
+  background:linear-gradient(180deg,var(--panel2),var(--panel));
+  border:1px solid var(--line);border-radius:10px;
+}
+.note{font-size:13.5px;color:var(--dim);line-height:1.65}
+.note b{color:var(--text);font-weight:600}
+
+.chip{
+  display:inline-flex;align-items:center;gap:5px;
+  font-family:var(--pix);font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+  padding:4px 7px 3px;border-radius:3px;border:1px solid currentColor;white-space:nowrap;
+}
+.chip .dot{width:5px;height:5px;background:currentColor;transform:rotate(45deg)}
+.r-common{color:var(--r-common)} .r-rare{color:var(--r-rare)} .r-epic{color:var(--r-epic)}
+.r-legendary{color:var(--r-legendary)} .r-mythic{color:var(--r-mythic)} .r-ancient{color:var(--r-ancient)}
+
+/* ---------- masthead ---------- */
+.mast{padding:64px 0 0;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:44px;align-items:end}
+@media (max-width:900px){.mast{grid-template-columns:1fr;gap:28px}}
+.logo{font-family:var(--disp);font-size:clamp(44px,8.4vw,104px);line-height:.86;margin:0;letter-spacing:-.01em}
+.logo span{display:block}
+.logo .l1{color:var(--text);text-shadow:0 0 26px rgba(255,61,166,.42)}
+.logo .l2{
+  background:linear-gradient(96deg,var(--pink) 0%,var(--violet) 44%,var(--cyan) 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 22px rgba(164,92,255,.4));
+}
+.tagline{font-family:var(--pix);font-size:12px;letter-spacing:.24em;color:var(--cyan);margin:18px 0 0;text-transform:uppercase}
+.mast p.lede{color:var(--dim);font-size:16px;max-width:56ch;margin:18px 0 0}
+.mast p.lede b{color:var(--text);font-weight:600}
+.specs{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--line2)}
+.specs div{display:flex;justify-content:space-between;gap:16px;padding:11px 2px;border-bottom:1px solid var(--line);font-size:13.5px}
+.specs dt,.specs .k{font-family:var(--pix);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);padding-top:3px}
+.specs .v{color:var(--text);text-align:right;font-weight:500}
+</style>
+<style>
+/* ============================================================
+   THE LIVE SCREEN — a 16:9 game frame. Everything inside is
+   sized in cqw so the whole HUD scales as one piece.
+   ============================================================ */
+.screen{
+  position:relative;width:100%;aspect-ratio:16/9;
+  container-type:inline-size;
+  border:1px solid var(--line2);border-radius:10px;overflow:hidden;
+  background:#120E22;
+  box-shadow:0 30px 90px -30px rgba(0,0,0,.9), 0 0 0 1px rgba(255,61,166,.08) inset;
+  isolation:isolate;
+}
+.screen canvas.world{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:0}
+.screen .vignette{
+  position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(120% 100% at 50% 45%, transparent 52%, rgba(6,4,16,.55) 100%);
+}
+.screen .scan{
+  position:absolute;inset:0;z-index:6;pointer-events:none;opacity:.16;
+  background:repeating-linear-gradient(180deg, rgba(255,255,255,.06) 0 1px, transparent 1px 3px);
+  mix-blend-mode:overlay;
+}
+
+/* --- glass panel base used by every HUD box --- */
+.pane{
+  background:linear-gradient(180deg, rgba(22,17,44,.93), rgba(12,9,26,.95));
+  border:.14cqw solid rgba(120,98,200,.55);
+  border-radius:.85cqw;
+  backdrop-filter:blur(3px);
+  box-shadow:0 .5cqw 1.6cqw rgba(0,0,0,.55);
+}
+.screen .lyr{position:absolute;z-index:4}
+
+/* --- top left: avatar card --- */
+.hud-av{top:1.3cqw;left:1.3cqw;width:21cqw;padding:.85cqw;display:flex;gap:.8cqw;align-items:center}
+.hud-av .port{
+  width:4.6cqw;height:4.6cqw;border-radius:.6cqw;flex:0 0 auto;
+  background:linear-gradient(160deg,#3A2A63,#191033);
+  border:.14cqw solid var(--violet);overflow:hidden;position:relative;
+}
+.hud-av .port canvas{position:absolute;left:50%;top:-2.05cqw;width:14.3cqw;transform:translateX(-50%)}
+.hud-av .who{flex:1;min-width:0}
+.hud-av .nm{display:flex;align-items:center;gap:.4cqw;font-weight:700;font-size:1.55cqw;line-height:1.1}
+.hud-av .nm .star{color:var(--gold);font-size:1.3cqw}
+.hud-av .lv{font-family:var(--pix);font-size:.85cqw;color:var(--cyan);letter-spacing:.06em;margin-top:.15cqw}
+.xp{position:relative;height:1.05cqw;margin-top:.4cqw;border-radius:.55cqw;background:#0B0819;border:.1cqw solid rgba(120,98,200,.5);overflow:hidden}
+.xp i{position:absolute;inset:0;width:67%;background:linear-gradient(90deg,#1FD4C9,#31E8DF);box-shadow:0 0 .8cqw rgba(49,232,223,.7)}
+.xp span{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--pix);font-size:.72cqw;color:#04121A;text-shadow:0 .07cqw 0 rgba(255,255,255,.35)}
+.gems{top:6.9cqw;left:1.3cqw;display:flex;align-items:center;gap:.6cqw;padding:.5cqw .55cqw .5cqw .7cqw}
+.gems .g{width:1.7cqw;height:1.7cqw}
+.gems .n{font-weight:700;font-size:1.6cqw;font-variant-numeric:tabular-nums}
+.gems .add{
+  width:1.9cqw;height:1.9cqw;border-radius:.45cqw;display:grid;place-items:center;
+  background:linear-gradient(180deg,#3ADFA0,#12A874);color:#04241A;font-weight:700;font-size:1.3cqw;line-height:1;
+  border:.1cqw solid rgba(255,255,255,.35);
+}
+
+/* --- top center: world banner --- */
+.hud-world{top:1.3cqw;left:50%;transform:translateX(-50%);padding:.7cqw 1.4cqw;text-align:center;min-width:26cqw}
+.hud-world .t{display:flex;align-items:center;justify-content:center;gap:.6cqw;font-weight:700;font-size:1.85cqw;line-height:1.1}
+.hud-world .t .fav{color:var(--pink);font-size:1.5cqw}
+.hud-world .meta{display:flex;align-items:center;justify-content:center;gap:.7cqw;margin-top:.45cqw;flex-wrap:wrap}
+.tag{font-family:var(--pix);font-size:.78cqw;letter-spacing:.08em;padding:.28cqw .45cqw .2cqw;border-radius:.25cqw}
+.tag.owner{background:var(--gold);color:#1A1000}
+.tag.pub{background:rgba(49,232,223,.14);color:var(--cyan);border:.1cqw solid rgba(49,232,223,.4)}
+.hud-world .own{font-size:1.05cqw;color:var(--dim)}
+.hud-world .own b{color:var(--text)}
+
+/* --- top right: visitors + minimap --- */
+.hud-vis{top:1.3cqw;right:14.6cqw;padding:.7cqw .95cqw;min-width:11cqw}
+.hud-vis .k{font-family:var(--pix);font-size:.78cqw;letter-spacing:.1em;color:var(--faint);text-transform:uppercase}
+.hud-vis .v{display:flex;align-items:baseline;gap:.4cqw;font-weight:700;font-size:1.5cqw;font-variant-numeric:tabular-nums}
+.hud-vis .v small{font-size:1cqw;color:var(--dim);font-weight:500}
+.hud-vis hr{border:0;border-top:.1cqw solid var(--line);margin:.5cqw 0}
+.hud-map{top:1.3cqw;right:1.3cqw;width:12.6cqw;padding:.3cqw}
+.hud-map canvas{width:100%;display:block;border-radius:.5cqw}
+.hud-map .bar{display:flex;justify-content:space-between;align-items:center;padding:.2cqw .3cqw .35cqw}
+.hud-map .bar span{font-family:var(--pix);font-size:.75cqw;color:var(--faint)}
+
+/* --- left: chat --- */
+.chat{left:1.3cqw;top:10.6cqw;width:19.4cqw;display:flex;flex-direction:column;overflow:hidden}
+.chat .tabs{display:flex;gap:.25cqw;padding:.45cqw;border-bottom:.1cqw solid var(--line)}
+.chat .tabs b{
+  font-family:var(--pix);font-size:.8cqw;letter-spacing:.06em;padding:.4cqw .6cqw .3cqw;border-radius:.35cqw;
+  color:var(--faint);font-weight:400;
+}
+.chat .tabs b.on{background:rgba(49,232,223,.16);color:var(--cyan)}
+.chat .log{display:flex;flex-direction:column;gap:.75cqw;padding:.75cqw;height:19cqw;overflow:hidden;justify-content:flex-end}
+.msg{display:flex;gap:.55cqw;align-items:flex-start;animation:msgIn .45s ease both}
+@keyframes msgIn{from{opacity:0;transform:translateY(.7cqw)}to{opacity:1;transform:none}}
+.msg .av{width:1.9cqw;height:1.9cqw;flex:0 0 auto;border-radius:50%;overflow:hidden;background:#2A2050;position:relative;border:.09cqw solid rgba(120,98,200,.5)}
+.msg .av canvas{position:absolute;left:50%;top:-.85cqw;width:5.9cqw;transform:translateX(-50%)}
+.msg .b{min-width:0;flex:1}
+.msg .hd{display:flex;justify-content:space-between;gap:.4cqw;align-items:baseline}
+.msg .n{font-size:1cqw;font-weight:700;line-height:1.2}
+.msg .tm{font-family:var(--pix);font-size:.7cqw;color:var(--faint)}
+.msg .tx{font-size:.98cqw;color:#D6D0F2;line-height:1.35}
+.msg.sys .n{color:var(--gold)} .msg.sys .tx{color:var(--gold);opacity:.85}
+.chat .inp{display:flex;gap:.4cqw;align-items:center;padding:.5cqw;border-top:.1cqw solid var(--line)}
+.chat .inp .f{flex:1;background:#0B0819;border:.1cqw solid var(--line2);border-radius:.45cqw;padding:.42cqw .55cqw;font-size:.95cqw;color:var(--faint)}
+.chat .inp .s{width:2cqw;height:2cqw;border-radius:.45cqw;display:grid;place-items:center;background:linear-gradient(180deg,#2ED8CE,#12A29A);color:#03191A;font-size:1cqw}
+
+/* --- right: trade request --- */
+.trade{right:1.3cqw;top:12.4cqw;width:24cqw;overflow:hidden;
+  border-color:rgba(255,61,166,.6);
+  box-shadow:0 .5cqw 2cqw rgba(0,0,0,.6), 0 0 2.4cqw rgba(255,61,166,.22);
+}
+.trade .hd{display:flex;align-items:center;justify-content:space-between;padding:.6cqw .8cqw;
+  background:linear-gradient(180deg,rgba(255,61,166,.28),rgba(255,61,166,.08));border-bottom:.1cqw solid rgba(255,61,166,.4)}
+.trade .hd h4{margin:0;font-family:var(--pix);font-size:1cqw;letter-spacing:.1em;color:#FFD9EE}
+.trade .hd .x{width:1.5cqw;height:1.5cqw;border-radius:50%;display:grid;place-items:center;background:rgba(255,61,166,.9);color:#2A0016;font-size:.9cqw;font-weight:700}
+.trade .ask{text-align:center;font-size:1.02cqw;color:var(--dim);padding:.65cqw .5cqw .35cqw}
+.trade .ask b{color:var(--text)}
+.trade .cols{display:grid;grid-template-columns:1fr auto 1fr;gap:.5cqw;padding:0 .8cqw .5cqw;align-items:center}
+.trade .side .lbl{display:flex;justify-content:space-between;font-family:var(--pix);font-size:.78cqw;letter-spacing:.05em;margin-bottom:.35cqw}
+.trade .side.a .lbl{color:var(--cyan)} .trade .side.b .lbl{color:var(--pink)}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:.3cqw}
+.slot{
+  position:relative;aspect-ratio:1;border-radius:.4cqw;background:#0C0A1C;
+  border:.11cqw solid var(--line2);display:grid;place-items:center;overflow:hidden;
+}
+.slot.filled{background:linear-gradient(160deg,#241C46,#130E28)}
+.slot canvas{width:82%;display:block}
+.slot .q{position:absolute;right:.15cqw;bottom:.05cqw;font-family:var(--pix);font-size:.72cqw;color:#fff;text-shadow:0 .1cqw 0 #000,.1cqw 0 0 #000,-.1cqw 0 0 #000,0 -.1cqw 0 #000}
+.slot.o-rare{border-color:var(--r-rare);box-shadow:0 0 .6cqw rgba(77,168,255,.35) inset}
+.slot.o-epic{border-color:var(--r-epic);box-shadow:0 0 .6cqw rgba(180,92,255,.4) inset}
+.slot.o-leg{border-color:var(--r-legendary);box-shadow:0 0 .6cqw rgba(255,177,61,.4) inset}
+.slot.o-myth{border-color:var(--r-mythic);box-shadow:0 0 .6cqw rgba(255,71,87,.4) inset}
+.trade .arrows{display:flex;flex-direction:column;gap:.4cqw;font-size:1.3cqw;line-height:1}
+.trade .arrows .r{color:var(--cyan)} .trade .arrows .l{color:var(--pink)}
+.trade .go{
+  margin:.2cqw .8cqw .5cqw;padding:.7cqw;border-radius:.5cqw;text-align:center;
+  background:linear-gradient(180deg,#20C7B4,#0E8C86);color:#03211F;
+  font-family:var(--pix);font-size:1.1cqw;letter-spacing:.1em;
+  border:.11cqw solid rgba(255,255,255,.3);box-shadow:0 .25cqw 0 #07524F;
+}
+.trade .tick{text-align:center;font-family:var(--pix);font-size:.85cqw;color:var(--red);padding:0 0 .7cqw;letter-spacing:.05em}
+
+/* --- bottom: hotbar --- */
+.hotbar{left:50%;transform:translateX(-50%);bottom:5.6cqw;width:54cqw;padding:.5cqw;display:flex;flex-direction:column;gap:.35cqw}
+.hotbar .row{display:grid;grid-template-columns:repeat(10,1fr);gap:.35cqw}
+.hotbar .slot .k{position:absolute;left:.2cqw;top:.05cqw;font-family:var(--pix);font-size:.7cqw;color:var(--faint)}
+.hotbar .slot.sel{border-color:var(--pink);box-shadow:0 0 0 .1cqw rgba(255,61,166,.5),0 0 1cqw rgba(255,61,166,.4)}
+.hotbar .slot.add{color:var(--faint);font-size:1.6cqw;border-style:dashed}
+
+/* --- bottom left: nav --- */
+.nav{left:1.3cqw;bottom:1.3cqw;display:flex;gap:.4cqw;padding:.45cqw}
+.nav .b{position:relative;width:5.2cqw;padding:.5cqw .2cqw .4cqw;border-radius:.5cqw;text-align:center;color:var(--dim)}
+.nav .b.on{background:linear-gradient(180deg,rgba(49,232,223,.22),rgba(49,232,223,.06));color:var(--cyan);box-shadow:0 0 0 .1cqw rgba(49,232,223,.4) inset}
+.nav .b svg{display:block;margin:0 auto .25cqw;width:1.7cqw;height:1.7cqw}
+.nav .b span{font-family:var(--pix);font-size:.72cqw;letter-spacing:.04em}
+.pip{position:absolute;top:.1cqw;right:.55cqw;min-width:1.15cqw;height:1.15cqw;padding:0 .2cqw;border-radius:1cqw;
+  background:var(--red);color:#fff;font-family:var(--pix);font-size:.7cqw;display:grid;place-items:center;line-height:1;
+  border:.1cqw solid #2A0009}
+
+/* --- bottom right: rail --- */
+.rail{right:1.3cqw;bottom:1.3cqw;display:flex;gap:.4cqw;padding:.45cqw}
+.rail .b{position:relative;width:4.9cqw;padding:.5cqw .2cqw .4cqw;border-radius:.5cqw;text-align:center;color:var(--dim)}
+.rail .b svg{display:block;margin:0 auto .25cqw;width:1.7cqw;height:1.7cqw}
+.rail .b span{font-family:var(--pix);font-size:.72cqw}
+.rail .b .day{font-family:var(--disp);font-size:1.5cqw;color:var(--gold);line-height:1;margin-bottom:.1cqw}
+
+/* --- world overlays: signs, tags, bubbles --- */
+.sign{position:absolute;z-index:2;font-family:var(--disp);text-transform:uppercase;pointer-events:none;line-height:1;white-space:nowrap}
+.sign.s-pink{color:#FF8FD0;text-shadow:0 0 .35cqw #FF3DA6,0 0 1.1cqw #FF3DA6,0 0 2.6cqw rgba(255,61,166,.75)}
+.sign.s-cyan{color:#B6FFFB;text-shadow:0 0 .35cqw #31E8DF,0 0 1.1cqw #31E8DF,0 0 2.6cqw rgba(49,232,223,.7)}
+.sign.s-violet{color:#E3CBFF;text-shadow:0 0 .35cqw #A45CFF,0 0 1.1cqw #A45CFF,0 0 2.6cqw rgba(164,92,255,.7)}
+.sign.s-gold{color:#FFEBC2;text-shadow:0 0 .35cqw #FFC24B,0 0 1.1cqw #FFC24B,0 0 2.4cqw rgba(255,194,75,.6)}
+.flicker{animation:flick 5.5s infinite steps(1)}
+@keyframes flick{0%,92%,94%,97%,100%{opacity:1}93%,95.5%{opacity:.45}}
+
+.tagname{
+  position:absolute;z-index:3;transform:translateX(-50%);
+  font-family:var(--pix);font-size:.9cqw;letter-spacing:.03em;white-space:nowrap;
+  padding:.2cqw .4cqw .12cqw;border-radius:.25cqw;
+  background:rgba(8,5,20,.78);border:.09cqw solid rgba(120,98,200,.5);
+}
+.tagname .m{margin-right:.25cqw}
+.bubble{
+  position:absolute;z-index:3;transform:translateX(-50%);
+  max-width:15cqw;font-size:.95cqw;line-height:1.3;color:#1A1030;
+  background:#F3EEFF;border-radius:.55cqw;padding:.42cqw .6cqw;
+  box-shadow:0 .3cqw .9cqw rgba(0,0,0,.45);
+}
+.bubble::after{content:"";position:absolute;left:1.1cqw;bottom:-.45cqw;border:.5cqw solid transparent;border-top-color:#F3EEFF;border-bottom:0}
+.bubble.own{background:#FFF4D6}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition:none !important}
+}
+</style>
+<style>
+/* ============================================================
+   PLATE FURNITURE — lineup, vault, systems, hub, style guide
+   ============================================================ */
+
+/* --- avatar lineup --- */
+.lineup{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;
+}
+@media (max-width:980px){.lineup{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.lineup{grid-template-columns:1fr}}
+.hero{
+  background:linear-gradient(180deg,var(--panel2) 0%,var(--panel) 62%,#100D20 100%);
+  padding:22px 18px 18px;display:flex;flex-direction:column;gap:12px;position:relative;
+}
+.hero::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--h,var(--violet));opacity:.85;
+}
+.hero .stage{position:relative;height:190px;display:grid;place-items:end center}
+.hero .stage::before{
+  content:"";position:absolute;left:50%;bottom:14px;transform:translateX(-50%);
+  width:132px;height:16px;border-radius:50%;
+  background:radial-gradient(closest-side, var(--h,var(--violet)), transparent);
+  opacity:.45;filter:blur(2px);
+}
+.hero .stage canvas{position:relative;width:212px;height:auto;filter:drop-shadow(0 0 16px var(--glow,rgba(164,92,255,.5)))}
+.bob{animation:bob 2.6s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.hero h3{margin:0;font-family:var(--disp);font-size:17px;line-height:1.05;color:var(--h,var(--violet));letter-spacing:.01em}
+.hero .sub{font-family:var(--pix);font-size:9.5px;letter-spacing:.14em;color:var(--faint);text-transform:uppercase;margin-top:-6px}
+.hero ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
+.hero li{display:flex;gap:8px;align-items:baseline;font-size:12.5px;color:var(--dim)}
+.hero li::before{content:"";width:5px;height:5px;flex:0 0 auto;background:var(--h,var(--violet));transform:rotate(45deg);position:relative;top:-1px}
+.hero li b{color:var(--text);font-weight:600}
+
+/* --- turnaround strip --- */
+.turn{
+  margin-top:22px;border:1px solid var(--line);border-radius:10px;overflow:hidden;
+  background:linear-gradient(180deg,#171331,#100D20);
+}
+.turn .hd{display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
+.turn .strip{display:flex;gap:0;overflow-x:auto;padding:16px 8px}
+.turn .cell{flex:0 0 auto;width:116px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px}
+.turn .cell canvas{width:108px;height:auto}
+.turn .cell span{font-family:var(--pix);font-size:8.5px;color:var(--faint);letter-spacing:.08em}
+
+/* --- cosmetics vault --- */
+.vault{display:flex;flex-direction:column;gap:18px}
+.rack{border:1px solid var(--line);border-radius:10px;background:linear-gradient(180deg,var(--panel2),var(--panel));overflow:hidden}
+.rack > .hd{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  padding:12px 16px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02);
+}
+.rack > .hd h3{margin:0;font-family:var(--disp);font-size:15px;letter-spacing:.02em}
+.rack > .hd .c{font-family:var(--pix);font-size:9.5px;color:var(--faint);letter-spacing:.1em}
+.tray{display:grid;gap:1px;background:var(--line);padding:1px}
+.tray.w6{grid-template-columns:repeat(6,minmax(0,1fr))}
+.tray.w8{grid-template-columns:repeat(8,minmax(0,1fr))}
+.tray.w10{grid-template-columns:repeat(10,minmax(0,1fr))}
+@media (max-width:980px){.tray.w10{grid-template-columns:repeat(5,minmax(0,1fr))}.tray.w8{grid-template-columns:repeat(4,minmax(0,1fr))}.tray.w6{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:560px){.tray.w10,.tray.w8{grid-template-columns:repeat(3,minmax(0,1fr))}.tray.w6{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.item{
+  background:#131028;padding:12px 8px 10px;display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center;
+  transition:background .18s ease;
+}
+.item:hover{background:#1A1536}
+.item canvas{width:100%;max-width:104px;display:block}
+.item .n{font-size:11.5px;font-weight:600;line-height:1.25;color:var(--text)}
+.item .n i{display:block;font-style:normal;font-family:var(--pix);font-size:8px;color:var(--faint);margin-bottom:2px;letter-spacing:.08em}
+
+/* --- systems: annotated UI --- */
+.sys{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+@media (max-width:980px){.sys{grid-template-columns:1fr}}
+.sysbox{border:1px solid var(--line);border-radius:10px;background:linear-gradient(180deg,var(--panel2),var(--panel));display:flex;flex-direction:column;overflow:hidden}
+.sysbox > .hd{padding:13px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.sysbox > .hd h3{margin:0;font-family:var(--disp);font-size:14px}
+.sysbox .demo{padding:16px;background:#0C0A1B;border-bottom:1px solid var(--line);container-type:inline-size}
+.sysbox .demo .pane{border-radius:6px}
+.sysbox .body{padding:16px;display:flex;flex-direction:column;gap:11px}
+.sysbox .body ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:9px}
+.sysbox .body li{display:flex;gap:9px;font-size:13px;color:var(--dim);line-height:1.5}
+.sysbox .body li::before{content:"";width:6px;height:6px;flex:0 0 auto;margin-top:7px;background:var(--cyan);transform:rotate(45deg)}
+.sysbox .body li b{color:var(--text);font-weight:600}
+
+/* systems demos reuse the game scale: pin a local cq context */
+.mini{container-type:inline-size;width:100%}
+
+/* --- world hub --- */
+.hub{position:relative;border:1px solid var(--line2);border-radius:10px;overflow:hidden;background:#0B0918}
+.hub canvas{display:block;width:100%;aspect-ratio:2/1}
+.hub .ov{position:absolute;inset:0;pointer-events:none}
+.portals{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;overflow:hidden;margin-top:-1px}
+@media (max-width:900px){.portals{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.portals{grid-template-columns:1fr}}
+.portal{background:#131028;padding:14px;display:flex;flex-direction:column;gap:7px}
+.portal .r{display:flex;align-items:center;gap:8px}
+.portal .ring{width:14px;height:14px;border-radius:50%;border:3px solid var(--p,var(--cyan));box-shadow:0 0 10px var(--p,var(--cyan))}
+.portal h4{margin:0;font-family:var(--disp);font-size:12.5px;letter-spacing:.02em;color:var(--p,var(--cyan))}
+.portal p{margin:0;font-size:12.5px;color:var(--dim);line-height:1.45}
+.portal .st{font-family:var(--pix);font-size:9px;color:var(--faint);letter-spacing:.08em;display:flex;justify-content:space-between}
+
+/* --- style guide --- */
+.guide{display:grid;grid-template-columns:repeat(12,1fr);gap:18px}
+.guide > *{grid-column:span 12}
+@media (min-width:900px){
+  .g-pal{grid-column:span 7} .g-rar{grid-column:span 5}
+  .g-ana{grid-column:span 5} .g-tile{grid-column:span 7}
+}
+.box{border:1px solid var(--line);border-radius:10px;background:linear-gradient(180deg,var(--panel2),var(--panel));overflow:hidden}
+.box > .hd{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.box > .hd h3{margin:0;font-family:var(--disp);font-size:13.5px}
+.box .in{padding:16px}
+.sw{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:560px){.sw{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.sw div{border-radius:7px;overflow:hidden;border:1px solid var(--line)}
+.sw .c{height:56px}
+.sw .l{padding:7px 9px;background:#100D21;font-family:var(--pix);font-size:8.5px;letter-spacing:.06em;color:var(--dim);display:flex;justify-content:space-between;gap:6px}
+.sw .l b{color:var(--text);font-weight:400}
+.ladder{display:flex;flex-direction:column;gap:0}
+.ladder .row{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.ladder .row:last-child{border-bottom:0}
+.ladder .sq{width:26px;height:26px;border-radius:5px;border:2px solid currentColor;background:#0C0A1C;box-shadow:0 0 10px currentColor inset}
+.ladder .nm{font-family:var(--pix);font-size:10.5px;letter-spacing:.1em}
+.ladder .dr{font-family:var(--pix);font-size:9.5px;color:var(--faint);font-variant-numeric:tabular-nums}
+.anat{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center}
+.anat canvas{width:150px}
+.anat ol{margin:0;padding:0;list-style:none;counter-reset:a;display:flex;flex-direction:column;gap:5px}
+.anat li{counter-increment:a;font-size:12px;color:var(--dim);display:flex;gap:8px}
+.anat li::before{content:counter(a,decimal-leading-zero);font-family:var(--pix);font-size:9px;color:var(--gold);padding-top:2px}
+.anat li b{color:var(--text);font-weight:600}
+.tiles{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.tiles figure{margin:0;display:flex;flex-direction:column;gap:6px;align-items:center}
+.tiles canvas{width:100%;border-radius:4px;border:1px solid var(--line)}
+.tiles figcaption{font-family:var(--pix);font-size:8px;color:var(--faint);letter-spacing:.05em;text-align:center}
+
+/* --- notes + footer --- */
+.notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:18px}
+@media (max-width:900px){.notes{grid-template-columns:1fr}}
+.notes .n{border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:0 8px 8px 0;padding:14px 16px;background:rgba(255,255,255,.02)}
+.notes .n h4{margin:0 0 6px;font-size:13px;font-weight:700;letter-spacing:.01em}
+.notes .n p{margin:0;font-size:13px;color:var(--dim);line-height:1.55}
+
+.foot{margin-top:90px;border-top:1px solid var(--line2);padding-top:26px;display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center}
+.foot .l{font-family:var(--disp);font-size:13px;letter-spacing:.02em;color:var(--dim)}
+.foot .r{font-family:var(--pix);font-size:9.5px;letter-spacing:.16em;color:var(--faint)}
+.foot .gems{position:static;display:flex;gap:6px}
+.foot .gems canvas{width:22px}
+</style>
+<div class="bg"></div>
+<div class="wrap">
+
+<!-- ══════════════════════ MASTHEAD ══════════════════════ -->
+<header class="mast">
+  <div>
+    <p class="eyebrow">Concept art bible &nbsp;·&nbsp; v1.0 &nbsp;·&nbsp; internal</p>
+    <h1 class="logo"><span class="l1">Pixel</span><span class="l2">Realms</span></h1>
+    <p class="tagline">Your world. Your crowd. Your legend.</p>
+    <p class="lede">A 2D sandbox MMO where every player is handed an empty world and one
+      question: <b>what will you build that makes people stay?</b> Shops, parkour towers,
+      casinos, gardens, dance floors. The world is the content, and the crowd is the score.</p>
+  </div>
+  <div class="specs">
+    <div><span class="k">Genre</span><span class="v">2D sandbox MMO · block world</span></div>
+    <div><span class="k">Core loop</span><span class="v">Build → draw a crowd → trade up</span></div>
+    <div><span class="k">Worlds</span><span class="v">One per player, permanent, named</span></div>
+    <div><span class="k">Systems</span><span class="v">Chat · Trade · Inventory · Wardrobe</span></div>
+    <div><span class="k">Art spec</span><span class="v">16px tiles · 32px avatars · 8 equip layers</span></div>
+    <div><span class="k">Palette</span><span class="v">Twilight neon — violet, pink, cyan, gold</span></div>
+  </div>
+</header>
+
+<!-- ══════════════════════ PLATE 01 — KEY ART ══════════════════════ -->
+<section class="plate" id="p1">
+  <div class="plate-head">
+    <span class="plate-num">Plate 01</span>
+    <div class="grow">
+      <h2 class="plate-title">The Live Screen</h2>
+      <p class="plate-sub">Everything the player sees at once, in a stranger's world at dusk.
+        The HUD frames the edges and never covers the build; the middle stays playable.
+        This runs — the world animates, chat fills, the trade timer is really counting down.</p>
+    </div>
+  </div>
+
+  <div class="screen" id="screen">
+    <canvas class="world" id="worldCv" width="480" height="270" role="img"
+            aria-label="Pixel art game scene: a neon-lit player shop at sunset with avatars, trees, floating islands and a portal."></canvas>
+    <div id="worldOv" style="position:absolute;inset:0;z-index:2;pointer-events:none"></div>
+    <div class="vignette"></div>
+
+    <!-- top left: avatar -->
+    <div class="pane lyr hud-av">
+      <div class="port"><canvas data-av="lumiix" data-scale="6"></canvas></div>
+      <div class="who">
+        <div class="nm">Lumiix <span class="star">★</span></div>
+        <div class="lv">Lv. 42</div>
+        <div class="xp"><i></i><span>18,560 / 27,500</span></div>
+      </div>
+    </div>
+    <div class="pane lyr gems">
+      <canvas class="g" data-gem="diamond" data-scale="4"></canvas>
+      <span class="n">3,842</span>
+      <span class="add">+</span>
+    </div>
+
+    <!-- top center: world banner -->
+    <div class="pane lyr hud-world">
+      <div class="t"><span class="fav">♥</span> Neon Nostalgia Shop</div>
+      <div class="meta">
+        <span class="tag owner">Owner</span>
+        <span class="own"><b>Lumiix</b> 👑</span>
+        <span class="tag pub">◍ Public world</span>
+      </div>
+    </div>
+
+    <!-- top right: visitors + minimap -->
+    <div class="pane lyr hud-vis">
+      <div class="k">World visitors</div>
+      <div class="v">28 <small>/ 50</small></div>
+      <hr>
+      <div class="k">Unique today</div>
+      <div class="v">1,248</div>
+    </div>
+    <div class="pane lyr hud-map">
+      <canvas id="miniCv" width="150" height="70" aria-label="Minimap of the current world"></canvas>
+      <div class="bar"><span>◈ WORLD MAP</span><span>☰</span></div>
+    </div>
+
+    <!-- left: chat -->
+    <div class="pane lyr chat">
+      <div class="tabs"><b class="on">World</b><b>Friends</b><b>Guild</b></div>
+      <div class="log" id="chatLog"></div>
+      <div class="inp"><div class="f">Tap to chat…</div><div class="s">➤</div></div>
+    </div>
+
+    <!-- right: trade -->
+    <div class="pane lyr trade">
+      <div class="hd"><h4>TRADE REQUEST</h4><div class="x">✕</div></div>
+      <div class="ask"><b>Zenn</b> wants to trade with you</div>
+      <div class="cols">
+        <div class="side a">
+          <div class="lbl"><span>ZENN OFFERS</span><span>(9)</span></div>
+          <div class="grid3" id="tradeA"></div>
+        </div>
+        <div class="arrows"><div class="r">⇢</div><div class="l">⇠</div></div>
+        <div class="side b">
+          <div class="lbl"><span>YOU OFFER</span><span>(4)</span></div>
+          <div class="grid3" id="tradeB"></div>
+        </div>
+      </div>
+      <div class="go">CONFIRM TRADE</div>
+      <div class="tick">Expires in <span id="tradeTick">26</span>s</div>
+    </div>
+
+    <!-- bottom: hotbar -->
+    <div class="pane lyr hotbar"><div class="row" id="bar1"></div><div class="row" id="bar2"></div></div>
+
+    <!-- bottom left: nav -->
+    <div class="pane lyr nav">
+      <div class="b"><span class="pip">!</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3l7 7-4 4-7-7z"/><path d="M10 7L3 14v7h7l7-7"/></svg>
+        <span>BUILD</span></div>
+      <div class="b on">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a4 4 0 018 0v2"/><path d="M3 12h18"/></svg>
+        <span>INVENTORY</span></div>
+      <div class="b">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>
+        <span>MAP</span></div>
+      <div class="b">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M2 20a7 7 0 0114 0"/><circle cx="17" cy="9" r="2.5"/><path d="M16 15a6 6 0 016 5"/></svg>
+        <span>SOCIAL</span></div>
+      <div class="b"><span class="pip">3</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 6h18l-2 12H5L3 6z"/><path d="M8 6a4 4 0 118 0"/></svg>
+        <span>SHOP</span></div>
+    </div>
+
+    <!-- bottom right: rail -->
+    <div class="pane lyr rail">
+      <div class="b"><span class="pip">2</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="9" width="18" height="12" rx="1.5"/><path d="M3 13h18M12 9v12"/><path d="M12 9S9 3 6.5 4.5 9 9 12 9zM12 9s3-6 5.5-4.5S15 9 12 9z"/></svg>
+        <span>EVENTS</span></div>
+      <div class="b"><div class="day">7</div><span>DAILY</span></div>
+      <div class="b"><span class="pip">!</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 3h11l3 3v15H5z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
+        <span>QUESTS</span></div>
+      <div class="b">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        <span>MENU</span></div>
+    </div>
+
+    <div class="scan"></div>
+  </div>
+
+  <div class="notes">
+    <div class="n"><h4>The edges belong to the HUD</h4><p>Identity top-left, world identity top-centre, crowd metrics top-right. Nothing floats over the middle third except a trade request, which is the one interruption worth blocking play for.</p></div>
+    <div class="n"><h4>Signage is the player's voice</h4><p>Neon is a placeable block, not a decal. Every glowing letter on this screen was spelled out by the owner, one tile at a time — which is why no two worlds look alike.</p></div>
+    <div class="n"><h4>Chat sits where the eye rests</h4><p>Left rail, bottom-anchored, three tabs deep. Speech bubbles also float over the speaker so newcomers can follow a conversation without ever reading the log.</p></div>
+  </div>
+</section>
+<style>
+/* --- zoom host: lets the systems plate reuse the real HUD components
+       at true fidelity, scaled to fit a narrow column --- */
+.zoom{position:relative;overflow:hidden;width:100%}
+.zoom > .zin{position:absolute;left:0;top:0;width:1280px;container-type:inline-size;transform-origin:0 0}
+.zoom .lyr{position:relative !important;left:auto !important;right:auto !important;top:auto !important;bottom:auto !important;transform:none !important}
+.zoom .chat .log{height:15cqw}
+
+/* --- full inventory panel (systems plate) --- */
+.inv{width:34cqw;overflow:hidden}
+.inv .hd{display:flex;align-items:center;justify-content:space-between;padding:.7cqw .9cqw;border-bottom:.1cqw solid var(--line)}
+.inv .hd h4{margin:0;font-family:var(--pix);font-size:1cqw;letter-spacing:.1em;color:var(--cyan)}
+.inv .hd .w{font-family:var(--pix);font-size:.8cqw;color:var(--faint)}
+.inv .cols{display:grid;grid-template-columns:9.4cqw 1fr;gap:.7cqw;padding:.7cqw .9cqw .9cqw}
+.inv .doll{background:#0B0819;border:.1cqw solid var(--line2);border-radius:.5cqw;padding:.5cqw;display:flex;flex-direction:column;gap:.4cqw;align-items:center}
+.inv .doll canvas{width:8.6cqw}
+.inv .doll .nm{font-family:var(--pix);font-size:.8cqw;color:var(--cyan);letter-spacing:.05em}
+.inv .doll .eq{width:100%;display:flex;flex-direction:column;gap:.22cqw}
+.inv .doll .eq div{display:flex;justify-content:space-between;gap:.4cqw;font-size:.78cqw;color:var(--faint);border-bottom:.08cqw solid rgba(120,98,200,.18);padding-bottom:.1cqw}
+.inv .doll .eq b{color:#CFC7EE;font-weight:500}
+.inv .right{display:flex;flex-direction:column;gap:.5cqw}
+.inv .filters{display:flex;gap:.25cqw;flex-wrap:wrap}
+.inv .filters b{font-family:var(--pix);font-size:.75cqw;padding:.3cqw .5cqw .22cqw;border-radius:.3cqw;color:var(--faint);font-weight:400;border:.09cqw solid var(--line2)}
+.inv .filters b.on{background:rgba(255,61,166,.18);color:#FF9BD0;border-color:rgba(255,61,166,.5)}
+.inv .g6{display:grid;grid-template-columns:repeat(6,1fr);gap:.35cqw}
+.inv .cash{display:flex;justify-content:space-between;align-items:center;font-family:var(--pix);font-size:.82cqw;color:var(--faint);padding-top:.15cqw}
+.inv .cash b{color:var(--gold)}
+</style>
+
+<!-- ══════════════════════ PLATE 02 — AVATARS ══════════════════════ -->
+<section class="plate" id="p2">
+  <div class="plate-head">
+    <span class="plate-num">Plate 02</span>
+    <div class="grow">
+      <h2 class="plate-title">Avatar Lineup</h2>
+      <p class="plate-sub">Eight silhouettes that have to read at 32 pixels tall across a crowded world.
+        Identity is carried by shape first, glow second, colour third — you should know who is
+        standing on the other side of the shop before you can see their face.</p>
+    </div>
+  </div>
+  <div class="lineup" id="lineup"></div>
+
+  <div class="turn">
+    <div class="hd"><span class="eyebrow">Turnaround</span><span class="note" style="font-size:12.5px">Front · back · and the same body with everything stripped off — every avatar is one base rig wearing eight layers.</span></div>
+    <div class="strip" id="turnStrip"></div>
+  </div>
+</section>
+
+<!-- ══════════════════════ PLATE 03 — COSMETICS ══════════════════════ -->
+<section class="plate" id="p3">
+  <div class="plate-head">
+    <span class="plate-num">Plate 03</span>
+    <div class="grow">
+      <h2 class="plate-title">The Cosmetics Vault</h2>
+      <p class="plate-sub">Thirty-eight launch pieces across five slots. Rarity is not a stat — it is
+        pure supply. A Mythic pair of wings does nothing a Common pair doesn't, which is exactly
+        why people will trade a world's worth of gems for them.</p>
+    </div>
+  </div>
+  <div class="vault" id="vault"></div>
+  <div class="notes">
+    <div class="n"><h4>Wings are the flex slot</h4><p>Biggest silhouette change, biggest drop rate gap. They render behind the body and are the only cosmetic with an idle animation of their own, so a rare pair is visible even when the wearer is standing still.</p></div>
+    <div class="n"><h4>Eyes are the cheap thrill</h4><p>Six pixels of real estate, and players will grind a week for the right six. Sold in the starter shop for gems so every new account has one thing worth showing off on day one.</p></div>
+    <div class="n"><h4>Nothing is bind-on-pickup</h4><p>Every piece in this vault can cross the trade window. The economy is the endgame; a cosmetic that can't be sold is a cosmetic nobody chases.</p></div>
+  </div>
+</section>
+
+<!-- ══════════════════════ PLATE 04 — SYSTEMS ══════════════════════ -->
+<section class="plate" id="p4">
+  <div class="plate-head">
+    <span class="plate-num">Plate 04</span>
+    <div class="grow">
+      <h2 class="plate-title">Three Systems, One Grid</h2>
+      <p class="plate-sub">Chat, trade and inventory are the whole social contract. They share one
+        slot component, one rarity border language and one 4px rhythm, so a player who learns to
+        read an inventory can read a trade window without being taught twice.</p>
+    </div>
+  </div>
+  <div class="sys">
+
+    <div class="sysbox">
+      <div class="hd"><h3>Chat</h3><span class="chip r-rare"><span class="dot"></span>Social</span></div>
+      <div class="demo"><div class="zoom"><div class="zin">
+        <div class="pane lyr chat" style="width:19.4cqw">
+          <div class="tabs"><b class="on">World</b><b>Friends</b><b>Guild</b></div>
+          <div class="log" id="chatLog2"></div>
+          <div class="inp"><div class="f">Tap to chat…</div><div class="s">➤</div></div>
+        </div>
+      </div></div></div>
+      <div class="body"><ul>
+        <li><b>Three scopes.</b> World chat is everyone standing on your blocks; Friends and Guild follow you between worlds.</li>
+        <li><b>Bubbles first.</b> Every line also floats over the speaker's head for four seconds, so the log is optional.</li>
+        <li><b>System lines are gold.</b> Likes, joins, drops and trades all speak in the same voice, visually separated from players.</li>
+        <li><b>Filter on the client.</b> Mutes are local and instant — no round trip, no waiting for a report queue.</li>
+      </ul></div>
+    </div>
+
+    <div class="sysbox">
+      <div class="hd"><h3>Trade</h3><span class="chip r-legendary"><span class="dot"></span>Economy</span></div>
+      <div class="demo"><div class="zoom"><div class="zin">
+        <div class="pane lyr trade" style="width:24cqw">
+          <div class="hd"><h4>TRADE REQUEST</h4><div class="x">✕</div></div>
+          <div class="ask"><b>Zenn</b> wants to trade with you</div>
+          <div class="cols">
+            <div class="side a"><div class="lbl"><span>ZENN OFFERS</span><span>(9)</span></div><div class="grid3" id="tradeA2"></div></div>
+            <div class="arrows"><div class="r">⇢</div><div class="l">⇠</div></div>
+            <div class="side b"><div class="lbl"><span>YOU OFFER</span><span>(4)</span></div><div class="grid3" id="tradeB2"></div></div>
+          </div>
+          <div class="go">CONFIRM TRADE</div>
+          <div class="tick">Expires in <span id="tradeTick2">26</span>s</div>
+        </div>
+      </div></div></div>
+      <div class="body"><ul>
+        <li><b>Both sides lock, then both sides confirm.</b> Any change to either grid breaks the lock and resets the confirm.</li>
+        <li><b>A timer, not a trap.</b> Thirty seconds on the request. Long enough to read, short enough that nobody can stall you into a mistake.</li>
+        <li><b>Rarity borders travel.</b> The same coloured frame the item wears in your bag wears into the trade grid — no reading item names under pressure.</li>
+        <li><b>Gems are just another slot.</b> Currency sits in the grid with everything else, so a mixed offer needs no second screen.</li>
+      </ul></div>
+    </div>
+
+    <div class="sysbox">
+      <div class="hd"><h3>Inventory</h3><span class="chip r-epic"><span class="dot"></span>Wardrobe</span></div>
+      <div class="demo"><div class="zoom"><div class="zin">
+        <div class="pane lyr inv">
+          <div class="hd"><h4>INVENTORY</h4><span class="w">84 / 200 SLOTS</span></div>
+          <div class="cols">
+            <div class="doll">
+              <canvas data-av="lumiix" data-scale="7"></canvas>
+              <div class="nm">LUMIIX</div>
+              <div class="eq">
+                <div><span>Wings</span><b>Crystal</b></div>
+                <div><span>Eyes</span><b>Ice</b></div>
+                <div><span>Head</span><b>Horns</b></div>
+                <div><span>Cape</span><b>—</b></div>
+                <div><span>Shoes</span><b>Jet</b></div>
+              </div>
+            </div>
+            <div class="right">
+              <div class="filters"><b class="on">All</b><b>Blocks</b><b>Wear</b><b>Pets</b><b>Seeds</b></div>
+              <div class="g6" id="invGrid"></div>
+              <div class="cash"><span>WORLD LOCKS</span><b>◆ 3,842</b></div>
+            </div>
+          </div>
+        </div>
+      </div></div></div>
+      <div class="body"><ul>
+        <li><b>One bag, everything in it.</b> Blocks, wearables, pets and currency share a grid — the same grid the hotbar draws from.</li>
+        <li><b>The doll is the truth.</b> Equipping happens by dragging onto the character, and what you see there is exactly what the world renders.</li>
+        <li><b>Stacks show counts, uniques don't.</b> A missing number is itself information: this one is one of a kind.</li>
+        <li><b>Two hundred slots, hard cap.</b> Scarcity of space is what pushes goods back into the trade window instead of into a hoard.</li>
+      </ul></div>
+    </div>
+
+  </div>
+</section>
+<!-- ══════════════════════ PLATE 05 — HUB ══════════════════════ -->
+<section class="plate" id="p5">
+  <div class="plate-head">
+    <span class="plate-num">Plate 05</span>
+    <div class="grow">
+      <h2 class="plate-title">Skyblock Hub</h2>
+      <p class="plate-sub">The one world nobody owns. Every session lands here, and every portal on
+        the platform is a real player's build that earned its place on the board this week.
+        The hub is a leaderboard you can walk around in.</p>
+    </div>
+  </div>
+  <div class="hub">
+    <canvas id="hubCv" width="960" height="480" role="img"
+            aria-label="Pixel art of a floating hub island at golden hour with five glowing portals, a boutique, a dance floor and dozens of winged avatars."></canvas>
+  </div>
+  <div class="portals" id="portalRow"></div>
+  <div class="notes">
+    <div class="n"><h4>Featured is earned, not sold</h4><p>Portal placement is driven by unique visitors and time-on-world over a rolling seven days. There is no way to buy the centre arch, and everyone can see the numbers that put a world there.</p></div>
+    <div class="n"><h4>The hub teaches the game</h4><p>A new player walks past a shop, a parkour tower, a casino and a dance floor in fifteen seconds. Nobody has to be told what to build — they have already seen four answers.</p></div>
+    <div class="n"><h4>Crowds are the lighting</h4><p>Busy worlds glow brighter. Portal bloom scales with live player count, so the hub visibly breathes across a day without a single UI number.</p></div>
+  </div>
+</section>
+
+<!-- ══════════════════════ PLATE 06 — STYLE GUIDE ══════════════════════ -->
+<section class="plate" id="p6">
+  <div class="plate-head">
+    <span class="plate-num">Plate 06</span>
+    <div class="grow">
+      <h2 class="plate-title">Production Rules</h2>
+      <p class="plate-sub">The constraints that keep ten thousand player-built worlds looking like
+        one game. Break these and the world reads as a mod pack.</p>
+    </div>
+  </div>
+  <div class="guide">
+
+    <div class="box g-pal">
+      <div class="hd"><h3>Palette</h3><span class="eyebrow">Twilight neon</span></div>
+      <div class="in">
+        <div class="sw" id="swatches"></div>
+        <p class="note" style="margin:16px 0 0">Grounds are violet-biased near-blacks, never neutral grey — the world is
+          lit by signage, and signage tints its own shadows. Neon hues are used at full saturation
+          <b>only</b> as emitted light: a glowing block, a sign, a portal, a rarity border. Nothing that
+          isn't a light source gets to be that bright.</p>
+      </div>
+    </div>
+
+    <div class="box g-rar">
+      <div class="hd"><h3>Rarity ladder</h3><span class="eyebrow">Drop rate</span></div>
+      <div class="in"><div class="ladder" id="ladder"></div></div>
+    </div>
+
+    <div class="box g-ana">
+      <div class="hd"><h3>Sprite anatomy</h3><span class="eyebrow">24 × 32 px</span></div>
+      <div class="in"><div class="anat">
+        <canvas data-av="lumiix" data-scale="5" aria-label="Base avatar sprite"></canvas>
+        <ol>
+          <li><b>Wings</b> — behind, own idle cycle</li>
+          <li><b>Cape</b> — behind, sways on move</li>
+          <li><b>Body</b> — skin, hands, base rig</li>
+          <li><b>Legs &amp; shoes</b> — recolour layer</li>
+          <li><b>Outerwear</b> — torso and sleeves</li>
+          <li><b>Face</b> — six pixels of eyes</li>
+          <li><b>Hair</b> — sits under headwear</li>
+          <li><b>Headwear</b> — overrides hair top</li>
+        </ol>
+      </div></div>
+    </div>
+
+    <div class="box g-tile">
+      <div class="hd"><h3>Block set</h3><span class="eyebrow">16 × 16 px · seamless on all four edges</span></div>
+      <div class="in">
+        <div class="tiles" id="tiles"></div>
+        <p class="note" style="margin:16px 0 0">Every block is authored as a tile that tessellates without a visible seam, with
+          all detail inside the middle 12 pixels so adjacent blocks never fight. Emissive blocks
+          carry their glow in a second pass, which is what lets a player spell a shop name in light.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="notes">
+    <div class="n"><h4>Readability beats detail</h4><p>Any sprite that stops reading at 100% zoom on a phone gets simplified, not shaded harder. Two tones and a rim light will out-perform four tones every time at this size.</p></div>
+    <div class="n"><h4>Glow is a budget</h4><p>One emissive focal point per screen third. When a player's build blows the budget the world still holds together, because nothing in the base tileset competes.</p></div>
+    <div class="n"><h4>Every cosmetic is one layer</h4><p>No cosmetic may span two equip layers or require a bespoke body. If a concept can't be drawn inside its own layer, it ships as two pieces or it doesn't ship.</p></div>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="l">PIXEL REALMS &nbsp;·&nbsp; Express. Create. Adventure.</div>
+  <div class="gems" id="footGems"></div>
+  <div class="r">CONCEPT BIBLE v1.0</div>
+</footer>
+
+</div>
+<script>
+/* ============================================================
+   PIXEL FORGE — every sprite on this page is generated in the
+   browser from layer data. Nothing here is a bitmap file.
+   Body rig: 24 x 32. Frame: 40 x 40. Tiles: 16 x 16.
+   ============================================================ */
+(function(){
+'use strict';
+
+/* ---------- canvas helpers ---------- */
+function mk(w,h){var c=document.createElement('canvas');c.width=w;c.height=h;
+  var x=c.getContext('2d');x.imageSmoothingEnabled=false;return x;}
+function blit(x,rows,pal,ox,oy,flip,w){
+  ox=ox||0;oy=oy||0;
+  for(var y=0;y<rows.length;y++){var r=rows[y];
+    for(var i=0;i<r.length;i++){var ch=r[i];
+      if(ch==='.'||ch===' ')continue;
+      var col=pal[ch];if(!col)continue;
+      var px=flip?(ox+(w-1-i)):(ox+i);
+      x.fillStyle=col;x.fillRect(px,oy+y,1,1);}}
+}
+function px(x,c,a,b,w,h){x.fillStyle=c;x.fillRect(a,b,w||1,h||1);}
+function mount(el,ctx,scale){
+  var c=el.tagName==='CANVAS'?el:null;if(!c)return;
+  var s=scale||1;c.width=ctx.canvas.width*s;c.height=ctx.canvas.height*s;
+  var g=c.getContext('2d');g.imageSmoothingEnabled=false;
+  g.drawImage(ctx.canvas,0,0,c.width,c.height);
+}
+function shade(hex,amt){
+  var n=parseInt(hex.slice(1),16),r=(n>>16)&255,g=(n>>8)&255,b=n&255;
+  r=Math.max(0,Math.min(255,Math.round(r+amt)));
+  g=Math.max(0,Math.min(255,Math.round(g+amt)));
+  b=Math.max(0,Math.min(255,Math.round(b+amt)));
+  return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+function mixc(a,b,t){
+  var A=parseInt(a.slice(1),16),B=parseInt(b.slice(1),16);
+  var r=Math.round(((A>>16&255))*(1-t)+((B>>16&255))*t);
+  var g=Math.round(((A>>8&255))*(1-t)+((B>>8&255))*t);
+  var c=Math.round((A&255)*(1-t)+(B&255)*t);
+  return '#'+((1<<24)+(r<<16)+(g<<8)+c).toString(16).slice(1);
+}
+
+/* ---------- base rig 24 x 32 ---------- */
+var BODY=[
+'........................',
+'........................',
+'.......KKKKKKKKKK.......',
+'......KssssssssssK......',
+'.....KssssssssssSSK.....',
+'.....KssssssssssSSK.....',
+'.....KssssssssssSSK.....',
+'.....KssssssssssSSK.....',
+'.....KssssssssssSSK.....',
+'.....KssssssssssSSK.....',
+'.....KssssssssssSSK.....',
+'......KssssssssSSK......',
+'.......KSssssssSK.......',
+'........KSSssSSK........',
+'.........KssssK.........',
+'....KoooooooooooOOOK....',
+'....KoooooooooooOOOK....',
+'...KsKoooooooooOOOKsK...',
+'...KsKoooooooooOOOKsK...',
+'...KsKoooooooooOOOKsK...',
+'...KsKoooooooooOOOKsK...',
+'...KsKoooooooooOOOKsK...',
+'....KoooooooooooOOOK....',
+'....KpppppppppppPPPK....',
+'....KpppppPKKpppppPK....',
+'....KpppppPKKpppppPK....',
+'....KpppppPKKpppppPK....',
+'....KpppppPKKpppppPK....',
+'....KpppppPKKpppppPK....',
+'....KbbbbbBKKbbbbbBK....',
+'....KbbbbbBKKbbbbbBK....',
+'....KKKKKKKKKKKKKKKK....'];
+
+var FACE={
+  base:[
+  '','','','','','',
+  '........KKK..KKK........',
+  '........wee..wee........',
+  '........eeE..eeE........',
+  '.......R........R.......',
+  '...........KK...........']
+};
+
+var HAIR={
+ spiky:[
+ '.......h..h..h..h.......',
+ '......hhhhhhhhhhhh......',
+ '.....hhhhhhhhhhhhhh.....',
+ '.....hhhhhhhhhhhhHH.....',
+ '.....hH..........HH.....',
+ '.....hH..........HH.....',
+ '.....h............H.....'],
+ long:[
+ '........hhhhhhhh........',
+ '......hhhhhhhhhhhh......',
+ '.....hhhhhhhhhhhhhh.....',
+ '.....hhhhhhhhhhhhHH.....',
+ '.....hH..........HH.....',
+ '.....hH..........HH.....',
+ '.....hH..........HH.....',
+ '.....hH..........HH.....',
+ '.....hH..........HH.....',
+ '.....hH..........HH.....',
+ '.....hH..........HH.....',
+ '.....hh..........HH.....',
+ '......h..........H......',
+ '......h..........H......',
+ '......H..........H......',
+ '......H..........H......'],
+ bob:[
+ '.......hhhhhhhhhh.......',
+ '......hhhhhhhhhhhh......',
+ '.....hhhhhhhhhhhhhh.....',
+ '.....hhhhhhhhhhhhHH.....',
+ '.....hH..........HH.....',
+ '.....hH..........HH.....',
+ '.....hh..........HH.....',
+ '......h..........H......'],
+ twin:[
+ '........hhhhhhhh........',
+ '......hhhhhhhhhhhh......',
+ '.....hhhhhhhhhhhhhh.....',
+ '...hhhhhhhhhhhhhhhhhh...',
+ '...hHhH..........HhHh...',
+ '...hHhH..........HhHh...',
+ '....hHh..........hHh....',
+ '....hHh..........hHh....',
+ '.....hh..........hh.....',
+ '.....hh..........hh.....',
+ '......h..........h......',
+ '....hhh..........hhh....',
+ '....hHh..........hHh....',
+ '....hHh..........hHh....',
+ '.....h............h.....']
+};
+
+/* outfits fill the rig interior; row 0 of each array == rig row 14 */
+var OUT={
+ hoodie:[
+ '.........aaaaaa.........',
+ '.....oooooooooooooo.....',
+ '.....oaaaaaaaaaaaaO.....',
+ '....o.oooooooooooo.o....',
+ '....o.oooooooooooo.o....',
+ '....o.oooooooooooo.o....',
+ '......oooooooooooo......',
+ '......OOOOOOOOOOOO......',
+ '.....oooooooooooooo.....',
+ '.....aaaaaaaaaaaaaa.....'],
+ jacket:[
+ '.........oooooo.........',
+ '.....oooooooooooooo.....',
+ '.....oaaOOOOOOaaaaO.....',
+ '....o.ooaOOOOaoooo.o....',
+ '....o.ooaOOOOaoooo.o....',
+ '....a.ooaOOOOaoooo.a....',
+ '......ooaOOOOaoooo......',
+ '......OOaOOOOaOOOO......',
+ '.....oooooooooooooo.....',
+ '.....aaaaaaaaaaaaaa.....'],
+ coat:[
+ '.........aaaaaa.........',
+ '.....oooooooooooooo.....',
+ '.....oaOOOOOOOOaaaO.....',
+ '....o.ooaOOOOaoooo.o....',
+ '....o.ooaOOOOaoooo.o....',
+ '....o.ooaOOOOaoooo.o....',
+ '......ooaOOOOaoooo......',
+ '......ooaOOOOaoooo......',
+ '.....oooaaaaaaooooo.....',
+ '.....oooooooooooooo.....',
+ '.....oooooooooooooo.....',
+ '.....oooooooooooooo.....',
+ '.....OOooooooooooOO.....',
+ '......OOOOOOOOOOOO......'],
+ robe:[
+ '.........aaaaaa.........',
+ '.....oooooooooooooo.....',
+ '.....oaaaOOOOaaaaaO.....',
+ '....o.ooaOaaOaoooo.o....',
+ '....o.ooaOaaOaoooo.o....',
+ '....a.ooaOaaOaoooo.a....',
+ '......ooaOaaOaoooo......',
+ '......ooaaaaaaoooo......',
+ '.....oooooooooooooo.....',
+ '.....oooooaaaooooooo....',
+ '....ooooooooooooooooo...',
+ '....ooooooooooooooooo...',
+ '...oooooooaaaoooooooo...',
+ '...oooooooooooooooooo...',
+ '...OOOOOOOOOOOOOOOOOO...',
+ '...aaaaaaaaaaaaaaaaaa...'],
+ armor:[
+ '.........aaaaaa.........',
+ '.....oooooooooooooo.....',
+ '.....oOaaaaaaaaaaOO.....',
+ '....o.ooOOaaOOoooo.o....',
+ '....a.ooOaggaOoooo.a....',
+ '....o.ooOOaaOOoooo.o....',
+ '......ooooaaoooooo......',
+ '......OOOOaaOOOOOO......',
+ '.....oooooaaooooooo.....',
+ '.....aaaaaaaaaaaaaa.....',
+ '.....oOooooooooOOoo.....',
+ '.....oOooooooooOOoo.....'],
+ kimono:[
+ '.........aaaaaa.........',
+ '.....oooooooooooooo.....',
+ '.....ooaOOOOOOaaaoO.....',
+ '....o.oaaOOOOaaooo.o....',
+ '....o.ooaaOOaaoooo.o....',
+ '....o.oooaaaaooooo.o....',
+ '......oooaOOaoooooo.....',
+ '......aaaaaaaaaaaa......',
+ '.....AAAAAAAAAAAAAA.....',
+ '.....oooooooooooooo.....',
+ '.....oooooooooooooo.....',
+ '....oooooooooooooooo....',
+ '....ooooooooooooooOO....',
+ '...oooooooooooooooooo...',
+ '...OOOOOOOOOOOOOOOOOO...']
+};
+
+/* headwear; row 0 == rig row 0 */
+var HATS={
+ crown:['.....g...g....g...g.....',
+        '.....gggggggggggggg.....',
+        '.....gjgggjgggjgggG.....',
+        '.....GGGGGGGGGGGGGG.....'],
+ wizard:['...........hh...........',
+        '..........hhhh..........',
+        '.........hhhhhh.........',
+        '........hhhahhhh........',
+        '.......hhhhahhhhh.......',
+        '......hhhhhahhhhhh......',
+        '...hhhhhhhhhhhhhhhhhh...',
+        '...aaaaaaaaaaaaaaaaaa...'],
+ tophat:['.......hhhhhhhhhh.......',
+        '.......hhhhhhhhhH.......',
+        '.......hhhhhhhhhH.......',
+        '.......aaaaaaaaaa.......',
+        '.......hhhhhhhhhH.......',
+        '....hhhhhhhhhhhhhhhh....',
+        '....HHHHHHHHHHHHHHHH....'],
+ viking:['...ww..............ww...',
+        '....ww............ww....',
+        '.....wwmmmmmmmmmmww.....',
+        '.....mmmmmmmmmmmmmM.....',
+        '.....mmmmaaaaaammmM.....',
+        '.....MMMMMMMMMMMMMM.....',
+        '...........mm...........',
+        '...........mm...........'],
+ knight:['...........cc...........',
+        '...........cc...........',
+        '.....mmmmmmmmmmmmmm.....',
+        '.....mmmmmmmmmmmmmM.....',
+        '.....mmmmmmmmmmmmmM.....',
+        '.....mmmmmmmmmmmmmM.....',
+        '.....mm..........mM.....',
+        '.....mm..........mM.....',
+        '.....mmmmmmmmmmmmmM.....',
+        '.....MMMMMMMMMMMMMM.....'],
+ samurai:['....gggg......gggg......',
+        '.....mmmmmmmmmmmmmm.....',
+        '.....mmmmmgggmmmmmM.....',
+        '.....mmmmmmmmmmmmmM.....',
+        '.....mmmmmmmmmmmmmM.....',
+        '....MM............MM....',
+        '....MM............MM....'],
+ panda:['....wwww........wwww....',
+        '....whhw........whhw....',
+        '....wwwwwwwwwwwwwwww....',
+        '.....wwwwwwwwwwwwww.....',
+        '.....wwhhwwwwwwhhww.....',
+        '.....ww..........ww.....',
+        '.....ww..........ww.....'],
+ plague:['.......KKKKKKKKKK.......',
+        '....KKKKKKKKKKKKKKKK....',
+        '.....hhhhhhhhhhhhhh.....',
+        '.....hhhhhhhhhhhhhh.....',
+        '.....hhwwhhhhwwhhhh.....',
+        '.....hhwwhhhhwwhhhh.....',
+        '..........bbbb..........',
+        '..........bbbb..........',
+        '..........bbb...........',
+        '..........bb............'],
+ pumpkin:['..........gg............',
+        '......oooooooooooo......',
+        '.....oooooooooooooo.....',
+        '.....ooKKoooooKKooo.....',
+        '.....oooooooooooooo.....',
+        '.....oKKKKKKKKKKKoo.....',
+        '.....oooooooooooooo.....',
+        '......oooooooooooo......'],
+ dragonhelm:['...hh..............hh...',
+        '....hh............hh....',
+        '.....hhhhhhhhhhhhhh.....',
+        '.....hhaahhhhhhaahh.....',
+        '.....hhhhhhhhhhhhhH.....',
+        '.....HHHHHHHHHHHHHH.....'],
+ cap:['.......hhhhhhhhhh.......',
+        '......hhaahhhhhhhh......',
+        '.....hhhhhhhhhhhhhh.....',
+        '.....hhhhhhhhhhhhhH.....',
+        '.....HHHHHHHHHHHHHH.....',
+        '...HHH..................']
+};
+
+window.PR_DATA={BODY:BODY,FACE:FACE,HAIR:HAIR,OUT:OUT,HATS:HATS,
+  mk:mk,blit:blit,px:px,mount:mount,shade:shade,mixc:mixc};
+})();
+</script>
+<script>
+/* ============================================================
+   GENERATORS — wings, capes, eyes, gems, blocks, shoes, items
+   ============================================================ */
+(function(){
+'use strict';
+var D=window.PR_DATA, mk=D.mk, blit=D.blit, px=D.px, mixc=D.mixc, shade=D.shade;
+
+/* ---------------- wings: 32 x 22, mirrored about the spine ---------------- */
+var WPAL={
+ angel:['#FFFFFF','#DEE4F4','#B4BFDA','#FFE9A8'],
+ dragon:['#B8323A','#7C1B22','#460F16','#E9B463'],
+ mech:['#93A4BC','#5D6D87','#313E58','#4FE3FF'],
+ butterfly:['#B06CFF','#6B47DC','#3A2A80','#FF9BE8'],
+ phoenix:['#FFD966','#FF8A2B','#DE2F1B','#FFF6C9'],
+ crystal:['#A8ECFF','#57B4F2','#2A63CC','#F0FCFF'],
+ void:['#8A4BE0','#4B238F','#1C0D3A','#E8B6FF']
+};
+var WW=24,WH=30;
+function wIn(style,u,v){
+  if(u<0||u>=WW||v<0||v>=WH) return false;
+  if(style==='butterfly'){
+    var a=Math.pow((u-9.5)/11,2)+Math.pow((v-7.5)/8.4,2);
+    var b=Math.pow((u-6)/7.6,2)+Math.pow((v-20.5)/6.2,2);
+    return a<=1||b<=1;
+  }
+  var uu=u,vv=v;
+  if(style==='mech'){uu=Math.floor(u/2)*2;vv=Math.floor(v/2)*2;}
+  var c=20-uu*0.62,h=9-uu*0.30;
+  if(h<=0.4) return false;
+  var lo=c-h,hi=c+h;
+  if(style==='dragon'||style==='void') hi-=3.2*Math.abs(Math.sin(uu*0.52));
+  else if(style==='angel'||style==='phoenix') hi-=1.7*Math.abs(Math.sin(uu*0.75));
+  return vv>=lo&&vv<=hi;
+}
+function wEdge(style,u,v){
+  return !wIn(style,u-1,v)||!wIn(style,u+1,v)||!wIn(style,u,v-1)||!wIn(style,u,v+1);
+}
+function wTone(style,u,v){
+  var e=wEdge(style,u,v);
+  var ac=20-u*0.62,ah=9-u*0.30,f=(v-ac)/(ah||1);
+  switch(style){
+    case 'angel':   if(u>14&&v<9) return 3; return e?2:(((u*0.9+v)%5)<1.6?1:0);
+    case 'dragon':
+    case 'void':{
+      for(var k=-0.62;k<0.85;k+=0.42){ if(Math.abs(f-k)<0.06) return 3; }
+      return e?2:(u<8?0:(u<16?1:2));
+    }
+    case 'mech':    if(u%5===2&&v%5===2) return 3; if(u%5===0||v%5===0) return 2; return u<9?0:1;
+    case 'butterfly':{
+      if(((u*7+v*11)%29)===0) return 3;
+      if(e) return 2;
+      return ((Math.floor(u/3)+Math.floor(v/3))%2)?1:0;
+    }
+    case 'phoenix': if(((u*3+v*5)%17)<2) return 3; return e?2:(u<7?0:(u<14?1:2));
+    case 'crystal': if(e) return 3; return Math.floor((u*0.7+v*0.55)/4)%3;
+  }
+  return 0;
+}
+function drawWings(x,style,ox,oy,tint){
+  var pal=tint||WPAL[style]; if(!pal) return;
+  for(var sx=0;sx<WW*2;sx++){
+    var u=sx<WW?(WW-1-sx):(sx-WW);
+    for(var v=0;v<WH;v++){
+      if(!wIn(style,u,v)) continue;
+      px(x,pal[wTone(style,u,v)],ox+sx,oy+v);
+    }
+  }
+}
+
+/* ---------------- capes: drawn in rig space ---------------- */
+var CPAL={
+ royal:['#2F52AE','#1D3474','#12224E','#FFC24B'],
+ shadow:['#302647','#1D1733','#0F0C1F','#A45CFF'],
+ heroic:['#BB3440','#82202B','#4E1119','#FFC24B'],
+ winter:['#86BCEC','#4E82C0','#2C528C','#EAF6FF'],
+ flame:['#E5501F','#AE2A14','#6B1408','#FFD24A'],
+ crystalc:['#9670EE','#5B3FB0','#331E6E','#B6FFFB']
+};
+function capeW(y){return 12.5+(y-15)*0.58;}
+function cIn(x,y){
+  if(y<15||y>30) return false;
+  if(Math.abs(x-11.5)>capeW(y)) return false;
+  if(y===30) return Math.floor((x+14)/3)%2===0;
+  return true;
+}
+function cTone(style,x,y){
+  if(!cIn(x-1,y)||!cIn(x+1,y)||!cIn(x,y+1)) return 2;
+  if(style==='winter'&&((x*3+y*5)%11===0)) return 3;
+  if(style==='flame'){var g=(y-15)/14;return g>0.62?2:(g>0.3?0:3);}
+  if(style==='crystalc') return Math.floor((x+y*0.7)/3)%3;
+  if((style==='royal'||style==='heroic')&&(Math.abs(x-11.5)+Math.abs(y-22))<4.6) return 3;
+  if(style==='shadow'&&((x*5+y*3)%17===0)) return 3;
+  return Math.abs((x-11.5)/capeW(y))>0.48?1:0;
+}
+function drawCape(x,style,ox,oy){
+  var pal=CPAL[style]; if(!pal) return;
+  for(var a=-14;a<38;a++) for(var b=15;b<31;b++){
+    if(cIn(a,b)) px(x,pal[cTone(style,a,b)],ox+a,oy+b);
+  }
+}
+
+/* ---------------- eyes: showcase renderer, 28 x 18 ---------------- */
+function irisColor(style,dx,dy,r,R){
+  var th=Math.atan2(dy,dx);
+  switch(style){
+    case 'heart':{
+      var X=dx/4.6,Y=-dy/4.6,q=X*X+Y*Y-1;
+      return (q*q*q-X*X*Y*Y*Y<=0)?'#FF2E6B':(r<R*0.62?'#FF7FAE':'#D6185A');
+    }
+    case 'star':{
+      var lim=R*(0.5+0.5*Math.cos(5*(th+Math.PI/2)));
+      return r<=lim?'#FFE066':(r<R*0.8?'#C7861B':'#7E4A0C');
+    }
+    case 'galaxy':{
+      var a=th+r*0.95, s=Math.sin(a*2);
+      if(r<1.6) return '#FFFFFF';
+      return s>0.25?'#C69BFF':(s>-0.3?'#5B3AC0':'#1E1148');
+    }
+    case 'slit':{
+      if(Math.pow(dx/1.5,2)+Math.pow(dy/5.4,2)<=1) return '#160604';
+      return r<R*0.55?'#FF9A2B':(r<R*0.85?'#E5561A':'#8C260C');
+    }
+    case 'rainbow':{
+      if(r<1.6) return '#120A20';
+      var h=((th+Math.PI)/(2*Math.PI))*360;
+      return 'hsl('+h.toFixed(0)+',88%,'+(r<R*0.7?62:46)+'%)';
+    }
+    case 'ice':{
+      if(r<1.5) return '#0B2540';
+      var f=Math.floor((dx*0.9+dy*0.7+8)/2.2)%3;
+      return ['#BFEBFF','#6FC0F0','#3B85CC'][f];
+    }
+    case 'void':{
+      if(r<1.4) return '#000000';
+      if(r<2.9) return '#7A2FD8';
+      if(r<4.2) return '#0B0418';
+      return r<R*0.95?'#B168FF':'#2A0F55';
+    }
+  }
+  return '#888';
+}
+function drawEye(x,style,ox,oy){
+  var cx=14,cy=9,R=5.6;
+  for(var a=0;a<28;a++) for(var b=0;b<18;b++){
+    var ex=Math.pow((a-cx)/12.4,2)+Math.pow((b-cy)/6.4,2);
+    if(ex>1) continue;
+    var dx=a-cx, dy=b-cy, r=Math.sqrt(dx*dx+dy*dy);
+    var col;
+    if(style==='visor'){
+      col = (b>=4&&b<=13) ? (((b-4)%3===0)?'#8FF6FF':(a<6||a>21?'#0E4A63':'#1B87A8')) : '#0A2E3E';
+      if(b>=6&&b<=11&&a>8&&a<20&&((a+b)%4===0)) col='#C9FDFF';
+    } else if(r<=R){
+      col=irisColor(style,dx,dy,r,R);
+    } else {
+      col = (b<cy) ? '#DCD4E8' : '#F4F0FA';
+    }
+    px(x,col,ox+a,oy+b);
+  }
+  /* lash line + brow shadow + highlight */
+  for(var a2=0;a2<28;a2++){
+    var t=(a2-cx)/12.4, yy=cy-Math.round(6.4*Math.sqrt(Math.max(0,1-t*t)));
+    if(a2>1&&a2<26){ px(x,'#1B1230',ox+a2,oy+yy); px(x,'#2A1C48',ox+a2,oy+yy+1); }
+  }
+  px(x,'#FFFFFF',ox+11,oy+6,2,2);
+  px(x,'rgba(255,255,255,.75)',ox+16,oy+11);
+}
+
+/* ---------------- gems ---------------- */
+var GEMS={gold:'#FFC24B',diamond:'#63D8FF',emerald:'#3FD97A',ruby:'#FF4D5E',
+          amethyst:'#B45CFF',sapphire:'#4D7BFF',topaz:'#FFA224',opal:'#E9D6FF'};
+function drawGem(x,name,ox,oy){
+  var base=GEMS[name]||'#FFC24B';
+  var lo=shade(base,-70), hi=mixc(base,'#FFFFFF',.55), mid=shade(base,-24);
+  for(var a=0;a<16;a++) for(var b=0;b<16;b++){
+    var dx=Math.abs(a-7.5), dy=Math.abs(b-7.5);
+    if(dx+dy>9.6||dx>6.6||dy>7.2) continue;
+    var col;
+    if(dx+dy>8.6) col='#120A22';
+    else if(b<4) col=hi;
+    else if(a<7.5) col=(b<9?base:mid);
+    else col=(b<9?mid:lo);
+    if(b>=4&&b<=6&&a>=5&&a<=7) col='#FFFFFF';
+    px(x,col,ox+a,oy+b);
+  }
+}
+
+/* ---------------- blocks ---------------- */
+function hash(a,b,s){var n=Math.sin(a*127.1+b*311.7+s*74.7)*43758.5453;return n-Math.floor(n);}
+var TILES={
+  dirt:{n:'DIRT',f:function(a,b){var h=hash(a,b,1);return h>.82?'#7A5030':(h>.5?'#5E3B22':'#4A2E1B');}},
+  stone:{n:'STONE',f:function(a,b){var h=hash(a,b,2);return h>.86?'#6C6784':(h>.45?'#4A4560':'#38344B');}},
+  grass:{n:'GRASS',f:function(a,b){if(b<4){var h=hash(a,b,3);return h>.5?'#4FBF52':'#3B9C41';}var g=hash(a,b,1);return g>.7?'#5E3B22':'#4A2E1B';}},
+  wood:{n:'WOOD',f:function(a,b){var c=(a%8<1)?'#4A2E1B':(hash(0,b,4)>.55?'#8A5A32':'#75492A');return c;}},
+  neon:{n:'NEON',f:function(a,b){var e=(a<2||a>13||b<2||b>13);return e?'#2A0E3C':(((a+b)%4===0)?'#FF8FD0':'#FF3DA6');}},
+  glass:{n:'GLASS',f:function(a,b){var e=(a<1||a>14||b<1||b>14);return e?'#7FD6F0':((a+b)%7===0?'#BFF0FF':'#2A5C74');}},
+  vine:{n:'VINE',f:function(a,b){var d=Math.abs(a-8+Math.sin(b*0.7)*3);return d<1.6?'#3F8F3C':(d<3.2?'#2C6B2B':'#16301C');}},
+  cloud:{n:'CLOUD',f:function(a,b){var h=hash(Math.floor(a/3),Math.floor(b/3),9);return h>.6?'#F0E7FF':(h>.3?'#D2C4EE':'#B3A2D6');}}
+};
+function drawTile(x,key,ox,oy){
+  var t=TILES[key];if(!t)return;
+  for(var a=0;a<16;a++)for(var b=0;b<16;b++) px(x,t.f(a,b),ox+a,oy+b);
+}
+
+/* ---------------- shoes ---------------- */
+var SHOE=[
+'...bbbb...','..bbbbbb..','..bbbbbb..','..bbbbbb..','..bbbbbb..','..bbbbbb..',
+'.bbbbbbbb.','.bbbbbbbb.','bbbbbbbbbb','bbbbbbbbbb','BBBBBBBBBB','KKKKKKKKKK'];
+var SHOES={
+ sneakers:{n:'Sneakers',c:['#E8E3EF','#B9B1C8'],a:'#E0413F',sole:'#F2EEF8',r:'common'},
+ boots:{n:'Boots',c:['#7A4E2C','#573620'],a:'#3A2312',sole:'#2B1A0E',r:'common'},
+ slippers:{n:'Magic Slippers',c:['#3E4FA8','#27317A'],a:'#FFC24B',sole:'#1A1F52',r:'rare'},
+ greaves:{n:'Steel Greaves',c:['#A9B2C6','#727B94'],a:'#D7DEEC',sole:'#4A5266',r:'rare'},
+ claws:{n:'Dragon Claws',c:['#8E2B22','#5C1712'],a:'#E9B463',sole:'#2C0C0A',r:'mythic'},
+ frost:{n:'Frost Boots',c:['#5FA8E0','#3A73B0'],a:'#EAF6FF',sole:'#22456E',r:'epic'},
+ jet:{n:'Jet Boots',c:['#2C3550','#1A2035'],a:'#31E8DF',sole:'#0E1428',r:'legendary'},
+ fairy:{n:'Fairy Shoes',c:['#6FA84A','#4A7A31'],a:'#CDEF9A',sole:'#2E4D1E',r:'epic'}
+};
+function drawShoePair(x,key,ox,oy){
+  var s=SHOES[key];if(!s)return;
+  var pal={b:s.c[0],B:s.c[1],K:s.sole};
+  for(var i=0;i<2;i++){
+    blit(x,SHOE,pal,ox+i*12,oy,i===1,10);
+    /* accents: lace band / trim / glow sole */
+    for(var a=0;a<10;a++){
+      px(x,s.a,ox+i*12+a,oy+ (key==='frost'?0:6));
+      if(key==='jet'||key==='slippers') px(x,s.a,ox+i*12+a,oy+11);
+    }
+    if(key==='frost'){for(var a2=0;a2<10;a2++){px(x,s.a,ox+i*12+a2,oy+1);}}
+    if(key==='claws'){for(var k=0;k<3;k++){px(x,s.a,ox+i*12+(i?1:8),oy+8+k);px(x,s.a,ox+i*12+(i?0:9),oy+9+k);}}
+    if(key==='fairy'){for(var k2=0;k2<4;k2++)px(x,s.a,ox+i*12+2+k2*2,oy+3);}
+  }
+}
+
+/* ---------------- items 16 x 16 ---------------- */
+var ITEMS={
+ sword:{n:'Neon Sword',r:'mythic',p:{a:'#FF3DA6',B:'#FFC8E8',g:'#5B3FB0',K:'#2A0E3C'},d:[
+ '...............a','..............aa','.............aBa','............aBBa',
+ '...........aBBa.','..........aBBa..','.........aBBa...','........aBBa....',
+ '.......aBBa.....','......aBBa......','.g...aBBa.......','.gg.aBBa........',
+ '..gggga.........','.g.gg...........','gg..gg..........','g...............']},
+ bow:{n:'Void Bow',r:'epic',p:{a:'#B45CFF',B:'#E8CBFF',g:'#3A1C6E',K:'#150A2A'},d:[
+ '...a....aa......','...a...a..a.....','...a..a....a....','...a.a......a...',
+ '...a.a......a...','...aa........a..','...a.........a..','..BBBBBBBBB..a..',
+ '...a.........a..','...aa........a..','...a.a......a...','...a.a......a...',
+ '...a..a....a....','...a...a..a.....','...a....aa......','................']},
+ wand:{n:'Star Wand',r:'legendary',p:{a:'#FFC24B',B:'#FFF3C9',g:'#8A5AD8',K:'#3A2065'},d:[
+ '.......B........','......BaB.......','.....BaaaB......','....BaaaaaB.....',
+ '.....BaaaB......','......BaB.......','.......B........','.......g........',
+ '.......g........','......g.g.......','......g.g.......','.....g...g......',
+ '.....g...g......','....g.....g.....','....K.....K.....','................']},
+ potion:{n:'Growth Potion',r:'rare',p:{a:'#B45CFF',B:'#E8CBFF',g:'#4A3070',K:'#1A0F30'},d:[
+ '.....gggg.......','.....g..g.......','.....g..g.......','....ggggggg.....',
+ '...gg.....gg....','..gg.......gg...','..g.........g...','..g...BB....g...',
+ '..g..Baaa...g...','..g.Baaaaa..g...','..g.aaaaaa..g...','..g.aaaaaa..g...',
+ '...gaaaaaa.g....','...ggaaaagg.....','....gggggg......','................']},
+ flower:{n:'Bloom Seed',r:'common',p:{a:'#FF7AB8',B:'#FFD1E8',g:'#4FBF52',K:'#FFC24B'},d:[
+ '................','.....aaa........','....aBBBa.......','...aBKKKBa......',
+ '...aBKKKBa......','....aBBBa.......','.....aaa........','.......g........',
+ '.......g........','....gg.g........','...g...g........','.......g..gg....',
+ '.......g.g......','.......gg.......','.......g........','................']},
+ teddy:{n:'Neon Teddy',r:'rare',p:{a:'#B77A4A',B:'#8A5632',g:'#FF3DA6',K:'#2A1608'},d:[
+ '................','..aa........aa..','.aBBa......aBBa.','.aBBBa....aBBBa.',
+ '..aaaaaaaaaaaa..','..aBBBBBBBBBBa..','..aBKBBBBKBBa...','..aBBBBBBBBBBa..',
+ '...aBBgggBBBa...','...aaBBBBBBaa...','..aBBBBBBBBBBa..','..aBBBBBBBBBBa..',
+ '..aBBBBBBBBBBa..','...aaaaaaaaaa...','...aa......aa...','................']},
+ lamp:{n:'Street Lamp',r:'common',p:{a:'#FFE9A8',B:'#FFC24B',g:'#4A4560',K:'#2A2740'},d:[
+ '................','.....gggg.......','....gBBBBg......','....gBaaBg......',
+ '....gBaaBg......','....gBBBBg......','.....gaag.......','......gg........',
+ '......gg........','......gg........','......gg........','......gg........',
+ '......gg........','.....gggg.......','....gggggg......','................']},
+ chest:{n:'Loot Chest',r:'legendary',p:{a:'#FFC24B',B:'#8A5632',g:'#5A3620',K:'#2A1608'},d:[
+ '................','................','..aaaaaaaaaaaa..','.aBBBBBBBBBBBBa.',
+ '.aBBBBBBBBBBBBa.','.aBBBBaaBBBBBBa.','.aaaaaaaaaaaaaa.','.aBBBBBaaBBBBBa.',
+ '.aBBBBBaaBBBBBa.','.aBBBBBaaBBBBBa.','.aBBBBBBBBBBBBa.','.aBBBBBBBBBBBBa.',
+ '.aaaaaaaaaaaaaa.','..KKKKKKKKKKKK..','................','................']}
+};
+function drawItem(x,key,ox,oy){var it=ITEMS[key];if(!it)return;blit(x,it.d,it.p,ox,oy);}
+
+window.PR_GEN={drawWings:drawWings,drawCape:drawCape,drawEye:drawEye,drawGem:drawGem,
+  drawTile:drawTile,drawShoePair:drawShoePair,drawItem:drawItem,
+  WPAL:WPAL,CPAL:CPAL,GEMS:GEMS,TILES:TILES,SHOES:SHOES,ITEMS:ITEMS};
+})();
+</script>
+<script>
+/* ============================================================
+   FORGE — composite a character from eight equip layers
+   ============================================================ */
+(function(){
+'use strict';
+var D=window.PR_DATA,G=window.PR_GEN;
+var mk=D.mk,blit=D.blit,px=D.px,mount=D.mount,shade=D.shade;
+
+var FRAME_W=56,FRAME_H=44,BX=16,BY=6,WX=4,WY=3;
+var HATC={
+ crown:{g:'#FFC24B',G:'#C7861B',j:'#FF4D5E'},
+ wizard:{h:'#2E3A8C',H:'#1B2258',a:'#FFC24B'},
+ tophat:{h:'#342C48',H:'#1D1830',a:'#A06A3E'},
+ viking:{w:'#EFE6D2',m:'#9AA6BE',M:'#5E6A82',a:'#C7861B'},
+ knight:{m:'#B4BECF',M:'#6A7488',c:'#3E6BD8'},
+ samurai:{m:'#5E6A82',M:'#39424F',g:'#FFC24B'},
+ panda:{h:'#1B1626',w:'#F2EEF8'},
+ plague:{K:'#1A1428',h:'#2A2240',w:'#8FF6FF',b:'#C9A227'},
+ pumpkin:{o:'#FF8A2B',K:'#2A1004',g:'#4FBF52'},
+ dragonhelm:{h:'#A02A26',H:'#5C1513',a:'#FFC24B'},
+ cap:{h:'#161226',H:'#0B0816',a:'#31E8DF'}
+};
+var HATY={crown:0,wizard:-4,tophat:-4,viking:-1,knight:0,samurai:0,panda:0,plague:2,pumpkin:2,dragonhelm:0,cap:0};
+
+function bodyPal(c){
+  return {K:'#150C26',s:c.skin[0],S:c.skin[1],
+    o:c.outc[0],O:c.outc[1],a:c.outc[2],A:c.outc[3]||c.outc[2],
+    p:c.pant[0],P:c.pant[1],b:c.shoe[0],B:c.shoe[1],
+    h:c.hairc[0],H:c.hairc[1],w:'#FFFFFF',e:c.eyec,E:shade(c.eyec,-70),
+    R:'rgba(255,120,150,.40)'};
+}
+function forge(c,mode){
+  var x=mk(FRAME_W,FRAME_H),pal=bodyPal(c);
+  mode=mode||'front';
+  var showWings=c.wing&&mode!=='base', showCape=c.cape&&mode!=='base';
+  if(showWings&&mode==='front') G.drawWings(x,c.wing,WX,WY,c.wingPal);
+  if(showCape&&mode==='front') G.drawCape(x,c.cape,BX,BY);
+  blit(x,D.BODY,mode==='base'?bodyPal({skin:c.skin,outc:['#6C6784','#4A4560','#38344B'],
+      pant:['#4A4560','#38344B'],shoe:['#38344B','#26233A'],hairc:c.hairc,eyec:'#8A85A6'}):pal,BX,BY);
+  if(mode!=='base'){
+    if(c.out) blit(x,D.OUT[c.out],pal,BX,BY+14);
+    if(mode==='front') blit(x,D.FACE.base,pal,BX,BY);
+    if(c.hair) blit(x,D.HAIR[c.hair],pal,BX,BY+1);
+    if(mode==='back'){ for(var a=5;a<19;a++) for(var b=2;b<12;b++) px(x,c.hairc[0],BX+a,BY+b); }
+    if(c.hat){
+      var hp={};for(var k in pal)hp[k]=pal[k];
+      var hc=HATC[c.hat]||{};for(var k2 in hc)hp[k2]=hc[k2];
+      if(c.hatPal) for(var k3 in c.hatPal) hp[k3]=c.hatPal[k3];
+      blit(x,D.HATS[c.hat],hp,BX,BY+(HATY[c.hat]||0));
+    }
+    if(showCape&&mode==='back') G.drawCape(x,c.cape,BX,BY);
+    if(showWings&&mode==='back') G.drawWings(x,c.wing,WX,WY,c.wingPal);
+  }
+  return x;
+}
+
+/* ---------------- roster ---------------- */
+function C(o){
+  var d={skin:['#F2D6C0','#D2AC92'],hairc:['#E8E2F2','#B9B1C8'],
+    outc:['#2A2440','#1A1630','#A45CFF','#A45CFF'],pant:['#221E38','#151228'],
+    shoe:['#3A3358','#241F3E'],eyec:'#63D8FF',hair:'spiky',out:'hoodie',
+    wing:null,cape:null,hat:null,eye:'ice',hue:'#A45CFF'};
+  for(var k in o)d[k]=o[k];return d;
+}
+var CAST={
+ heartbreaker:C({name:'HEARTBREAKER',title:'LOVE STRUCK',hue:'#FF7AB8',
+   skin:['#F7D5C0','#DBAB92'],hair:'long',hairc:['#FFAFD6','#DC79AE'],
+   out:'hoodie',outc:['#F2ECF7','#CDC3DB','#FF5FA8','#FF5FA8'],
+   pant:['#2B2740','#1B1930'],shoe:['#FF9CCB','#DC6BA4'],
+   eye:'heart',eyec:'#FF2E6B',wing:'angel',
+   kit:['Angel Wings','Heart Eyes','Cloud Hoodie','Glow Sneakers']}),
+ inferno:C({name:'INFERNO',title:'SOUL FLAME',hue:'#FF7A2B',
+   skin:['#E8B894','#C08F6A'],hair:'spiky',hairc:['#2A1810','#150C08'],
+   out:'coat',outc:['#2A1712','#160B08','#E5501F','#FFC24B'],
+   pant:['#1E1210','#120A08'],shoe:['#5C2A18','#38180E'],
+   eye:'slit',eyec:'#FF8A2B',wing:'dragon',hat:'dragonhelm',
+   kit:['Dragon Wings','Dragon Slit Eyes','Ember Coat','Dragon Claws']}),
+ starseeker:C({name:'STARSEEKER',title:'COSMIC DREAMER',hue:'#7FA8FF',
+   skin:['#F2D9C4','#D3B096'],hair:'spiky',hairc:['#EDEAF6','#BEB7D3'],
+   out:'coat',outc:['#1E2A66','#141C46','#FFC24B','#FFC24B'],
+   pant:['#141C46','#0E1332'],shoe:['#2A3470','#161F4A'],
+   eye:'galaxy',eyec:'#8A6BFF',wing:'crystal',cape:'royal',
+   kit:['Crystal Wings','Galaxy Eyes','Starlight Cape','Magic Slippers']}),
+ mecha:C({name:'MECHA UNIT-07',title:'CYBER DEFENDER',hue:'#2FE0C8',
+   skin:['#CFE8E4','#9BBFBB'],hair:'bob',hairc:['#2A3A44','#19242B'],
+   out:'armor',outc:['#2E6B68','#1B4342','#31E8DF','#31E8DF'],
+   pant:['#1B4342','#123030'],shoe:['#2A5E5C','#173A38'],
+   eye:'visor',eyec:'#31E8DF',wing:'mech',hat:'knight',
+   hatPal:{m:'#3E8C88',M:'#1F4E4C',c:'#31E8DF'},
+   kit:['Mecha Wings','Cyber Visor','Energy Core','Steel Greaves']}),
+ sakura:C({name:'SAKURA BLOOM',title:'WANDERING SPIRIT',hue:'#FF9BC4',
+   skin:['#F7D9C6','#D9AF95'],hair:'twin',hairc:['#241C33','#140F22'],
+   out:'kimono',outc:['#F2A8BE','#D3788F','#FFF0F5','#B23F5E'],
+   pant:['#D3788F','#AF596F'],shoe:['#F2E4D2','#C8B49C'],
+   eye:'rainbow',eyec:'#FF7AB8',wing:'butterfly',
+   kit:['Butterfly Wings','Rainbow Eyes','Kimono Layers','Fairy Shoes']}),
+ drifter:C({name:'NEON DRIFTER',title:'STREET LEGEND',hue:'#31E8DF',
+   skin:['#E8C4A0','#C39B78'],hair:'spiky',hairc:['#1FC9C0','#127B77'],
+   out:'jacket',outc:['#171326','#0C0919','#7DF06A','#31E8DF'],
+   pant:['#1B1730','#0E0B1D'],shoe:['#2CE0D6','#149D96'],
+   eye:'ice',eyec:'#63D8FF',hat:'cap',
+   kit:['Street Jacket','Ice Eyes','Snap Cap','Jet Boots']}),
+ mage:C({name:'ARCANE MAGE',title:'MYSTIC SCHOLAR',hue:'#FFC24B',
+   skin:['#F2D9C4','#D3B096'],hair:'bob',hairc:['#E8E2F2','#B9B1CD'],
+   out:'robe',outc:['#26307E','#171E58','#FFC24B','#FFC24B'],
+   pant:['#171E58','#0D123A'],shoe:['#3A2E66','#231C46'],
+   eye:'star',eyec:'#FFC24B',hat:'wizard',cape:'royal',
+   kit:['Wizard Hat','Star Eyes','Arcane Robe','Royal Cape']}),
+ voidhunter:C({name:'VOID HUNTER',title:'SHADOW REAPER',hue:'#A45CFF',
+   skin:['#E3C7B4','#BD9E88'],hair:'spiky',hairc:['#3A2458','#221436'],
+   out:'coat',outc:['#231A3C','#140F26','#A45CFF','#B45CFF'],
+   pant:['#140F26','#0B0818'],shoe:['#2E1F52','#191030'],
+   eye:'void',eyec:'#B168FF',wing:'dragon',wingPal:G.WPAL.void,cape:'shadow',
+   kit:['Shadow Wings','Void Eyes','Reaper Coat','Dark Energy']}),
+
+ /* world cast */
+ lumiix:C({name:'Lumiix',hue:'#31E8DF',hair:'long',hairc:['#E9E4F5','#B8B0CE'],
+   out:'jacket',outc:['#191430','#0E0A1E','#31E8DF','#FF3DA6'],
+   pant:['#1B1730','#0E0B1D'],shoe:['#2CE0D6','#149D96'],
+   eye:'ice',eyec:'#63D8FF',wing:'crystal'}),
+ skylar:C({name:'Skylar',hue:'#EDEAF6',hairc:['#F2EEF8','#C4BCD6'],
+   out:'hoodie',outc:['#F0ECF6','#CBC2DA','#8AA8FF','#8AA8FF'],
+   shoe:['#DDD6EA','#B0A8C4'],wing:'angel',eyec:'#8AA8FF'}),
+ noctis:C({name:'Noctis',hue:'#B45CFF',hairc:['#231A33','#140E20'],
+   out:'coat',outc:['#1A1430','#0D0920','#B45CFF','#B45CFF'],
+   shoe:['#2A1F4A','#170F2E'],wing:'butterfly',eyec:'#B168FF',eye:'void'}),
+ mochi:C({name:'Mochi',hue:'#FF9BC4',hair:'twin',hairc:['#F0DCEE','#C9A8C6'],
+   out:'kimono',outc:['#E8E4F2','#C0B8D4','#FF7AB8','#FF7AB8'],
+   pant:['#C0B8D4','#9C93B4'],shoe:['#F2E4D2','#C8B49C'],
+   wing:'butterfly',eyec:'#FF7AB8',eye:'heart'}),
+ zenn:C({name:'Zenn',hue:'#A45CFF',hairc:['#DED8F0','#ADA4C8'],
+   out:'coat',outc:['#1E1738','#100C22','#A45CFF','#A45CFF'],
+   shoe:['#2E2352','#191030'],wing:'crystal',eyec:'#A45CFF',eye:'galaxy'}),
+ yuki:C({name:'Yuki',hue:'#FFC24B',hair:'long',hairc:['#F2DFA8','#C9B276'],
+   out:'hoodie',outc:['#EAF2FF','#C2CEE4','#63D8FF','#63D8FF'],
+   shoe:['#EAF2FF','#B6C2D8'],wing:'angel',eyec:'#63D8FF'})
+};
+var ORDER=['heartbreaker','inferno','starseeker','mecha','sakura','drifter','mage','voidhunter'];
+
+window.PR=Object.assign({},D,G,{forge:forge,CAST:CAST,ORDER:ORDER,FRAME_W:FRAME_W,FRAME_H:FRAME_H});
+})();
+</script>
+<script>
+/* ============================================================
+   SCENES + PAGE BUILD
+   ============================================================ */
+(function(){
+'use strict';
+var P=window.PR,mk=P.mk,px=P.px,mount=P.mount,mixc=P.mixc,shade=P.shade;
+var $=function(s,r){return (r||document).querySelector(s);};
+var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));};
+function el(t,c,h){var n=document.createElement(t);if(c)n.className=c;if(h!=null)n.innerHTML=h;return n;}
+function hash(a,b,s){var n=Math.sin(a*127.1+b*311.7+s*74.7)*43758.5453;return n-Math.floor(n);}
+
+/* ---------- standalone cosmetic previews ---------- */
+function wingCanvas(style,tint){var x=mk(48,30);P.drawWings(x,style,0,0,tint);return x;}
+function capeCanvas(style){var x=mk(52,17);P.drawCape(x,style,14,-15);return x;}
+function eyeCanvas(style){var x=mk(28,18);P.drawEye(x,style,0,0);return x;}
+function shoeCanvas(key){var x=mk(22,12);P.drawShoePair(x,key,0,0);return x;}
+function hatCanvas(key,pal){
+  var x=mk(24,16),base={K:'#150C26',s:'#F2D6C0',h:'#2A2440',H:'#1A1630',a:'#A45CFF',
+    w:'#FFFFFF',m:'#9AA6BE',M:'#5E6A82',g:'#FFC24B',G:'#C7861B',j:'#FF4D5E',o:'#FF8A2B',
+    b:'#C9A227',c:'#3E6BD8'};
+  var p={};for(var k in base)p[k]=base[k];if(pal)for(var k2 in pal)p[k2]=pal[k2];
+  P.blit(x,P.HATS[key],p,0,2);return x;
+}
+var HAT_LOOK={
+ crown:{g:'#FFC24B',G:'#C7861B',j:'#FF4D5E'},
+ wizard:{h:'#2E3A8C',H:'#1B2258',a:'#FFC24B'},
+ tophat:{h:'#342C48',H:'#1D1830',a:'#A06A3E'},
+ viking:{w:'#EFE6D2',m:'#9AA6BE',M:'#5E6A82',a:'#C7861B'},
+ knight:{m:'#B4BECF',M:'#6A7488',c:'#3E6BD8'},
+ samurai:{m:'#5E6A82',M:'#39424F',g:'#FFC24B'},
+ panda:{h:'#1B1626',w:'#F2EEF8'},
+ plague:{K:'#1A1428',h:'#2A2240',w:'#8FF6FF',b:'#C9A227'},
+ pumpkin:{o:'#FF8A2B',K:'#2A1004',g:'#4FBF52'},
+ dragonhelm:{h:'#A02A26',H:'#5C1513',a:'#FFC24B'}
+};
+
+/* ---------- generic tagged canvases ---------- */
+function renderTagged(root){
+  $$('[data-av]',root).forEach(function(c){
+    var ch=P.CAST[c.dataset.av];if(!ch)return;
+    mount(c,P.forge(ch,c.dataset.mode||'front'),+(c.dataset.scale||4));});
+  $$('[data-gem]',root).forEach(function(c){var x=mk(16,16);P.drawGem(x,c.dataset.gem,0,0);mount(c,x,+(c.dataset.scale||4));});
+  $$('[data-item]',root).forEach(function(c){var x=mk(16,16);P.drawItem(x,c.dataset.item,0,0);mount(c,x,+(c.dataset.scale||4));});
+  $$('[data-tile]',root).forEach(function(c){var x=mk(16,16);P.drawTile(x,c.dataset.tile,0,0);mount(c,x,+(c.dataset.scale||4));});
+}
+
+/* ============================================================
+   WORLD SCENE — 480 x 270, 16px tiles, ground at y = 178
+   ============================================================ */
+var GROUND=178, FX0=96, FX1=352, FY0=32;
+var WORLD_CAST=[
+ {id:'skylar',x:118},{id:'noctis',x:152},{id:'lumiix',x:196},
+ {id:'mochi',x:240},{id:'zenn',x:288},{id:'yuki',x:332}];
+
+function tilePattern(cols,seed){
+  var t=mk(16,16);
+  for(var a=0;a<16;a++)for(var b=0;b<16;b++){
+    var h=hash(a,b,seed);
+    px(t,h>.72?cols[0]:(h>.35?cols[1]:cols[2]),a,b);}
+  return t;
+}
+function facadeTile(a,b,gx,gy){
+  var h=hash(gx,gy,7);
+  if(a===0||b===0) return '#150B26';
+  if(gy===2) return h>.5?'#3E2A5E':'#33224E';
+  if(h>.94) return '#553180';
+  return h>.5?'#2D1946':'#25143B';
+}
+function frameBox(x,ax,ay,col,draw){
+  px(x,'#0C0718',ax,ay,20,20);
+  px(x,col,ax,ay,20,1);px(x,col,ax,ay+19,20,1);
+  px(x,col,ax,ay,1,20);px(x,col,ax+19,ay,1,20);
+  draw(x,ax+2,ay+2);
+}
+function drawWorld(){
+  var cv=document.getElementById('worldCv');if(!cv)return;
+  var x=cv.getContext('2d');x.imageSmoothingEnabled=false;
+  /* sky */
+  var g=x.createLinearGradient(0,0,0,GROUND+8);
+  g.addColorStop(0,'#1C1040');g.addColorStop(.30,'#431D66');g.addColorStop(.55,'#8A3470');
+  g.addColorStop(.74,'#CE5A6B');g.addColorStop(.88,'#EE9863');g.addColorStop(1,'#FFC98A');
+  x.fillStyle=g;x.fillRect(0,0,480,GROUND+8);
+  /* stars + moon */
+  for(var i=0;i<90;i++){var sx=Math.floor(hash(i,1,3)*480),sy=Math.floor(hash(i,2,3)*110);
+    px(x,hash(i,3,3)>.6?'#FFF6D8':'#C9B6F0',sx,sy);}
+  px(x,'#FFE9A8',300,26,10,10);px(x,'#FFF6D8',302,28,6,6);px(x,'#431D66',296,24,8,8);
+  /* clouds */
+  [[24,54,34],[402,40,28],[196,20,22],[70,96,26],[430,92,20]].forEach(function(c){
+    for(var k=0;k<4;k++){var w=c[2]-k*5;if(w<4)continue;
+      px(x,k%2?'#E8B6C8':'#F2CFD8',c[0]+k*3,c[1]+k*2,w,4);}});
+  /* floating islands */
+  [[26,118,40],[398,124,34],[62,150,26]].forEach(function(s){
+    var w=s[2];px(x,'#4FBF52',s[0],s[1],w,4);
+    for(var k=0;k<4;k++)px(x,'#4A2E1B',s[0]+k*2,s[1]+4,w-k*4,4);});
+  /* facade */
+  for(var gx=FX0/16;gx<FX1/16;gx++) for(var gy=FY0/16;gy<Math.ceil(GROUND/16);gy++){
+    for(var a=0;a<16;a++) for(var b=0;b<16;b++){
+      var yy=gy*16+b;if(yy>=GROUND)continue;
+      px(x,facadeTile(a,b,gx,gy),gx*16+a,yy);}}
+  /* glowing windows worked into the wall */
+  [[112,54],[336,54],[112,118],[336,118],[124,86],[324,86]].forEach(function(w){
+    px(x,'#7A4FD0',w[0],w[1],12,14);px(x,'#B98CFF',w[0]+2,w[1]+2,8,10);
+    px(x,'#E8D4FF',w[0]+3,w[1]+3,3,4);});
+  /* display frames: wings / items / pets */
+  var wingKeys=['angel','butterfly','phoenix'],itemKeys=['sword','bow','wand'],petGems=['diamond','amethyst','emerald'];
+  wingKeys.forEach(function(k,i){frameBox(x,116+i*26,112,'#8AA8FF',function(c,ax,ay){
+    var t=mk(48,30);P.drawWings(t,k,0,0);c.drawImage(t.canvas,0,0,48,30,ax-3,ay+3,22,14);});});
+  itemKeys.forEach(function(k,i){frameBox(x,204+i*26,112,'#FF7AB8',function(c,ax,ay){P.drawItem(c,k,ax,ay);});});
+  petGems.forEach(function(k,i){frameBox(x,292+i*26,112,'#31E8DF',function(c,ax,ay){P.drawGem(c,k,ax,ay);});});
+  /* shop door */
+  px(x,'#120A22',300,140,30,38);px(x,'#31E8DF',300,140,30,1);
+  px(x,'#1B3A48',303,144,24,34);
+  for(var d=0;d<5;d++)px(x,'#2A5E70',305,148+d*6,20,3);
+  /* lanterns */
+  [104,180,264,344].forEach(function(lx){
+    px(x,'#2A2440',lx,96,4,10);px(x,'#FFC24B',lx-2,90,8,7);px(x,'#FFF3C9',lx-1,92,6,3);});
+  /* ground */
+  for(var gx2=0;gx2<30;gx2++) for(var a2=0;a2<16;a2++) for(var b2=0;b2<16;b2++){
+    var h=hash(gx2,b2,3);
+    px(x,b2<4?(h>.5?'#4FBF52':'#3B9C41'):(h>.7?'#5E3B22':'#4A2E1B'),gx2*16+a2,GROUND+b2);}
+  x.fillStyle=x.createPattern(tilePattern(['#5E3B22','#4A2E1B','#3A2415'],1).canvas,'repeat');
+  x.fillRect(0,GROUND+16,480,270-(GROUND+16));
+  /* trees */
+  [[70,GROUND],[372,GROUND]].forEach(function(t){
+    for(var k=0;k<5;k++)px(x,'#4A2E1B',t[0]-2,t[1]-10-k*8,5,8);
+    for(var r=0;r<5;r++)for(var q=0;q<5;q++){
+      if(hash(r,q,5)<.22)continue;
+      px(x,hash(r,q,6)>.5?'#F2A8CE':'#D97BAE',t[0]-16+r*7,t[1]-72+q*7,7,7);}});
+  /* pet familiar */
+  px(x,'#241A3E',218,166,12,10);px(x,'#B45CFF',220,168,2,2);px(x,'#B45CFF',226,168,2,2);
+  px(x,'#241A3E',216,162,4,5);px(x,'#241A3E',228,162,4,5);
+  /* cast */
+  WORLD_CAST.forEach(function(m){
+    var ch=P.CAST[m.id];if(!ch)return;
+    x.drawImage(P.forge(ch,'front').canvas,m.x-28,GROUND-38);});
+}
+
+/* ---------- world overlays: signs, name tags, bubbles ---------- */
+function pctL(v){return (v/480*100)+'%';}
+function pctT(v){return (v/270*100)+'%';}
+function buildOverlay(){
+  var ov=document.getElementById('worldOv');if(!ov)return;
+  var signs=[
+   {t:'Lumiix',x:224,y:40,s:5.6,c:'s-pink',f:1},
+   {t:'Shop',x:224,y:70,s:3.6,c:'s-cyan',f:0},
+   {t:'Wings',x:142,y:96,s:2,c:'s-cyan',f:0},
+   {t:'Items',x:230,y:96,s:2,c:'s-pink',f:1},
+   {t:'Pets',x:318,y:96,s:2,c:'s-cyan',f:0},
+   {t:'Open',x:315,y:134,s:1.5,c:'s-gold',f:1},
+   {t:'♡',x:170,y:44,s:2.4,c:'s-pink',f:0},
+   {t:'☾',x:282,y:44,s:2.6,c:'s-gold',f:0}];
+  signs.forEach(function(s){
+    var n=el('div','sign '+s.c+(s.f?' flicker':''),s.t);
+    n.style.left=pctL(s.x);n.style.top=pctT(s.y);
+    n.style.fontSize=s.s+'cqw';n.style.transform='translate(-50%,-50%)';
+    ov.appendChild(n);});
+  var tags=[{id:'skylar',x:118},{id:'noctis',x:152},{id:'lumiix',x:196,own:1},
+            {id:'mochi',x:240},{id:'zenn',x:288},{id:'yuki',x:332}];
+  var marks={skylar:'★',noctis:'✦',lumiix:'👑',mochi:'✿',zenn:'★',yuki:'✦'};
+  tags.forEach(function(t){
+    var ch=P.CAST[t.id];
+    var n=el('div','tagname','<span class="m" style="color:'+(t.own?'#FFC24B':ch.hue)+'">'+marks[t.id]+'</span>'+
+      '<span style="color:'+(t.own?'#FFC24B':'#EFEBFF')+'">'+ch.name+'</span>');
+    n.style.left=pctL(t.x);n.style.top=pctT(GROUND+2);
+    ov.appendChild(n);});
+  var bubbles=[
+   {x:126,y:126,t:'Love the neon vibes! ✨'},
+   {x:200,y:118,t:'Welcome to my shop! Look around~',own:1},
+   {x:254,y:106,t:'That pet is so cute! 🥺'},
+   {x:302,y:122,t:'Do you have the neon sword? 👀'}];
+  bubbles.forEach(function(b){
+    var n=el('div','bubble'+(b.own?' own':''),b.t);
+    n.style.left=pctL(b.x);n.style.top=pctT(b.y);
+    ov.appendChild(n);});
+}
+
+/* ---------- minimap ---------- */
+function drawMini(){
+  var cv=document.getElementById('miniCv');if(!cv)return;
+  var x=cv.getContext('2d');x.imageSmoothingEnabled=false;
+  var g=x.createLinearGradient(0,0,0,70);
+  g.addColorStop(0,'#1C1040');g.addColorStop(.6,'#8A3470');g.addColorStop(1,'#EE9863');
+  x.fillStyle=g;x.fillRect(0,0,150,70);
+  px(x,'#25143B',30,10,90,46);
+  px(x,'#FF3DA6',44,16,62,4);px(x,'#31E8DF',52,24,46,3);
+  [[44,34],[68,34],[92,34]].forEach(function(s){px(x,'#8AA8FF',s[0],s[1],14,8);});
+  px(x,'#4FBF52',0,56,150,4);px(x,'#4A2E1B',0,60,150,10);
+  [38,48,62,76,92,106].forEach(function(pxx,i){
+    px(x,i===2?'#FFC24B':'#EFEBFF',pxx,50,3,5);});
+  px(x,'rgba(49,232,223,.9)',0,0,150,1);px(x,'rgba(49,232,223,.9)',0,69,150,1);
+}
+
+/* ============================================================
+   HUB — 960 x 480
+   ============================================================ */
+var PORTALS=[
+ {n:'SUNSET SHORES',c:'#4FD8F0',x:150,tag:'Beach · social',live:'412 online',owner:'@koi'},
+ {n:'DRAGON PEAKS',c:'#FF5A3C',x:330,tag:'Boss raid',live:'268 online',owner:'@zed'},
+ {n:'PARKOUR',c:'#C46CFF',x:500,tag:'Skill course',live:'890 online',owner:'@nova'},
+ {n:'CELESTIAL GARDENS',c:'#5CE88A',x:670,tag:'Build showcase',live:'333 online',owner:'@ivy'},
+ {n:'VOID REALM',c:'#A45CFF',x:840,tag:'Endgame',live:'157 online',owner:'@luna'}];
+
+function drawHub(){
+  var cv=document.getElementById('hubCv');if(!cv)return;
+  var x=cv.getContext('2d');x.imageSmoothingEnabled=false;
+  var BACK=300, FRONT=392;
+  var g=x.createLinearGradient(0,0,0,480);
+  g.addColorStop(0,'#2E2266');g.addColorStop(.30,'#7A4488');g.addColorStop(.55,'#D0737C');
+  g.addColorStop(.76,'#F2AE72');g.addColorStop(1,'#FFE3B4');
+  x.fillStyle=g;x.fillRect(0,0,960,480);
+  for(var i=0;i<70;i++)px(x,'#FFF6D8',Math.floor(hash(i,7,2)*960),Math.floor(hash(i,8,2)*160));
+  /* clouds, centred so they read as clouds and not staircases */
+  for(var c=0;c<15;c++){
+    var cx=Math.floor(hash(c,11,4)*960),cy=40+Math.floor(hash(c,12,4)*190),w=34+Math.floor(hash(c,13,4)*66);
+    var prof=[.55,1,.8,.45];
+    for(var k=0;k<4;k++){var ww=Math.round(w*prof[k]);
+      px(x,k<2?'#FBE2D6':'#EEC3C8',Math.round(cx-ww/2),cy+k*5,ww,5);}}
+  /* far islands */
+  [[90,150,64],[790,116,54],[380,86,44],[600,168,38]].forEach(function(s2){
+    px(x,'#6FBE72',s2[0],s2[1],s2[2],5);
+    for(var k=0;k<5;k++)px(x,'#63482F',s2[0]+k*4,s2[1]+5+k*5,Math.max(4,s2[2]-k*8),5);});
+
+  function slab(x0,x1,top,depth,grass,dirt,edge){
+    for(var a=x0;a<x1;a++)for(var b=0;b<depth;b++){
+      var h=hash(a*0.13,b,3);
+      px(x,b<4?(h>.5?grass:edge):(h>.7?dirt:shade(dirt,-14)),a,top+b);}}
+  /* back tier: portal platform, hazed by distance */
+  slab(60,900,BACK,36,'#69A874','#7A6047','#589464');
+  x.fillStyle='rgba(206,115,124,.28)';x.fillRect(60,BACK,840,36);
+
+  /* portals */
+  PORTALS.forEach(function(p){
+    for(var t=0;t<220;t++){
+      var ang=Math.PI*(t/220), rx=Math.cos(ang)*38, ry=Math.sin(ang)*66;
+      px(x,'#241B33',Math.round(p.x+rx)-3,Math.round(BACK-ry),6,6);}
+    for(var q=-30;q<=30;q++)for(var w=0;w<58;w++){
+      if(Math.pow(q/30,2)+Math.pow((w-29)/29,2)>1)continue;
+      var d=Math.abs(q)/30;
+      px(x,d>.76?p.c:mixc(p.c,'#FFFFFF',.58-d*.42),p.x+q,BACK-58+w);}
+    px(x,mixc(p.c,'#FFFFFF',.75),p.x-2,BACK-38,4,4);});
+
+  /* front tier */
+  slab(0,960,FRONT,88,'#7FCF6A','#8A6A48','#5FAE55');
+
+  /* buildings, with lit windows so they are not plain boxes */
+  function build(bx,by,bw,bh,wall,mortar,win){
+    for(var a=0;a<bw;a++)for(var b=0;b<bh;b++){
+      var e=(a%16===0||b%16===0);
+      px(x,e?mortar:(hash(a,b,9)>.6?wall:shade(wall,-13)),bx+a,by+b);}
+    for(var wy=12;wy<bh-16;wy+=30)for(var wx=10;wx<bw-14;wx+=26){
+      px(x,'#150E24',bx+wx,by+wy,12,14);
+      px(x,win,bx+wx+1,by+wy+1,10,12);
+      px(x,mixc(win,'#FFFFFF',.5),bx+wx+2,by+wy+2,4,5);}}
+  build(30,316,136,76,'#7A5C3C','#4A3524','#FFC98A');    /* boutique      */
+  build(520,210,106,182,'#57456C','#332747','#C9A0FF');   /* lucky isles   */
+  build(700,318,190,74,'#3A2C50','#241A34','#63D8FF');    /* dance pavilion*/
+  /* dance floor lit tiles on the pavilion roof */
+  for(var a3=0;a3<176;a3+=22)for(var b3=0;b3<0.1;b3++){}
+  for(var a4=0;a4<176;a4+=22)
+    px(x,((a4/22)%2)?'#B45CFF':'#31E8DF',708+a4,306,20,12);
+  /* awning on the boutique */
+  for(var a5=0;a5<140;a5+=14)px(x,((a5/14)%2)?'#FF6FA8':'#F2EEF8',28+a5,308,14,9);
+
+  /* crowd, standing on real surfaces */
+  var ids=Object.keys(P.CAST);
+  var STANDS=[[FRONT,40,920,24],[316,52,152,2],[306,718,876,4]];
+  var n=0;
+  STANDS.forEach(function(st){
+    for(var m=0;m<st[3];m++,n++){
+      var id=ids[Math.floor(hash(n,21,5)*ids.length)%ids.length];
+      var mx=st[1]+Math.floor(hash(n,22,5)*(st[2]-st[1]));
+      x.drawImage(P.forge(P.CAST[id],'front').canvas,mx-28,st[0]-38);}});
+
+  /* welcome board on posts */
+  px(x,'#4A3524',196,420,6,44);px(x,'#4A3524',300,420,6,44);
+  px(x,'#5C4530',176,398,150,40);px(x,'#7A5C3C',180,402,142,32);
+}
+function buildHubOverlay(){
+  var hub=$('.hub');if(!hub)return;
+  var ov=el('div','ov');
+  function label(txt,lx,ly,col,size){
+    var n=el('div','sign',txt);
+    n.style.cssText='position:absolute;left:'+(lx/960*100)+'%;top:'+(ly/480*100)+
+      '%;transform:translate(-50%,-100%);font-size:clamp(7px,'+size+'vw,'+(size*14)+
+      'px);line-height:1.3;text-align:center;color:'+mixc(col,'#FFFFFF',.62)+
+      ';text-shadow:0 0 6px '+col+',0 0 18px '+col+';white-space:nowrap;';
+    ov.appendChild(n);return n;
+  }
+  PORTALS.forEach(function(p){label(p.n,p.x,300-72,p.c,1.05);});
+  label('Boutique',98,298,'#FF3DA6',.95);
+  label('Lucky Isles',573,196,'#FFC24B',.95);
+  label('Dance Floor',795,288,'#31E8DF',.95);
+  var w=label('Welcome to<br>Skyblock Hub',251,418,'#FFC24B',.9);
+  w.style.whiteSpace='normal';
+  hub.appendChild(ov);
+  var row=document.getElementById('portalRow');
+  PORTALS.forEach(function(p){
+    var d=el('div','portal');d.style.setProperty('--p',p.c);
+    d.innerHTML='<div class="r"><span class="ring"></span><h4>'+p.n+'</h4></div>'+
+      '<p>'+p.tag+' — featured this week by unique visitors.</p>'+
+      '<div class="st"><span>'+p.owner+'</span><span>'+p.live+'</span></div>';
+    row.appendChild(d);});
+}
+window.PR_SCENE={drawWorld:drawWorld,buildOverlay:buildOverlay,drawMini:drawMini,
+  drawHub:drawHub,buildHubOverlay:buildHubOverlay,renderTagged:renderTagged,
+  wingCanvas:wingCanvas,capeCanvas:capeCanvas,eyeCanvas:eyeCanvas,shoeCanvas:shoeCanvas,
+  hatCanvas:hatCanvas,HAT_LOOK:HAT_LOOK,el:el,$:$,$$:$$};
+})();
+</script>
+<script>
+/* ============================================================
+   BUILDERS + LIFE
+   ============================================================ */
+(function(){
+'use strict';
+var P=window.PR,S=window.PR_SCENE,el=S.el,$=S.$,$$=S.$$,mk=P.mk,mount=P.mount,px=P.px;
+
+/* ---------- plate 02: lineup + turnaround ---------- */
+function buildLineup(){
+  var root=document.getElementById('lineup');if(!root)return;
+  P.ORDER.forEach(function(id){
+    var c=P.CAST[id],card=el('div','hero');
+    card.style.setProperty('--h',c.hue);
+    card.style.setProperty('--glow',c.hue+'88');
+    var stage=el('div','stage'),cv=document.createElement('canvas');
+    cv.className='bob';cv.setAttribute('role','img');
+    cv.setAttribute('aria-label',c.name+' avatar sprite');
+    mount(cv,P.forge(c,'front'),4);
+    stage.appendChild(cv);card.appendChild(stage);
+    card.appendChild(el('h3',null,c.name));
+    card.appendChild(el('div','sub',c.title));
+    var ul=el('ul');
+    (c.kit||[]).forEach(function(k){ul.appendChild(el('li',null,k));});
+    card.appendChild(ul);root.appendChild(card);});
+}
+function buildTurnaround(){
+  var root=document.getElementById('turnStrip');if(!root)return;
+  P.ORDER.forEach(function(id){
+    var c=P.CAST[id];
+    [['front','FRONT'],['back','BACK'],['base','BASE RIG']].forEach(function(m){
+      var cell=el('div','cell'),cv=document.createElement('canvas');
+      mount(cv,P.forge(c,m[0]),4);
+      cell.appendChild(cv);cell.appendChild(el('span',null,m[1]));
+      root.appendChild(cell);});});
+}
+
+/* ---------- plate 03: the vault ---------- */
+var R={common:'r-common',rare:'r-rare',epic:'r-epic',legendary:'r-legendary',
+       mythic:'r-mythic',ancient:'r-ancient'};
+var VAULT=[
+ {t:'Wings',c:'6 pairs',w:'w6',items:[
+  ['Angel','rare'],['Dragon','mythic'],['Mechanical','rare'],
+  ['Butterfly','epic'],['Phoenix','legendary'],['Crystal','ancient']],
+  key:['angel','dragon','mech','butterfly','phoenix','crystal'],
+  draw:function(k){return S.wingCanvas(k);}},
+ {t:'Eyes',c:'8 styles',w:'w8',items:[
+  ['Heart','common'],['Star','rare'],['Galaxy','epic'],['Dragon Slit','mythic'],
+  ['Cyber Visor','rare'],['Rainbow','epic'],['Ice','rare'],['Void','legendary']],
+  key:['heart','star','galaxy','slit','visor','rainbow','ice','void'],
+  draw:function(k){return S.eyeCanvas(k);}},
+ {t:'Hats & Helmets',c:'10 pieces',w:'w10',items:[
+  ['Crown','legendary'],['Wizard Hat','rare'],['Steampunk Top Hat','epic'],
+  ['Viking Helmet','rare'],['Knight Helmet','common'],['Samurai Helmet','epic'],
+  ['Panda Hood','rare'],['Plague Doctor','epic'],['Pumpkin Head','common'],
+  ['Dragon Helmet','mythic']],
+  key:['crown','wizard','tophat','viking','knight','samurai','panda','plague','pumpkin','dragonhelm'],
+  draw:function(k){return S.hatCanvas(k,S.HAT_LOOK[k]);}},
+ {t:'Capes',c:'6 designs',w:'w6',items:[
+  ['Royal','rare'],['Shadow','epic'],['Heroic','rare'],
+  ['Winter','epic'],['Flame','legendary'],['Crystal','ancient']],
+  key:['royal','shadow','heroic','winter','flame','crystalc'],
+  draw:function(k){return S.capeCanvas(k);}},
+ {t:'Shoes',c:'8 pairs',w:'w8',items:[
+  ['Sneakers','common'],['Boots','common'],['Magic Slippers','rare'],['Steel Greaves','rare'],
+  ['Dragon Claws','mythic'],['Frost Boots','epic'],['Jet Boots','legendary'],['Fairy Shoes','epic']],
+  key:['sneakers','boots','slippers','greaves','claws','frost','jet','fairy'],
+  draw:function(k){return S.shoeCanvas(k);}}
+];
+function buildVault(){
+  var root=document.getElementById('vault');if(!root)return;
+  VAULT.forEach(function(rack,ri){
+    var box=el('div','rack');
+    box.appendChild(el('div','hd','<h3>'+rack.t+'</h3><span class="c">'+rack.c.toUpperCase()+
+      ' · SLOT '+String(ri+1).padStart(2,'0')+'</span>'));
+    var tray=el('div','tray '+rack.w);
+    rack.items.forEach(function(it,i){
+      var cell=el('div','item'),cv=document.createElement('canvas');
+      cv.setAttribute('role','img');cv.setAttribute('aria-label',it[0]+' — '+it[1]);
+      mount(cv,rack.draw(rack.key[i]),6);
+      cell.appendChild(cv);
+      cell.appendChild(el('div','n','<i>'+String(i+1).padStart(2,'0')+'</i>'+it[0]));
+      cell.appendChild(el('span','chip '+R[it[1]],'<span class="dot"></span>'+it[1]));
+      tray.appendChild(cell);});
+    box.appendChild(tray);root.appendChild(box);});
+}
+
+/* ---------- slots: hotbar, trade, inventory ---------- */
+function slotCanvas(spec){
+  var x=mk(16,16);
+  if(spec.item)P.drawItem(x,spec.item,0,0);
+  else if(spec.gem)P.drawGem(x,spec.gem,0,0);
+  else if(spec.tile)P.drawTile(x,spec.tile,0,0);
+  else if(spec.wing){var t=S.wingCanvas(spec.wing);x.drawImage(t.canvas,0,0,48,30,0,3,16,10);}
+  else if(spec.shoe){var s=S.shoeCanvas(spec.shoe);x.drawImage(s.canvas,0,0,22,12,0,3,16,9);}
+  return x;
+}
+var RING={common:'',rare:'o-rare',epic:'o-epic',legendary:'o-leg',mythic:'o-myth'};
+function fillSlots(root,list,opts){
+  if(!root)return;opts=opts||{};
+  list.forEach(function(s,i){
+    var d=el('div','slot'+(s&&s.r?' '+RING[s.r]:'')+(s&&s.sel?' sel':'')+(s&&s.add?' add':''));
+    if(opts.keys)d.appendChild(el('span','k',String((i+1)%10)));
+    if(s&&s.add){d.innerHTML+='+';}
+    else if(s){
+      d.classList.add('filled');
+      var cv=document.createElement('canvas');mount(cv,slotCanvas(s),4);d.appendChild(cv);
+      if(s.q)d.appendChild(el('span','q',s.q));}
+    root.appendChild(d);});
+}
+var BAR1=[{item:'sword',r:'mythic',sel:1},{item:'bow',r:'epic'},{item:'wand',r:'legendary'},
+ {gem:'diamond',q:'32',r:'rare'},{tile:'stone',q:'64'},{item:'flower',q:'15'},
+ {item:'potion',q:'8',r:'rare'},{tile:'glass',q:'12',r:'rare'},
+ {wing:'butterfly',q:'1',r:'epic'},{gem:'gold',q:'2,500',r:'legendary'}];
+var BAR2=[{item:'chest',r:'legendary'},{item:'lamp',q:'6'},{item:'teddy',q:'1',r:'rare'},
+ {tile:'vine',q:'3'},{tile:'neon',q:'1',r:'epic'},{tile:'grass',q:'64'},
+ {tile:'wood',q:'40'},{tile:'cloud',q:'2',r:'rare'},{gem:'amethyst',q:'5',r:'epic'},{add:1}];
+var TRADE_A=[{item:'sword',r:'mythic'},{gem:'diamond',r:'rare'},{wing:'angel',r:'rare'},
+ {tile:'stone',q:'2'},{gem:'amethyst',q:'5',r:'epic'},{gem:'gold',q:'1,000',r:'legendary'},null,null,null];
+var TRADE_B=[{item:'sword',r:'mythic'},{tile:'neon',q:'1',r:'epic'},null,
+ {wing:'butterfly',r:'epic'},{gem:'gold',q:'500',r:'legendary'},null,null,null,null];
+var INV=[{item:'sword',r:'mythic'},{item:'bow',r:'epic'},{item:'wand',r:'legendary'},
+ {item:'potion',q:'8',r:'rare'},{item:'chest',r:'legendary'},{item:'teddy',q:'1',r:'rare'},
+ {wing:'angel',r:'rare'},{wing:'crystal',r:'ancient'},{wing:'phoenix',r:'legendary'},
+ {shoe:'jet',r:'legendary'},{shoe:'frost',r:'epic'},{shoe:'claws',r:'mythic'},
+ {gem:'diamond',q:'32',r:'rare'},{gem:'amethyst',q:'5',r:'epic'},{gem:'emerald',q:'18',r:'rare'},
+ {gem:'ruby',q:'4',r:'epic'},{gem:'gold',q:'2,500',r:'legendary'},{item:'flower',q:'15'},
+ {tile:'neon',q:'1',r:'epic'},{tile:'glass',q:'12',r:'rare'},{tile:'stone',q:'64'},
+ {tile:'grass',q:'64'},{tile:'wood',q:'40'},{tile:'cloud',q:'2',r:'rare'}];
+
+/* ---------- chat ---------- */
+var LINES=[
+ ['noctis','Love the neon vibes! ✨'],['mochi','That pet is so cute! 🥺'],
+ ['zenn','Do you have the neon sword? 👀'],['lumiix','Yes! Check the ITEMS section~'],
+ ['skylar','This world is amazing!'],['yuki','Saved this world! 💖'],
+ ['sys','Yuki liked your world!'],['zenn','Sending a trade now 🤝'],
+ ['mochi','How many gems for the wings?'],['lumiix','850 for Butterfly, 3k for Crystal'],
+ ['sys','Skylar joined the world.'],['noctis','Building one of these tomorrow'],
+ ['skylar','Anyone know where the parkour is?'],['yuki','Hub → middle portal!'],
+ ['sys','Zenn traded 5 Amethyst for Neon Sword.']];
+function clock(i){var m=21+Math.floor(i/3);return '10:'+String(m).padStart(2,'0');}
+function chatRow(line,i){
+  var isSys=line[0]==='sys';
+  var c=isSys?null:P.CAST[line[0]];
+  var row=el('div','msg'+(isSys?' sys':''));
+  var av=el('div','av');
+  if(c){var cv=document.createElement('canvas');mount(cv,P.forge(c,'front'),4);av.appendChild(cv);}
+  else av.style.background='linear-gradient(160deg,#FFC24B,#8A5A18)';
+  row.appendChild(av);
+  var b=el('div','b');
+  b.appendChild(el('div','hd','<span class="n" style="color:'+(isSys?'#FFC24B':(c?c.hue:'#fff'))+'">'+
+    (isSys?'System':c.name)+'</span><span class="tm">'+clock(i)+'</span>'));
+  b.appendChild(el('div','tx',line[1]));
+  row.appendChild(b);return row;
+}
+function runChat(logId,seedOffset){
+  var log=document.getElementById(logId);if(!log)return;
+  var i=seedOffset||0,cap=6;
+  function push(){
+    log.appendChild(chatRow(LINES[i%LINES.length],i));i++;
+    while(log.children.length>cap)log.removeChild(log.firstChild);}
+  for(var k=0;k<cap;k++)push();
+  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(!reduce)setInterval(push,2800);
+}
+
+/* ---------- trade timer ---------- */
+function runTimer(ids){
+  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduce)return;
+  var t=26;
+  setInterval(function(){t=t>1?t-1:30;
+    ids.forEach(function(id){var n=document.getElementById(id);if(n)n.textContent=t;});},1000);
+}
+
+/* ---------- plate 06 ---------- */
+var SW=[['Void ground','#07060F'],['Panel','#151228'],['Line','#2E2850'],['Text','#EFEBFF'],
+        ['Neon pink','#FF3DA6'],['Neon cyan','#31E8DF'],['Sign gold','#FFC24B'],['Arcane violet','#A45CFF']];
+var LAD=[['Common','r-common','1 in 2'],['Rare','r-rare','1 in 12'],['Epic','r-epic','1 in 80'],
+ ['Legendary','r-legendary','1 in 600'],['Mythic','r-mythic','1 in 5,000'],['Ancient','r-ancient','1 in 40,000']];
+function buildGuide(){
+  var sw=document.getElementById('swatches');
+  if(sw)SW.forEach(function(s){
+    var d=el('div');d.appendChild(el('div','c')).style.background=s[1];
+    d.appendChild(el('div','l','<span>'+s[0]+'</span><b>'+s[1]+'</b>'));sw.appendChild(d);});
+  var lad=document.getElementById('ladder');
+  if(lad)LAD.forEach(function(r){
+    var d=el('div','row '+r[1]);
+    d.innerHTML='<span class="sq"></span><span class="nm">'+r[0].toUpperCase()+
+      '</span><span class="dr">'+r[2]+'</span>';lad.appendChild(d);});
+  var tl=document.getElementById('tiles');
+  if(tl)Object.keys(P.TILES).forEach(function(k){
+    var f=el('figure'),cv=document.createElement('canvas'),x=mk(16,16);
+    P.drawTile(x,k,0,0);mount(cv,x,4);
+    f.appendChild(cv);f.appendChild(el('figcaption',null,P.TILES[k].n));tl.appendChild(f);});
+  var fg=document.getElementById('footGems');
+  if(fg)Object.keys(P.GEMS).forEach(function(k){
+    var cv=document.createElement('canvas'),x=mk(16,16);P.drawGem(x,k,0,0);mount(cv,x,3);fg.appendChild(cv);});
+}
+
+/* ---------- zoom fitter ---------- */
+function fitZooms(){
+  $$('.zoom').forEach(function(z){
+    var inner=z.firstElementChild;if(!inner)return;
+    var pane=inner.firstElementChild;if(!pane)return;
+    inner.style.transform='none';
+    var w=pane.offsetWidth,h=pane.offsetHeight;
+    if(!w||!h)return;
+    var s=z.clientWidth/w;
+    inner.style.transform='scale('+s+')';
+    z.style.height=(h*s)+'px';});
+}
+
+/* ---------- boot ---------- */
+function boot(){
+  S.drawWorld();S.buildOverlay();S.drawMini();S.drawHub();S.buildHubOverlay();
+  buildLineup();buildTurnaround();buildVault();buildGuide();
+  fillSlots(document.getElementById('bar1'),BAR1,{keys:1});
+  fillSlots(document.getElementById('bar2'),BAR2,{keys:1});
+  fillSlots(document.getElementById('tradeA'),TRADE_A);
+  fillSlots(document.getElementById('tradeB'),TRADE_B);
+  fillSlots(document.getElementById('tradeA2'),TRADE_A);
+  fillSlots(document.getElementById('tradeB2'),TRADE_B);
+  fillSlots(document.getElementById('invGrid'),INV);
+  S.renderTagged(document);
+  runChat('chatLog',0);runChat('chatLog2',6);
+  runTimer(['tradeTick','tradeTick2']);
+  requestAnimationFrame(function(){fitZooms();setTimeout(fitZooms,120);});
+  var t;window.addEventListener('resize',function(){clearTimeout(t);t=setTimeout(fitZooms,120);});
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fitZooms);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+})();
+</script>
