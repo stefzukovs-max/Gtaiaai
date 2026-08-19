@@ -23,30 +23,37 @@ layer data:
 
 ## `game/pixel-realms.html` — the playable build
 
-The same art, running. One self-contained file, no dependencies.
+The same art, running, built around the loop Growtopia actually runs on:
+**punch → seed → splice → lock**. One self-contained file, no dependencies.
 
-**Play:** `A`/`D` move · `W` jump · `1`–`0` hotbar · `E` inventory · `T` chat.
-Click a block to mine it, click empty space to place one, walk into a portal
-and press `↑` to travel, click a player to trade. Touch controls appear on
-coarse-pointer devices.
+**Play:** `A`/`D` move · `W` jump · `S` drop through a platform · `1`–`0` hotbar ·
+`E` items · `B` splice book · `G` worlds · `T` chat · `Z`/`X`/`C` punch/place/wrench.
+Click a block to punch it, click empty space to build, walk into a door and press
+`↑` to travel, click a player to trade. Touch pads appear on coarse-pointer devices.
 
-**What's in it**
+**Systems**
 
 | System | Behaviour |
 | --- | --- |
-| World | 96 × 44 tile grid, 16px tiles, solid/scenery block classes |
-| Building | Hold-to-mine with per-block hardness; placement requires an adjacent block |
-| Worlds | Skyblock Hub, a player-built shop, and your own editable world |
-| Inventory | 200 slots, 10-slot hotbar, stacking, rarity borders |
-| Wardrobe | Equip wings/eyes/hats/capes/shoes; the world sprite updates live |
-| Chat | World chat with floating speech bubbles; NPCs talk back |
-| Trade | Nine-slot offer grids, live valuation, accept only when the value clears |
-| Shop | Blocks and cosmetics for gems mined out of the ground |
-| Persistence | Autosaves your world, inventory and gems to `localStorage` |
+| Two tile layers | Foreground blocks you collide with, background walls you walk in front of — the same split Growtopia uses |
+| Punching | Hit-based, not timer-based: every block has a hit count, with cracks and a swinging fist |
+| Seeds & trees | Blocks drop seeds; plant one on a background wall and it grows in real time |
+| Splicing | Plant a *different* seed on a growing tree to invent a new block — 25 recipes, tracked in a splice book |
+| Drops | Broken blocks, seeds and gems fall as pickups that magnet toward you |
+| World locks | Place one to claim a world; nobody else can build there until it comes out |
+| Doors & signs | Wrench a door to point it at any world, wrench a sign to write on it |
+| Platforms & ladders | One-way planks and climbable vines/ladders |
+| Worlds | Type any name in the WORLDS panel — existing worlds load, new names are generated |
+| Terrain | 100 × 54 tiles: grass, dirt, stone, carved caves, neon ore veins, bedrock |
+| Inventory | 200 slots, 10-slot hotbar, stacking, rarity borders, shift-click to drop |
+| Wardrobe | Wings/eyes/hats/capes/shoes; the world sprite updates live |
+| Chat | World chat with speech bubbles, NPC chatter, and `/warp` `/name` `/who` `/splice` commands |
+| Trade | Nine-slot offer grids with live valuation; the NPC accepts only when the value clears |
+| Shop | Seeds, blocks, world locks and cosmetics for gems mined out of the ground |
+| Persistence | Autosaves your worlds, inventory, gems and discovered recipes to `localStorage` |
 
-The three worlds are generated in code at boot, including the neon signage —
-every letter on a shop wall is a real block placed through a 3 × 5 bitmap font,
-which is why signs can be broken and rebuilt like anything else.
+World signage is placed through a 3 × 5 bitmap font, so every neon letter on a
+shop wall is a real block you can punch out and take with you.
 
 ## Running
 
