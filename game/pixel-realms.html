@@ -29,7 +29,7 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
 #frame{
   position:relative;overflow:hidden;background:#120E22;
   width:min(100vw,calc(100dvh * 16 / 9));height:min(100dvh,calc(100vw * 9 / 16));
-  container-type:inline-size;
+  container-type:size;   /* size, not inline-size — the aspect queries need height */
   box-shadow:0 0 0 1px #2E2850, 0 20px 80px -20px #000;
 }
 #game{position:absolute;inset:0;width:100%;height:100%;z-index:0;touch-action:none;cursor:crosshair}
@@ -691,16 +691,21 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
   .hud-world .t{font-size:1.7cqw}
   .hud-world .meta{display:none}
   .hud-map{display:none}
-  .chat{top:auto;bottom:21cqw;left:1cqw;width:30cqw;opacity:.94}
-  .chat .log{max-height:9cqw;min-height:0;padding:.5cqw}
-  .chat .msg .b{font-size:1.05cqw}
-  .chat .inp{padding:.3cqw}
-  .chat .inp input{font-size:1.1cqw;padding:.4cqw}
+  /* chat runs along the top so the thumbs own the bottom corners */
+  .chat{top:5.4cqw;bottom:auto;left:14cqw;right:37cqw;width:auto;opacity:.95;
+    background:linear-gradient(180deg,rgba(240,248,253,.90),rgba(196,224,242,.90))!important}
+  .chat .log{height:auto;max-height:7.5cqw;min-height:0;padding:.5cqw .8cqw;gap:.5cqw}
+  .chat .msg{gap:.6cqw}
+  .chat .msg .b{font-size:1.35cqw;line-height:1.3}
+  .chat .av{width:2.4cqw;height:2.4cqw}
+  .chat .inp{display:none}
+  .chat.typing .inp{display:flex;padding:.35cqw}
+  .chat.typing .inp input{font-size:1.4cqw;padding:.5cqw}
   .chat .tabs{display:none}
   .side{top:6.4cqw;right:1cqw;gap:.5cqw}
   .side .s{width:5.4cqw;height:5.4cqw;font-size:2.4cqw;border-radius:.9cqw}
   .nav{display:none}
-  .modes{bottom:auto;top:6.4cqw;left:1cqw;transform:none}
+  .modes{bottom:auto;top:13.6cqw;left:1cqw;transform:none}
   .modes .m{font-size:1.1cqw;padding:.5cqw .7cqw}
   .modes .m kbd{display:none}
   .hotbar{bottom:4cqw;width:62cqw;left:50%;transform:translateX(-50%)}
@@ -747,23 +752,57 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
    NARROW — portrait phone. The frame is taller than it is wide,
    so the world gets the top and the controls own the bottom.
    ============================================================ */
+/* the control deck: a solid floor the thumbs own, portrait only */
+#deck{display:none}
 @container (max-aspect-ratio: 3/4){
-  .chat{bottom:30cqw;width:56cqw}
-  .hotbar{bottom:2cqw;width:96cqw}
-  .hotbar .slot{border-radius:.5cqw!important}
-  #touch .l{left:3cqw;bottom:24cqw;width:16cqw;height:16cqw;font-size:5cqw}
-  #touch .r{left:22cqw;bottom:24cqw;width:16cqw;height:16cqw;font-size:5cqw}
-  #touch .j{right:3cqw;bottom:24cqw;width:16cqw;height:16cqw;font-size:5cqw}
-  #touch .act{right:22cqw;bottom:24cqw;width:16cqw;height:16cqw;font-size:5cqw}
-  #touch .up{right:12cqw;bottom:42cqw;width:13cqw;height:13cqw;font-size:4cqw}
-  .side{top:auto;bottom:42cqw;right:2cqw;flex-direction:column}
-  .side .s{width:9cqw;height:9cqw;font-size:4cqw}
-  .modes{top:11cqw;left:2cqw}
-  .modes .m{font-size:2cqw}
-  #tutCard{width:92cqw;top:16cqw}
-  #sheet .grid{grid-template-columns:repeat(5,1fr);max-height:52cqw}
+  #deck{display:block;position:absolute;left:0;right:0;bottom:0;height:47cqw;z-index:3;
+    background:linear-gradient(180deg,rgba(214,234,247,.97),rgba(168,203,226,.99));
+    border-top:.5cqw solid #FFFFFF;
+    box-shadow:0 -.3cqw 1.2cqw rgba(8,26,40,.35)}
+  /* chat is a thin strip across the top; the input only appears while typing */
+  .chat{top:9.5cqw;bottom:auto;left:2cqw;right:2cqw;width:auto;opacity:.96;
+    background:linear-gradient(180deg,rgba(240,248,253,.92),rgba(196,224,242,.92))!important}
+  .chat .log{height:auto;max-height:15cqw;min-height:0;padding:1cqw 1.2cqw;gap:1cqw}
+  .chat .msg{gap:1.1cqw}
+  .chat .msg .b{font-size:3.4cqw;line-height:1.3}
+  .chat .av{width:5.6cqw;height:5.6cqw}
+  .chat .inp{display:none}
+  .chat.typing .inp{display:flex;padding:.6cqw}
+  .chat.typing .inp input{font-size:2.8cqw;padding:1.1cqw}
+  .chat.typing .inp .s{width:7cqw;height:7cqw;font-size:2.8cqw}
+  .hotbar{bottom:37cqw;width:96cqw;padding:.8cqw}
+  .hotbar .row{gap:.6cqw}
+  .hotbar .slot{border-radius:.9cqw!important}
+  .hotbar .slot .k{font-size:1.5cqw}
+  .slot .n{font-size:2cqw!important}
+  #touch .pad{border-width:.55cqw}
+  #touch .l{left:3cqw;bottom:5cqw;width:18cqw;height:18cqw;font-size:6cqw}
+  #touch .r{left:23cqw;bottom:5cqw;width:18cqw;height:18cqw;font-size:6cqw}
+  #touch .act{right:23cqw;bottom:5cqw;width:18cqw;height:18cqw;font-size:6cqw}
+  #touch .j{right:3cqw;bottom:5cqw;width:18cqw;height:18cqw;font-size:6cqw}
+  #touch .up{right:3cqw;bottom:5cqw;top:auto;width:12cqw;height:12cqw;font-size:4cqw;
+    transform:translateY(-20cqw)}
+  /* the icon rail lies flat on the deck instead of running down the screen */
+  .side{top:auto;bottom:24cqw;right:auto;left:50%;transform:translateX(-50%);
+    flex-direction:row;gap:1.2cqw}
+  .side .s{width:11cqw;height:11cqw;font-size:4.8cqw;border-radius:2.2cqw!important}
+  .nav,.rail,.modes{display:none}
+  .hud-av{padding:.6cqw 1.6cqw .6cqw .6cqw}
+  .hud-av .port{width:7cqw;height:7cqw}
+  .hud-av .nm{font-size:2.9cqw}
+  .gems{left:auto;right:2cqw;top:2cqw;padding:.6cqw 1.4cqw}
+  .gems .n{font-size:2.9cqw}
+  .gems canvas{width:3.4cqw;height:3.4cqw}
+  .hud-world{top:2cqw;padding:.5cqw 1.6cqw}
+  .hud-world .t{font-size:3.1cqw}
+  #tutCard{width:92cqw;top:26cqw}
+  #sheet{z-index:18}
+  #sheet .grid{grid-template-columns:repeat(5,1fr);max-height:52cqw;gap:.7cqw}
   #sheet .col{width:22cqw}
-  #sheet .col .a{font-size:2.4cqw}
+  #sheet .col .a{font-size:2.6cqw;padding:1.6cqw .3cqw}
+  #sheet .grip i{width:22cqw;height:1.2cqw}
+  #sheet .bar{font-size:2cqw;padding:0 1.6cqw 1cqw}
+  #sheet .bar b{font-size:2.6cqw}
 }
 </style>
 <div id="shell"><div id="frame">
@@ -870,6 +909,7 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
       <span>RESET</span></div>
   </div>
 
+  <div id="deck"></div>
   <div id="touch">
     <div class="pad l" data-key="left">◀</div>
     <div class="pad r" data-key="right">▶</div>
@@ -2927,7 +2967,11 @@ var VW,VH;
   var iw=window.innerWidth||960, ih=window.innerHeight||540, a=iw/ih;
   if(!isFinite(a)||a<=0)a=16/9;
   if(a>=1){VH=540;VW=Math.round(540*Math.min(2.35,Math.max(1.40,a)));}
-  else    {VW=540;VH=Math.round(540/Math.min(1.0,Math.max(0.42,a)));}
+  else{
+    /* portrait: zoom in so tiles stay chunky, and cap how tall the view gets
+       — the control deck covers the bottom third anyway */
+    VW=384;VH=Math.min(940,Math.round(384/Math.min(0.95,Math.max(0.42,a))));
+  }
   VW=Math.round(VW/2)*2;VH=Math.round(VH/2)*2;
   var cvEl=document.getElementById('game');
   if(cvEl){cvEl.width=VW;cvEl.height=VH;}
@@ -3145,7 +3189,7 @@ function buildChunk(w,ci){
     /* baked lighting */
     var lv=w.light[i];
     if(lv<15){
-      var al=Math.pow(1-lv/15,1.15)*0.88;
+      var al=Math.pow(1-lv/15,1.20)*0.74;
       c.fillStyle='rgba(6,4,16,'+al.toFixed(3)+')';
       c.fillRect(dx,dy,TS,TS);
     }
@@ -4486,7 +4530,8 @@ var LINES={
 function camUpdate(){
   var w=W();
   G.cam.x=clamp(G.p.x+PW/2-VW*0.45,0,Math.max(0,w.w*TS-VW));
-  G.cam.y=clamp(G.p.y+PH/2-VH*0.62,0,Math.max(0,w.h*TS-VH));
+  var lift=(VH>VW*1.25)?0.42:0.62;   /* portrait keeps the player above the deck */
+  G.cam.y=clamp(G.p.y+PH/2-VH*lift,0,Math.max(0,w.h*TS-VH));
 }
 function screenToWorld(cx,cy){
   var r=cv.getBoundingClientRect();
@@ -4557,7 +4602,7 @@ function drawWorld(){
     ctx.drawImage(S.tileArt(id,mask,fr%it.frames).canvas,Math.round(sx),Math.round(sy));
     var lv=w.light[w.i(gx,gy)];
     if(lv<15){
-      ctx.fillStyle='rgba(6,4,16,'+(Math.pow(1-lv/15,1.15)*0.88).toFixed(3)+')';
+      ctx.fillStyle='rgba(6,4,16,'+(Math.pow(1-lv/15,1.20)*0.74).toFixed(3)+')';
       ctx.fillRect(Math.round(sx),Math.round(sy),TS,TS);
     }
     if(it.glow)glows.push([sx,sy]);
@@ -6519,6 +6564,24 @@ if(grip){
     });
   });
 }
+/* on a phone the chat input is hidden until you tap the log */
+(function(){
+  var chat=$('#chat')||document.querySelector('.chat');
+  var inp=$('#chatIn');
+  if(!chat||!inp)return;
+  function typing(on){
+    chat.classList.toggle('typing',!!on);
+    if(on)setTimeout(function(){inp.focus();},30);
+  }
+  var log=chat.querySelector('.log');
+  if(log)log.addEventListener('click',function(){typing(true);});
+  inp.addEventListener('focus',function(){chat.classList.add('typing');});
+  inp.addEventListener('blur',function(){
+    setTimeout(function(){if(document.activeElement!==inp)chat.classList.remove('typing');},120);
+  });
+  window.PRS.chatTyping=typing;
+})();
+
 /* a swipe up from the bottom eighth of the screen also opens it */
 var frame=$('#frame');
 if(frame&&coarse){
@@ -6662,7 +6725,8 @@ addEventListener('keydown',function(e){
   if(e.code==='KeyB'){G.open?U.closePanel():U.openSplice();return;}
   if(e.code==='KeyG'){G.open?U.closePanel():U.openWorlds();return;}
   if(e.code==='KeyL'){G.open?U.closePanel():U.openTokens();return;}
-  if(e.code==='KeyT'){e.preventDefault();$('#chatIn').focus();return;}
+  if(e.code==='KeyT'){e.preventDefault();
+    if(S.chatTyping)S.chatTyping(true);else $('#chatIn').focus();return;}
   if(e.code==='KeyZ'){D.setMode('punch');return;}
   if(e.code==='KeyX'){D.setMode('place');return;}
   if(e.code==='KeyC'){D.setMode('wrench');return;}
