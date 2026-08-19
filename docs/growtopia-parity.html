@@ -181,16 +181,17 @@ footer a:hover{color:var(--accent)}
 <div class="wrap">
 
 <header class="mast">
-  <span class="stamp">Teardown · August 2026</span>
+  <span class="stamp">Teardown · August 2026 · rebuild shipped</span>
   <h1>What Growtopia has<br>that <em>we don't</em></h1>
-  <p class="lede">Our build ships 37 blocks and 25 splice recipes. Growtopia ships thousands of
-    items across roughly <b>fifty distinct block behaviours</b>, ten clothing slots and a tradeable
-    currency that isn't gems. This is the gap, measured — and the prompt that closes it.</p>
+  <p class="lede">Growtopia ships thousands of items across roughly <b>fifty distinct block
+    behaviours</b>, ten clothing slots and a tradeable currency that isn't gems. This is that gap,
+    measured against our build — and the prompt that closed it. The status column and the numbers
+    below are current as of the parity rebuild.</p>
 
   <dl class="facts">
-    <div><dt>Behaviour types</dt><dd>11 <small>of ~50 implemented</small></dd></div>
-    <div><dt>Clothing slots</dt><dd>5 <small>of 10 implemented</small></dd></div>
-    <div><dt>Tile resolution</dt><dd>16px <small>theirs is 32px</small></dd></div>
+    <div><dt>Behaviour types</dt><dd>35 <small>of 51 implemented</small></dd></div>
+    <div><dt>Clothing slots</dt><dd>10 <small>of 10, plus hand</small></dd></div>
+    <div><dt>Tile resolution</dt><dd>32px <small>matches theirs</small></dd></div>
     <div><dt>World grid</dt><dd>100×54 <small>matches theirs exactly</small></dd></div>
   </dl>
 </header>
@@ -198,22 +199,28 @@ footer a:hover{color:var(--accent)}
 <section id="verdict">
   <div class="shead"><span class="n">00</span><h2>The verdict</h2></div>
   <div class="verdict">
-    <h3>We built the loop. We did not build the vocabulary.</h3>
+    <h3>We built the loop. The vocabulary came second.</h3>
     <p>Punch → seed → splice → lock is the correct spine, and we have it working. What separates
       Growtopia is not that its loop is better — it's that <b>every block is a small program</b>.
       A door teleports, a trampoline launches, a provider pays rent, a checkpoint saves your
       position, a weather machine repaints the sky. Fifty of those behaviours, mixed freely by
       players, is what makes a world worth visiting.</p>
-    <p>Three things separate us structurally, in order of how much they cost:</p>
-    <p><b>1. The item model.</b> Ours is a hardcoded <code>reg()</code> list with fixed booleans.
+    <p>Three things separated us structurally, in order of how much they cost. All three have
+      since been rebuilt — the diagnosis is kept here because it is what the prompt in
+      §06 was written against.</p>
+    <p><b>1. The item model.</b> Ours was a hardcoded <code>reg()</code> list with fixed booleans.
       Theirs is a data table where <code>type</code> is a behaviour id and the renderer, the
-      collision, the drop table and the UI all switch on it. Until we have that, every new block
-      is a code change.</p>
+      collision, the drop table and the UI all switch on it. Until we had that, every new block
+      was a code change. <b>Rebuilt:</b> 141 items are now table rows carrying
+      <code>type/rarity/layer/coll/hits/grow/spread/drops/props</code>.</p>
     <p><b>2. Sprite resolution and animation.</b> They author at 32×32 with extra animation frames
-      per tile. We render 16×16 static tiles. That single number is most of the graphical gap.</p>
+      per tile. We rendered 16×16 static tiles — that single number was most of the graphical gap.
+      <b>Rebuilt:</b> every art function is now <code>f(a,b,S,mask,frame)</code>, so the tile size
+      is one constant; it is 32, with edge-aware neighbour masks and animated frames.</p>
     <p><b>3. The economy's unit of account.</b> Gems are <b>untradable</b> in Growtopia — the
       currency players actually price in is the World Lock, and 100 of them fuse into a Diamond
-      Lock. We made gems the currency, which quietly removes the reason to trade at all.</p>
+      Lock. We had made gems the currency, which quietly removed the reason to trade at all.
+      <b>Rebuilt:</b> gems are system-only, the World Lock is the trade unit, and 100 fuse.</p>
   </div>
 </section>
 
@@ -248,7 +255,10 @@ footer a:hover{color:var(--accent)}
       integer into the behaviour table below, decoded by the modding community. It is the closest
       thing there is to a design document for the game.</p>
     <p>Ids 5 and 30 do not appear in the decoded list. Status is measured against our current
-      build.</p>
+      build: <b>35 built</b>, 3 partial, 13 not yet attempted. The partials are behaviours whose
+      handler exists but that no item declares outright — contact damage runs through lava and
+      spikes, crafting components through the lab bench, and deadly-if-on through the
+      switcheroo.</p>
   </div>
   <div class="tablewrap"><table>
     <thead><tr><th>ID</th><th>Type</th><th>What it does</th><th>Ours</th></tr></thead>
@@ -261,19 +271,21 @@ footer a:hover{color:var(--accent)}
   <div class="prose">
     <p>Clothing is <code>TYPE_CLOTHES</code> (20), and the slot is a second field on the item.
       Growtopia dresses an avatar in ten independent layers; a "set" like Garuda is six or seven
-      items bought separately. We render five.</p>
+      items bought separately. We now render all ten, plus the hand.</p>
   </div>
   <div class="slots">
-    <span class="on">Hat</span><span>Hair</span><span class="on">Face</span><span>Neck</span>
-    <span>Chest</span><span>Shirt</span><span>Pants</span><span class="on">Feet</span>
-    <span class="on">Back</span><span>Hand</span><span>Artifact</span>
+    <span class="on">Hat</span><span class="on">Hair</span><span class="on">Face</span>
+    <span class="on">Neck</span><span class="on">Chest</span><span class="on">Shirt</span>
+    <span class="on">Pants</span><span class="on">Feet</span><span class="on">Back</span>
+    <span class="on">Cape</span><span class="on">Hand</span>
   </div>
   <div class="prose">
-    <p>Green is what our sprite forge already composites. <b>Hair</b> we draw but do not treat as
-      an equippable item; <b>Shirt</b>, <b>Pants</b>, <b>Neck</b>, <b>Chest</b>, <b>Hand</b> and
-      <b>Artifact</b> do not exist as layers at all. Hand is the interesting omission — it is the
-      slot that holds tools and weapons, and it is what makes a punch animation read as a
-      pickaxe swing instead of a fist.</p>
+    <p>Green is what our sprite forge composites. All eleven are live, layered back-to-front as
+      wings → cape → body → pants → shirt → chest → neck → hand → face → hair → hat, and the
+      composed sprite is then cut into walk, jump and climb poses. <b>Hand</b> was the interesting
+      omission — it is the slot that holds tools and weapons, and it is what makes a punch
+      animation read as a pickaxe swing instead of a fist. It is now the held layer, drawn in
+      front of the body and swung on the punch frame.</p>
   </div>
 </section>
 
@@ -305,20 +317,21 @@ footer a:hover{color:var(--accent)}
 <section id="gap">
   <div class="shead"><span class="n">05</span><h2>The gap, measured</h2></div>
   <div class="cmp">
-    <div class="row head"><div>Dimension</div><div>Growtopia</div><div>Pixel Realms today</div></div>
-    <div class="row"><div class="k">Item count</div><div class="them">Thousands, added continuously</div><div class="us"><b>37 blocks</b> + 38 cosmetics</div></div>
-    <div class="row"><div class="k">Behaviour types</div><div class="them">~50 distinct <code>TYPE_*</code> handlers</div><div class="us"><b>11</b> — normal, background, seed, sign, door, platform, lock, bedrock, portal, fist, wrench</div></div>
-    <div class="row"><div class="k">Sprite resolution</div><div class="them">32 × 32 per tile, atlas-packed</div><div class="us"><b>16 × 16</b>, generated procedurally</div></div>
-    <div class="row"><div class="k">Tile animation</div><div class="them">Extra frames per tile (<code>*_WITH_EXTRA_FRAME</code>)</div><div class="us"><b>None</b> — every tile is static</div></div>
-    <div class="row"><div class="k">Clothing slots</div><div class="them">10 independent layers</div><div class="us"><b>5</b> (hat, face, back, feet, cape)</div></div>
-    <div class="row"><div class="k">Trade currency</div><div class="them">World Lock / Diamond Lock; gems untradable</div><div class="us"><b>Gems</b> — tradeable, which breaks the economy</div></div>
-    <div class="row"><div class="k">Passive income</div><div class="them">Providers on daily timers</div><div class="us"><b>None</b></div></div>
-    <div class="row"><div class="k">Hazards</div><div class="them">Lava, spikes, deadly, deadly-if-on, checkpoints</div><div class="us"><b>None</b> — you cannot die</div></div>
-    <div class="row"><div class="k">Movement modifiers</div><div class="them">Trampoline, bouncy, ice friction, gravity zones</div><div class="us"><b>Ladders and platforms only</b></div></div>
-    <div class="row"><div class="k">World access</div><div class="them">Any name; locks, access lists, guilds, WOTD</div><div class="us"><b>Any name + world lock</b> — no access list</div></div>
-    <div class="row"><div class="k">Side systems</div><div class="them">Fishing, Cooking, Surgery, Startopia, events</div><div class="us"><b>None</b></div></div>
-    <div class="row"><div class="k">Multiplayer</div><div class="them">Real server; 3.5M worlds, 2k+ concurrent</div><div class="us"><b>Single-player</b> with scripted NPCs</div></div>
-    <div class="row"><div class="k">Audio</div><div class="them">Music blocks, boomboxes, SFX per action</div><div class="us"><b>Silent</b></div></div>
+    <div class="row head"><div>Dimension</div><div>Growtopia</div><div>Pixel Realms — before → now</div></div>
+    <div class="row"><div class="k">Item count</div><div class="them">Thousands, added continuously</div><div class="us">37 blocks + 38 cosmetics → <b>141 items</b> + 75 wearables</div></div>
+    <div class="row"><div class="k">Behaviour types</div><div class="them">~50 distinct <code>TYPE_*</code> handlers</div><div class="us">11 → <b>35 built</b>, 3 partial (see §02)</div></div>
+    <div class="row"><div class="k">Sprite resolution</div><div class="them">32 × 32 per tile, atlas-packed</div><div class="us">16 × 16 → <b>32 × 32</b>, still generated procedurally</div></div>
+    <div class="row"><div class="k">Tile animation</div><div class="them">Extra frames per tile (<code>*_WITH_EXTRA_FRAME</code>)</div><div class="us">None → <b>per-item frames</b> + edge-aware neighbour masks</div></div>
+    <div class="row"><div class="k">Clothing slots</div><div class="them">10 independent layers</div><div class="us">5 → <b>10 plus hand</b></div></div>
+    <div class="row"><div class="k">Trade currency</div><div class="them">World Lock / Diamond Lock; gems untradable</div><div class="us">Tradeable gems → <b>World Lock</b> as the unit; 100 fuse to a Diamond Lock; gems system-only</div></div>
+    <div class="row"><div class="k">Passive income</div><div class="them">Providers on daily timers</div><div class="us">None → <b>three providers</b> paying out on timers</div></div>
+    <div class="row"><div class="k">Hazards</div><div class="them">Lava, spikes, deadly, deadly-if-on, checkpoints</div><div class="us">None → <b>lava, spikes, checkpoints, respawn</b></div></div>
+    <div class="row"><div class="k">Movement modifiers</div><div class="them">Trampoline, bouncy, ice friction, gravity zones</div><div class="us">Ladders and platforms → <b>+ trampoline, bouncy, ice</b> (2.2 tiles of slide vs 0.4 on stone)</div></div>
+    <div class="row"><div class="k">World access</div><div class="them">Any name; locks, access lists, guilds, WOTD</div><div class="us">Any name + world lock → <b>+ small lock, access door, gateway</b>; no guilds</div></div>
+    <div class="row"><div class="k">Lighting</div><div class="them">Baked per-tile darkness in caves</div><div class="us">Flat → <b>BFS skylight + emissive seeds</b>, 0.30 ms per relight</div></div>
+    <div class="row"><div class="k">Side systems</div><div class="them">Fishing, Cooking, Surgery, Startopia, events</div><div class="us">None → <b>lab bench crafting</b>, chests, pinatas, dice, weather machines</div></div>
+    <div class="row"><div class="k">Multiplayer</div><div class="them">Real server; 3.5M worlds, 2k+ concurrent</div><div class="us"><b>Still single-player</b> with scripted NPCs — the one gap nothing local closes</div></div>
+    <div class="row"><div class="k">Audio</div><div class="them">Music blocks, boomboxes, SFX per action</div><div class="us">Silent → <b>generated WebAudio</b>, no sound files</div></div>
   </div>
 </section>
 
@@ -327,7 +340,8 @@ footer a:hover{color:var(--accent)}
   <div class="prose">
     <p>Written to be pasted whole into a coding agent with the repo open. It assumes the current
       file and names its real functions, so the agent extends rather than restarts. Ordered by
-      dependency — phase 1 unblocks everything after it.</p>
+      dependency — phase 1 unblocks everything after it. This is the prompt that produced the
+      rebuild the columns above now describe; it is kept verbatim.</p>
   </div>
   <div class="promptbox">
     <div class="bar"><span>Paste target: game/pixel-realms.html</span>
@@ -367,52 +381,52 @@ footer a:hover{color:var(--accent)}
 var ENUM=[
 [0,'TYPE_FIST','The bare hand. Baseline break speed and reach.','h'],
 [1,'TYPE_WRENCH','Configures a placed block instead of breaking it.','h'],
-[2,'TYPE_USER_DOOR','Door with an access list — only named players pass.','g'],
-[3,'TYPE_LOCK','World / Small / Builder lock. Claims an area and its build rights.','p'],
+[2,'TYPE_USER_DOOR','Door with an access list — only named players pass.','h'],
+[3,'TYPE_LOCK','World / Small / Builder lock. Claims an area and its build rights.','h'],
 [4,'TYPE_GEMS','Loose gem pickup dropped by breaking and harvesting.','h'],
-[6,'TYPE_DEADLY','Kills on contact; respawn at the last checkpoint.','g'],
-[7,'TYPE_TRAMPOLINE','Launches the player upward with a per-block strength.','g'],
+[6,'TYPE_DEADLY','Kills on contact; respawn at the last checkpoint.','p'],
+[7,'TYPE_TRAMPOLINE','Launches the player upward with a per-block strength.','h'],
 [8,'TYPE_CONSUMABLE','One-shot effect on use — speed, jump, glow, gravity.','g'],
-[9,'TYPE_GATEWAY','Passable only while carrying a required item.','g'],
+[9,'TYPE_GATEWAY','Passable only while carrying a required item.','h'],
 [10,'TYPE_SIGN','Holds player-written text shown on approach.','h'],
 [11,'TYPE_SFX_WITH_EXTRA_FRAME','Animated tile that also fires a sound.','g'],
-[12,'TYPE_BOOMBOX','Plays music in a radius while placed.','g'],
+[12,'TYPE_BOOMBOX','Plays music in a radius while placed.','h'],
 [13,'TYPE_DOOR','Teleports to a named world or destination.','h'],
 [14,'TYPE_PLATFORM','One-way: land on it from above, drop through with down.','h'],
 [15,'TYPE_BEDROCK','Unbreakable world floor.','h'],
-[16,'TYPE_LAVA','Deadly liquid with its own lighting and particles.','g'],
+[16,'TYPE_LAVA','Deadly liquid with its own lighting and particles.','h'],
 [17,'TYPE_NORMAL','A plain solid foreground block.','h'],
 [18,'TYPE_BACKGROUND','Wallpaper behind the play layer; no collision.','h'],
 [19,'TYPE_SEED','Plants into a tree of its item; splices with another seed.','h'],
-[20,'TYPE_CLOTHES','Wearable in one of ten slots.','p'],
+[20,'TYPE_CLOTHES','Wearable in one of ten slots.','h'],
 [21,'TYPE_NORMAL_WITH_EXTRA_FRAME','Solid block with animation frames.','g'],
 [22,'TYPE_BACKGD_SFX_EXTRA_FRAME','Animated background that also fires a sound.','g'],
 [23,'TYPE_BACK_BOOMBOX','Background variant of the music block.','g'],
-[24,'TYPE_BOUNCY','Restitution on horizontal contact.','g'],
-[25,'TYPE_POINTY','Directional spikes — deadly from one side only.','g'],
-[26,'TYPE_PORTAL','Paired teleport inside a single world.','p'],
-[27,'TYPE_CHECKPOINT','Sets the respawn point on touch.','g'],
-[28,'TYPE_MUSICNOTE','Plays a pitch when touched; rows of them form melodies.','g'],
-[29,'TYPE_ICE','Low-friction ground the player slides across.','p'],
-[31,'TYPE_SWITCHEROO','Toggleable state other blocks can read.','g'],
-[32,'TYPE_CHEST','Loot container with a one-per-player roll.','g'],
-[33,'TYPE_MAILBOX','Drop-off point the world owner collects from.','g'],
-[34,'TYPE_BULLETIN','World message board visitors can read and post to.','g'],
-[35,'TYPE_PINATA','Breaks after N hits and sprays a burst of drops.','g'],
-[36,'TYPE_DICE','Rolls a random face when punched.','g'],
-[37,'TYPE_COMPONENT','Crafting ingredient — carried, never placed.','g'],
-[38,'TYPE_PROVIDER','Yields an item on a timer. The passive-income tier.','g'],
-[39,'TYPE_LAB','Consumes components and produces a crafted item.','g'],
+[24,'TYPE_BOUNCY','Restitution on horizontal contact.','h'],
+[25,'TYPE_POINTY','Directional spikes — deadly from one side only.','h'],
+[26,'TYPE_PORTAL','Paired teleport inside a single world.','h'],
+[27,'TYPE_CHECKPOINT','Sets the respawn point on touch.','h'],
+[28,'TYPE_MUSICNOTE','Plays a pitch when touched; rows of them form melodies.','h'],
+[29,'TYPE_ICE','Low-friction ground the player slides across.','h'],
+[31,'TYPE_SWITCHEROO','Toggleable state other blocks can read.','h'],
+[32,'TYPE_CHEST','Loot container with a one-per-player roll.','h'],
+[33,'TYPE_MAILBOX','Drop-off point the world owner collects from.','h'],
+[34,'TYPE_BULLETIN','World message board visitors can read and post to.','h'],
+[35,'TYPE_PINATA','Breaks after N hits and sprays a burst of drops.','h'],
+[36,'TYPE_DICE','Rolls a random face when punched.','h'],
+[37,'TYPE_COMPONENT','Crafting ingredient — carried, never placed.','p'],
+[38,'TYPE_PROVIDER','Yields an item on a timer. The passive-income tier.','h'],
+[39,'TYPE_LAB','Consumes components and produces a crafted item.','h'],
 [40,'TYPE_ACHIEVEMENT','Awards and displays a permanent milestone.','g'],
-[41,'TYPE_WEATHER_MACHINE','Repaints the sky and weather for the whole world.','g'],
-[42,'TYPE_SCOREBOARD','Per-world counter other blocks increment.','g'],
+[41,'TYPE_WEATHER_MACHINE','Repaints the sky and weather for the whole world.','h'],
+[42,'TYPE_SCOREBOARD','Per-world counter other blocks increment.','h'],
 [43,'TYPE_SUNGATE','Timed gate tied to a world event.','g'],
 [44,'TYPE_PROFILE','Shows a player card on interaction.','g'],
-[45,'TYPE_DEADLY_IF_ON','Deadly only while switched on.','g'],
+[45,'TYPE_DEADLY_IF_ON','Deadly only while switched on.','p'],
 [46,'TYPE_HEARTMONITOR','Reacts to the owner being online.','g'],
-[47,'TYPE_DONATION_BOX','Accepts item donations from visitors.','g'],
+[47,'TYPE_DONATION_BOX','Accepts item donations from visitors.','h'],
 [48,'TYPE_TOYBOX','Stores and dispenses a set of items.','g'],
-[49,'TYPE_MANNEQUIN','Displays a saved outfit as a standing figure.','g'],
+[49,'TYPE_MANNEQUIN','Displays a saved outfit as a standing figure.','h'],
 [50,'TYPE_CAMERA','Frames and captures a shot of the world.','g'],
 [51,'TYPE_MAGICEGG','Event container that hatches on a schedule.','g'],
 [52,'TYPE_TEAM','Assigns the toucher to a team for scoring.','g']
