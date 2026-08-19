@@ -504,6 +504,83 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
 #help p{color:var(--ink2)!important}
 #help kbd{background:rgba(255,255,255,.8);border-color:var(--edge);color:var(--ink)}
 #banner{color:#FFFFFF;text-shadow:0 .2cqw .4cqw rgba(0,0,0,.6)}
+
+/* ============================================================
+   FRONT-END SCREENS — title, login, connect log, world picker.
+   Full-frame overlays that own the boot flow.
+   ============================================================ */
+.scr{position:absolute;inset:0;z-index:40;display:none;flex-direction:column;
+  align-items:center;justify-content:center;font-family:var(--ui)}
+.scr.on{display:flex;animation:scrIn .28s ease-out}
+@keyframes scrIn{from{opacity:0}to{opacity:1}}
+.scr canvas.bg{position:absolute;inset:0;width:100%;height:100%;z-index:0}
+.scr .in{position:relative;z-index:1;display:flex;flex-direction:column;
+  align-items:center;width:100%;padding:0 4cqw}
+
+/* --- title --- */
+#title .logo{font-family:var(--disp);font-size:9cqw;line-height:.92;letter-spacing:.01em;
+  color:#F8D33A;text-align:center;margin-bottom:4cqw;
+  text-shadow:0 .35cqw 0 #B07A10, 0 .7cqw 0 #7A5008, 0 1.1cqw 1.6cqw rgba(0,0,0,.35),
+    -.18cqw -.18cqw 0 #7A5008, .18cqw -.18cqw 0 #7A5008,
+    -.18cqw .18cqw 0 #7A5008, .18cqw .18cqw 0 #7A5008}
+#title .logo small{display:block;font-size:2.5cqw;letter-spacing:.34em;color:#FFF6D2;
+  text-shadow:0 .18cqw 0 #7A5008;margin-top:.6cqw}
+.mbtn{width:26cqw;padding:1.15cqw;margin:.42cqw 0;border-radius:.5cqw;text-align:center;cursor:pointer;
+  font-size:2.4cqw;font-weight:700;letter-spacing:.02em;color:#FFFFFF;
+  background:linear-gradient(180deg,rgba(190,225,245,.94),rgba(126,182,216,.94));
+  border:.16cqw solid rgba(255,255,255,.85);
+  text-shadow:0 .16cqw .3cqw rgba(20,50,72,.55);
+  box-shadow:0 .3cqw .8cqw rgba(12,40,60,.32),inset 0 .2cqw 0 rgba(255,255,255,.5)}
+.mbtn:hover{filter:brightness(1.09)}
+.mbtn.dim{opacity:.72;font-size:2.1cqw;width:22cqw}
+
+/* --- the tinted-world screens --- */
+.scr.tint::before{content:"";position:absolute;inset:0;z-index:0;
+  background:linear-gradient(180deg,rgba(16,58,88,.90),rgba(9,36,58,.94))}
+.scr .row{display:flex;gap:1.6cqw;width:100%;max-width:74cqw;align-items:center}
+.scr label{font-size:1.7cqw;font-weight:700;color:#EAF6FF;white-space:nowrap}
+.scr label .hl{color:#F8D33A}
+.scr input[type=text],.scr input[type=password]{
+  flex:1;min-width:0;padding:.6cqw .8cqw;font-family:var(--ui);font-size:1.55cqw;
+  color:#EAF6FF;background:rgba(255,255,255,.10);
+  border:.14cqw solid rgba(160,205,232,.75);border-radius:.3cqw;outline:none}
+.scr input::placeholder{color:rgba(200,225,240,.45)}
+.scr .note{max-width:74cqw;font-size:1.45cqw;line-height:1.5;color:#DCEEF9;
+  background:rgba(6,26,44,.55);padding:1cqw 1.4cqw;border-radius:.4cqw;margin-top:1.4cqw}
+.scr .note b{color:#F8D33A}
+.scr .cbx{display:flex;align-items:center;gap:.7cqw;cursor:pointer}
+.scr .cbx i{width:2cqw;height:2cqw;border-radius:.25cqw;flex:none;
+  border:.2cqw solid #7FC4EA;background:rgba(255,255,255,.08);display:grid;place-items:center}
+.scr .cbx i.on::after{content:"✓";color:#7DF06A;font-size:1.5cqw;font-weight:700}
+.scr .foot{display:flex;justify-content:space-between;width:100%;max-width:74cqw;margin-top:2.6cqw}
+.sbtn{padding:.9cqw 3cqw;border-radius:.4cqw;cursor:pointer;font-size:2.1cqw;font-weight:700;
+  color:#FFFFFF;background:rgba(150,196,224,.62);border:.14cqw solid rgba(255,255,255,.5);
+  text-shadow:0 .16cqw .3cqw rgba(10,34,52,.6)}
+.sbtn:hover{filter:brightness(1.12)}
+.sbtn.pri{background:rgba(120,180,214,.92)}
+
+/* --- console log --- */
+.clog{width:100%;max-width:74cqw;height:17cqw;overflow:hidden;padding:.7cqw .9cqw;
+  background:rgba(20,74,110,.72);border:.14cqw solid rgba(160,205,232,.8);border-radius:.3cqw;
+  font-family:var(--pix);font-size:1.05cqw;line-height:1.75;color:#DCEEF9;
+  display:flex;flex-direction:column;justify-content:flex-end}
+.clog .tag{color:#7FC4EA}
+.clog .bad{color:#FF7A88}
+.clog .good{color:#7DF06A}
+
+/* --- world picker --- */
+#worldpick .in{gap:1cqw;justify-content:flex-start;padding-top:2cqw}
+#worldpick .lead{font-size:1.7cqw;color:#EAF6FF;font-weight:700;text-align:center}
+.wsec{width:100%;max-width:74cqw}
+.wsec h4{margin:.9cqw 0 .4cqw;font-family:var(--pix);font-size:1.05cqw;letter-spacing:.08em;
+  color:#9ED2EE;font-weight:400}
+.wchips{display:flex;flex-wrap:wrap;gap:.45cqw}
+.wchip{padding:.42cqw .95cqw;border-radius:.28cqw;cursor:pointer;font-size:1.4cqw;font-weight:700;
+  color:#FFFFFF;background:rgba(150,196,224,.55);border:.12cqw solid rgba(255,255,255,.35)}
+.wchip:hover{filter:brightness(1.15)}
+.wchip.top{background:#8E45C8}
+.wchip.mine{background:#2E9E52}
+.wchip.recent{background:rgba(150,196,224,.45)}
 </style>
 <div id="shell"><div id="frame">
   <canvas id="game" width="960" height="540" aria-label="Pixel Realms game world"></canvas>
@@ -633,6 +710,70 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
   </div>
 
   <div id="modals"><div class="pane panel" id="panel"></div></div>
+
+  <!-- ===== front end: title -> login -> connect -> world picker ===== -->
+  <div class="scr" id="title">
+    <canvas class="bg" id="titleBg" width="960" height="540"></canvas>
+    <div class="in">
+      <div class="logo">PIXEL REALMS<small>SANDBOX WORLDS</small></div>
+      <div class="mbtn btn" data-scr="play">Play Online</div>
+      <div class="mbtn btn dim" data-scr="options">Options</div>
+      <div class="mbtn btn dim" data-scr="about">About</div>
+    </div>
+  </div>
+
+  <div class="scr tint" id="login">
+    <div class="in">
+      <div class="row">
+        <label>Name:</label>
+        <input type="text" id="loginName" maxlength="16" placeholder="Pick a name">
+        <div class="cbx btn" id="hasIdBox"><i id="hasIdTick"></i>
+          <label>I have a <span class="hl">RealmID</span></label></div>
+      </div>
+      <div class="row" style="margin-top:.9cqw">
+        <label style="opacity:.75">RealmID:</label>
+        <input type="text" id="loginId" maxlength="20" disabled>
+        <label style="opacity:.75">Password:</label>
+        <input type="password" id="loginPw" maxlength="20" disabled>
+      </div>
+      <div class="note">Enter your name, then click <b>Connect</b> to go online.
+        An optional <b>RealmID</b> lets you play on more than one device without losing
+        your stuff. To get one, <b>Connect</b> without one, then pick <b>Get RealmID</b>
+        from the menu. It's free.</div>
+      <div class="foot">
+        <div class="sbtn btn" data-scr="back-title">Back</div>
+        <div class="sbtn pri btn" data-scr="connect">Connect</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scr tint" id="conn">
+    <div class="in">
+      <div class="clog" id="connLog"></div>
+      <div class="foot" style="justify-content:flex-start">
+        <div class="sbtn btn" data-scr="back-login">Cancel</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scr tint" id="worldpick">
+    <div class="in">
+      <div class="clog" id="pickLog" style="height:10cqw"></div>
+      <div class="lead" style="margin-top:1cqw">Enter a world name to join friends or create your own!</div>
+      <div class="row" style="margin-top:.8cqw">
+        <label>World Name:</label>
+        <input type="text" id="pickName" maxlength="18" placeholder="START">
+      </div>
+      <div class="wsec"><h4>Top Worlds</h4><div class="wchips" id="wTop"></div></div>
+      <div class="wsec"><h4>My Worlds</h4><div class="wchips" id="wMine"></div></div>
+      <div class="wsec"><h4>Recently Visited</h4><div class="wchips" id="wRecent"></div></div>
+      <div class="foot">
+        <div class="sbtn btn" data-scr="pick-back">Back</div>
+        <div class="sbtn btn" data-scr="pick-home">⌂ Home</div>
+        <div class="sbtn pri btn" data-scr="pick-go">Enter World</div>
+      </div>
+    </div>
+  </div>
 </div></div>
 <script>
 
@@ -2356,10 +2497,16 @@ function terrain(w,R,bi,opt){
     var top=height[x2];
     w.set(x2,top,ID[bi.top]);
     for(var y=top+1;y<h-1;y++){
+      if(opt.basic){
+        /* a fresh world is solid dirt with the odd pebble — nothing else */
+        w.set(x2,y,(R()<0.045&&y>top+2&&y<h-4)?ID.rock:ID[bi.sub]);
+        continue;
+      }
       var depth=(y-top)/(h-1-top);
       w.set(x2,y,ID[depth>0.16?(depth>0.5?'rock':bi.stone):bi.sub]);
     }
     w.set(x2,h-1,ID.bedrock);
+    if(opt.basic)w.set(x2,h-2,ID.bedrock);
     for(var yb=top;yb<h-1;yb++){
       var d2=(yb-top)/(h-1-top);
       w.setBg(x2,yb,ID[d2>0.16?bi.bgDeep:bi.bgTop]);
@@ -2415,20 +2562,17 @@ function surfaceTree(w,gx,top,kind,R){
 }
 
 var WORLDS={};
+/* A world nobody has built in yet: flat grass over solid dirt, a white
+   door on the left, and sky. Exactly what Growtopia hands you. */
 function genWorld(name){
-  var R=rng(seedOf(name)), bi=BIOMES[(R()*BIOMES.length)|0];
-  var w=new World(name,null,bi.sky);
-  w.biome=bi.k;
-  var height=terrain(w,R,bi);
-  for(var i=0;i<9;i++){
-    var gx=8+((R()*(w.w-16))|0);
-    surfaceTree(w,gx,height[gx],bi.tree,R);
-  }
-  /* spawn pocket and exit door */
+  var R=rng(seedOf(name));
+  var w=new World(name,null,'day');
+  w.biome='plains';w.fresh=true;
+  var height=terrain(w,R,BIOMES[0],
+    {flat:true,noCaves:true,noOre:true,noLava:true,basic:true});
   var sx=5, top=height[sx];
   w.fill(sx-2,top-5,sx+3,top-1,0);
   putDoor(w,sx,top-1,'START','EXIT',true);
-  putSign(w,sx+2,top-1,'Welcome to '+name+'.\nPunch blocks, plant seeds,\nlock it to make it yours.');
   w.spawn={x:sx*TS,y:(top-2)*TS};
   return w;
 }
@@ -2612,16 +2756,18 @@ function buildCaches(){
   rg.addColorStop(1,'rgba(255,255,255,0)');
   glowCv.fillStyle=rg;glowCv.fillRect(0,0,64,64);
   var skies={
+    day:['#4FD2E8','#63DAEE','#7FE2F2','#9BEAF6','#B6F0F8','#CFF6FA'],
     dusk:['#1B0B3A','#3F1462','#7C2A79','#C4486F','#F58A5C','#FFC98A'],
     dawn:['#132152','#39408F','#8556A0','#E08A82','#FFC79A','#FFE8C4'],
     night:['#03040C','#090C26','#141845','#22285E','#333B76','#4A5296'],
     storm:['#101319','#1C222C','#2C3340','#3E4554','#525A6C','#6A7284']};
-  var moonFor={dusk:1,dawn:0,night:1,storm:0};
+  var moonFor={dusk:1,dawn:0,night:1,storm:0,day:0};
   Object.keys(skies).forEach(function(kk){
     var c=mk(VW,VH),g=c.createLinearGradient(0,0,0,VH),s=skies[kk];
     g.addColorStop(0,s[0]);g.addColorStop(.26,s[1]);g.addColorStop(.48,s[2]);
     g.addColorStop(.68,s[3]);g.addColorStop(.86,s[4]);g.addColorStop(1,s[5]);
     c.fillStyle=g;c.fillRect(0,0,VW,VH);
+    if(kk==='day'){paintDay(c);skyCv[kk]=c;return;}
     /* the sun sitting on the horizon carries most of the warmth */
     if(kk!=='storm'){
       var sg=c.createRadialGradient(VW*0.72,VH*0.86,0,VW*0.72,VH*0.86,VH*0.62);
@@ -2651,6 +2797,40 @@ function buildCaches(){
     }
     skyCv[kk]=c;});
   buildIslands();
+}
+
+/* ---------------- daylight backdrop: mountains, sun, plus-clouds -------- */
+function paintDay(c){
+  /* rolling purple ranges, back to front */
+  [[0.62,'#8E86D8',0.0],[0.74,'#7A6FC8',0.35],[0.88,'#6A5AB8',0.7]].forEach(function(L){
+    var baseY=VH*L[0], amp=VH*(0.20-L[0]*0.10), ph=L[2]*9;
+    c.fillStyle=L[1];c.beginPath();c.moveTo(0,VH);
+    for(var x=0;x<=VW;x+=4){
+      var t=x/VW*6.3+ph;
+      var y=baseY-Math.abs(Math.sin(t*0.62))*amp*2.2-Math.sin(t*1.7)*amp*0.35;
+      c.lineTo(x,y);
+    }
+    c.lineTo(VW,VH);c.closePath();c.fill();
+  });
+  /* the sun: a hot core inside a soft green-white halo */
+  var sx=VW*0.86,sy=VH*0.17;
+  var hg=c.createRadialGradient(sx,sy,0,sx,sy,74);
+  hg.addColorStop(0,'rgba(214,255,180,.75)');
+  hg.addColorStop(.55,'rgba(190,240,170,.28)');
+  hg.addColorStop(1,'rgba(190,240,170,0)');
+  c.fillStyle=hg;c.beginPath();c.arc(sx,sy,74,0,6.284);c.fill();
+  c.fillStyle='#F5D423';c.beginPath();c.arc(sx,sy,42,0,6.284);c.fill();
+  c.fillStyle='#FFF07A';c.beginPath();c.arc(sx-11,sy-12,17,0,6.284);c.fill();
+  /* clouds built from plus-shaped clusters, the way the reference draws them */
+  for(var i=0;i<11;i++){
+    var cx=Q.hash(i,1,4)*VW, cy=18+Q.hash(i,2,4)*VH*0.42;
+    var u=9+Q.hash(i,3,4)*10;
+    c.fillStyle='rgba(255,255,255,'+(0.62+Q.hash(i,4,4)*0.30)+')';
+    [[0,0],[-1,0],[1,0],[0,-1],[0,1],[2,0],[-2,0]].forEach(function(d,k){
+      if(k>4&&Q.hash(i,5+k,4)<0.45)return;
+      c.fillRect(Math.round(cx+d[0]*u),Math.round(cy+d[1]*u),Math.round(u),Math.round(u));
+    });
+  }
 }
 
 /* ---------------- floating islands, two parallax depths ---------------- */
@@ -3300,10 +3480,11 @@ function drawEyes(x,eyec,blink){
     return;
   }
   [EL,ER].forEach(function(ex){
-    Rect(x,ex,EYE_Y,EYE_W,EYE_H,K);              /* solid dark mass */
-    Rect(x,ex+1,EYE_Y+1,EYE_W-2,EYE_H-2,eyec);   /* iris inset one pixel */
-    D(x,ex+1,EYE_Y+1,'#FFFFFF');                 /* one glint, top-left */
-    D(x,ex+EYE_W-2,EYE_Y+EYE_H-2,mixc(eyec,'#FFFFFF',0.5),0.8);
+    R(x,ex,ex+EYE_W-1,EYE_Y,K);                       /* lid line on top */
+    Rect(x,ex,EYE_Y+1,EYE_W,EYE_H-1,'#FFFFFF');       /* white of the eye */
+    Rect(x,ex,EYE_Y+1,2,EYE_H-2,eyec);                /* iris, pushed inboard */
+    D(x,ex,EYE_Y+1,shade(eyec,-60));
+    D(x,ex+EYE_W-1,EYE_Y+EYE_H-1,'#C8C8D2');          /* lower-lid shadow */
   });
 }
 function drawMouth(x,mood){
@@ -3613,19 +3794,20 @@ function forgeAnime(c,mode,frame){
     glow.push({x:BX+CX+13,y:BY+WING_Y,r:6,c:gcol,a:0.34});
   }
   if(e.cape)drawCape(x,(W.capePal&&W.capePal(e.cape))||null,flap);
-  hairBack(x,style,hc,hC);
-  hairTails(x,style,hc,hC);
+  var noHair=!!c.bare&&!e.hair;
+  if(!noHair){hairBack(x,style,hc,hC);hairTails(x,style,hc,hC);}
 
   drawBody(x,c);
 
+  var bare=!!c.bare;
   var pP=e.pants&&W.pantsPal&&W.pantsPal(e.pants);
-  drawPants(x,pP||c.pant||['#2A2440','#1A1630']);
+  if(pP)drawPants(x,pP); else if(!bare)drawPants(x,c.pant||['#2A2440','#1A1630']);
   var fP=e.feet&&W.shoePal&&W.shoePal(e.feet);
-  drawBoots(x,fP||c.shoe||['#3A3358','#241F3E']);
+  if(fP)drawBoots(x,fP); else if(!bare)drawBoots(x,c.shoe||['#3A3358','#241F3E']);
 
   var sP=e.shirt&&W.shirtPal&&W.shirtPal(e.shirt);
   if(sP)drawShirt(x,sP);
-  else drawJacket(x,c.outc||['#2A2440','#191430','#31E8DF']);
+  else if(!bare)drawJacket(x,c.outc||['#2A2440','#191430','#31E8DF']);
   var cP=e.chest&&W.chestPal&&W.chestPal(e.chest);if(cP)drawChest(x,cP);
   var nP=e.neck&&W.neckPal&&W.neckPal(e.neck);if(nP)drawNeck(x,nP);
 
@@ -3640,7 +3822,7 @@ function forgeAnime(c,mode,frame){
       glow.push({x:BX+ER+1,y:BY+EYE_Y+2,r:3,c:eyec,a:0.34});
     }
   }
-  hairFront(x,style,hc,hC);
+  if(!noHair)hairFront(x,style,hc,hC);
   var hP=e.hand&&W.handPal&&W.handPal(e.hand);
   if(hP)drawHand(x,hP,Math.sin(frame*0.2));
   if(e.hat&&W.drawHat)W.drawHat(x,e.hat,BX,BY,CX,R,D,Rect);
@@ -3888,11 +4070,18 @@ function poseFor(o,sig,strip){
 }
 
 /* ---------- player + npcs ---------- */
+/* everyone starts the way Growtopia starts you: bare skin, gold eyes,
+   no hair and nothing equipped. Every layer is something you earned. */
+var NUDE={skin:['#D8C3A4','#B39C7C'],hairc:['#6B5540','#4A3A2A'],
+  outc:['#8A7A62','#6A5A46','#B39C7C'],pant:['#8A7A62','#6A5A46'],
+  shoe:['#8A7A62','#6A5A46'],eyec:'#F0C022',hair:null,bare:true};
 function playerChar(){
-  var base=P.CAST.lumiix;
-  return charOf(G.equip,base);
+  var c=charOf(G.equip,NUDE);
+  c.bare=!(G.equip.shirt||G.equip.pants||G.equip.feet||G.equip.chest);
+  if(!G.equip.face)c.eyec='#F0C022';
+  return c;
 }
-function playerSig(){return 'me|'+sigOf(G.equip);}
+function playerSig(){return 'me|'+sigOf(G.equip)+'|'+(playerChar().bare?'b':'d');}
 function playerSprite(){return stripOf(playerSig(),playerChar());}
 var NPC_FIT={
   lumiix:{back:'crystal',hair:'longw',face:'aqua',shirt:'hoodie',pants:'neonleg',feet:'thigh',hat:null,pet:'shadowcat'},
@@ -3912,7 +4101,9 @@ function npcEquip(id){
 }
 function npcSprite(id){
   var eq=npcEquip(id), base=P.CAST[id]||P.CAST.lumiix;
-  return stripOf('npc|'+id,charOf(eq,base));
+  var c=charOf(eq,base);
+  c.skin=c.skin||NUDE.skin;
+  return stripOf('npc|'+id,c);
 }
 S.playerSprite=playerSprite;S.npcSprite=npcSprite;
 S.playerChar=playerChar;S.playerSig=playerSig;S.npcSig=function(id){return 'npc|'+id;};
@@ -4016,8 +4207,9 @@ function pctY(wy){return ((wy-G.cam.y)/VH*100)+'%';}
 function drawWorld(){
   var w=W();
   ctx.drawImage(S.skyCv[w.sky||'dusk'].canvas,0,0);
+  var plain=(w.sky==='day');
   /* two parallax bands of floating islands */
-  [[1,0.07,0.30,0.62],[0,0.15,0.55,0.86]].forEach(function(L){
+  if(!plain)[[1,0.07,0.30,0.62],[0,0.15,0.55,0.86]].forEach(function(L){
     var im=S.islandCv[L[0]];if(!im)return;
     var iw=im.canvas.width;
     var ox=-((G.cam.x*L[1])%iw), oy=L[2]*VH*0.12-G.cam.y*L[1]*0.6;
@@ -4028,7 +4220,7 @@ function drawWorld(){
   });
   /* soft cloud bands */
   var off=-(G.cam.x*0.26)%760;
-  for(var i=0;i<18;i++){
+  for(var i=0;plain?false:i<18;i++){
     var cx=((i*83+off)%760)-70, cy=26+((i*61)%120)-G.cam.y*0.11;
     var ww=34+(i%4)*18,prof=[.55,1,.82,.45];
     for(var k=0;k<4;k++){
@@ -4039,7 +4231,7 @@ function drawWorld(){
   }
   /* drifting sakura petals — the layer that makes the world feel alive */
   var tt=G.tick;
-  for(var pI=0;pI<34;pI++){
+  for(var pI=0;plain?false:pI<34;pI++){
     var ph=Q.hash(pI,1,9), pv=Q.hash(pI,2,9), pz=0.4+Q.hash(pI,3,9)*0.9;
     var pxx=((ph*VW+tt*0.30*pz+Math.sin((tt*0.02)+pI)*16)%(VW+40))-20;
     var pyy=((pv*VH+tt*0.42*pz)%(VH+30))-15;
@@ -5563,6 +5755,158 @@ window.PRUI={openInv:openInv,openSplice:openSplice,openWorlds:openWorlds,openSho
 </script>
 <script>
 /* ============================================================
+   PIXEL REALMS — FRONT END
+   Title, login, the connect log, and the world picker. The boot
+   flow lives here; the game only starts once you enter a world.
+   ============================================================ */
+(function(){
+'use strict';
+var P=window.PR,S=window.PRS,D=window.PRD,U=window.PRUI,Q=window.PRG,I=window.PRI;
+var G=S.G,$=function(q){return document.querySelector(q);};
+var AU=window.PRA;
+
+function show(id){
+  ['title','login','conn','worldpick'].forEach(function(k){
+    var n=$('#'+k);if(n)n.classList.toggle('on',k===id);
+  });
+  G.scr=id||null;
+}
+function anyScreen(){return !!G.scr;}
+
+/* ---------------- title backdrop ---------------- */
+function paintTitle(){
+  var cv=$('#titleBg');if(!cv)return;
+  var g=cv.getContext('2d');
+  var sky=S.skyCv&&S.skyCv.day;
+  if(sky)g.drawImage(sky.canvas,0,0);
+  else{g.fillStyle='#63DAEE';g.fillRect(0,0,960,540);}
+  /* a strip of ground so the title sits in a world, not on a poster */
+  g.fillStyle='#4FA83E';g.fillRect(0,502,960,7);
+  g.fillStyle='#6B4326';g.fillRect(0,509,960,31);
+  g.fillStyle='rgba(0,0,0,.14)';
+  for(var x=0;x<960;x+=48)g.fillRect(x,509,1,31);
+}
+
+/* ---------------- connect log ---------------- */
+function logLine(node,html){
+  var d=document.createElement('div');
+  d.innerHTML='<span class="tag">[i]</span> '+html;
+  node.appendChild(d);
+  while(node.children.length>9)node.removeChild(node.firstChild);
+}
+var connTimers=[];
+function clearTimers(){connTimers.forEach(clearTimeout);connTimers=[];}
+function runConnect(){
+  var box=$('#connLog');box.innerHTML='';
+  show('conn');
+  var name=G.name;
+  var steps=[
+    [120,'Locating server...'],
+    [700,'Located server, connecting...'],
+    [1400,'Logging on ['+name+']...'],
+    [2100,'<span class="good">Logged on.</span> Welcome back, '+name+'.'],
+    [2600,'Where would you like to go? ('+(94000+((Math.random()*4000)|0)).toLocaleString()+' online)']
+  ];
+  steps.forEach(function(st){
+    connTimers.push(setTimeout(function(){logLine(box,st[1]);},st[0]));
+  });
+  connTimers.push(setTimeout(openPicker,3100));
+}
+
+/* ---------------- world picker ---------------- */
+function chip(cls,name,cb){
+  var d=document.createElement('div');
+  d.className='wchip btn '+cls;d.textContent=name;
+  d.addEventListener('click',cb);
+  return d;
+}
+var TOP=['START','NEONSHOP'];
+function openPicker(from){
+  var box=$('#pickLog');box.innerHTML='';
+  logLine(box,'World <b>'+G.wid+'</b> <span class="good">[NOPUNCH, IMMUNE]</span> entered. '+
+    'There are '+(G.world?G.world.visitors:0)+' other people here.');
+  if(G.world&&G.world.owner)logLine(box,'['+G.wid+' World Locked by @'+G.world.owner+']');
+  logLine(box,'Where would you like to go?');
+  $('#pickName').value='';
+  function fill(sel,list,cls){
+    var n=$(sel);n.innerHTML='';
+    if(!list.length){n.innerHTML='<span style="font-size:1.2cqw;color:#8FB8D0">none yet</span>';return;}
+    list.slice(0,8).forEach(function(w){
+      n.appendChild(chip(cls,w,function(){$('#pickName').value=w;}));
+    });
+  }
+  var mine=Object.keys(I.WORLDS||{}).filter(function(k){
+    return I.WORLDS[k].owner===G.name;});
+  var recent=Object.keys(G.visited||{}).sort(function(a,b){
+    return G.visited[b]-G.visited[a];});
+  fill('#wTop',TOP,'top');
+  fill('#wMine',mine,'mine');
+  fill('#wRecent',recent,'recent');
+  show('worldpick');
+  setTimeout(function(){var f=$('#pickName');if(f)f.focus();},60);
+}
+
+/* ---------------- entering the game ---------------- */
+function beginGame(){
+  show(null);
+  G.started=true;
+  if(AU){AU.resume();if(!G.muted)AU.ambient(S.W().sky);}
+}
+function enterWorld(name){
+  name=(name||'').trim().toUpperCase().replace(/[^A-Z0-9 ]/g,'').slice(0,18);
+  if(!name)name='START';
+  beginGame();
+  if(name!==G.wid)D.travel(name);
+}
+
+/* ---------------- wiring ---------------- */
+document.addEventListener('click',function(e){
+  var t=e.target.closest('[data-scr]');
+  if(!t)return;
+  var a=t.getAttribute('data-scr');
+  if(a==='play'){
+    $('#loginName').value=G.name==='Player'?'':G.name;
+    show('login');
+    setTimeout(function(){$('#loginName').focus();},60);
+  }
+  else if(a==='options'||a==='about'){
+    S.toast(a==='about'
+      ? 'Pixel Realms — punch, seed, splice, lock. Every sprite drawn in your browser.'
+      : 'Sound toggles with M. Everything else is on the HELP card.');
+  }
+  else if(a==='back-title'){clearTimers();show('title');}
+  else if(a==='back-login'){clearTimers();show('login');}
+  else if(a==='connect'){
+    var n=($('#loginName').value||'').trim().replace(/[^A-Za-z0-9_]/g,'').slice(0,16);
+    if(!n){S.toast('Enter a name first');return;}
+    G.name=n;D.syncHud();U.refreshPortrait();
+    runConnect();
+  }
+  else if(a==='pick-back'){show('login');}
+  else if(a==='pick-home'){enterWorld('START');}
+  else if(a==='pick-go'){enterWorld($('#pickName').value);}
+});
+document.addEventListener('keydown',function(e){
+  if(!anyScreen())return;
+  if(e.code!=='Enter')return;
+  if(G.scr==='login'){var b=$('[data-scr=connect]');if(b)b.click();}
+  else if(G.scr==='worldpick'){var g=$('[data-scr=pick-go]');if(g)g.click();}
+},true);
+var tick=$('#hasIdTick'),box=$('#hasIdBox');
+if(box)box.addEventListener('click',function(){
+  var on=tick.classList.toggle('on');
+  $('#loginId').disabled=!on;$('#loginPw').disabled=!on;
+});
+
+/* the in-game WORLDS button reopens the picker instead of a panel */
+U.openWorlds=function(){U.closePanel&&U.closePanel();openPicker(true);};
+S.openPicker=openPicker;
+S.showTitle=function(){paintTitle();show('title');};
+S.anyScreen=anyScreen;
+})();
+</script>
+<script>
+/* ============================================================
    PIXEL REALMS — input, persistence, boot, main loop
    ============================================================ */
 (function(){
@@ -5639,8 +5983,12 @@ function starter(){
    [{t:'seed',k:'dirt'},4],[{t:'seed',k:'stone'},4],[{t:'seed',k:'wood'},4],
    [{t:'seed',k:'glass'},3],[{t:'seed',k:'grass'},3],[{t:'seed',k:'sand'},3]
   ].forEach(function(o){S.addItem(o[0],o[1]);});
-  G.equip.face='heart';G.equip.feet='sneakers';
-  G.equip.hair='longw';G.equip.shirt='tee';G.equip.pants='jeans';
+  /* you start with nothing on. Every layer is something you earned. */
+  ['back','cape','pants','shirt','chest','feet','hand','face','hair','neck','hat','pet']
+    .forEach(function(sl){G.equip[sl]=null;});
+  /* but the clothes are in the bag, waiting */
+  [['face','aqua'],['hair','longw'],['shirt','tee'],['pants','jeans'],['feet','sneak']]
+    .forEach(function(o){S.addItem({t:'wear',s:o[0],k:o[1]},1);});
 }
 
 /* ---------------- input ---------------- */
@@ -5875,10 +6223,8 @@ function boot(){
   S.say(null,'Punch blocks · plant seeds · splice trees · lock a world.',true);
   if(matchMedia('(pointer: coarse)').matches)$('#touch').classList.add('on');
   var mb=$('#muteBtn');if(mb)mb.textContent=G.muted?'🔇':'🔊';
-  $('#helpGo').addEventListener('click',function(){
-    $('#help').style.display='none';G.started=true;
-    if(AU){AU.resume();if(!G.muted)AU.ambient(W().sky);}
-  });
+  $('#help').style.display='none';
+  if(window.PRS.showTitle)PRS.showTitle();
   var gc=$('#gemCv'),gx=P.mk(16,16);P.drawGem(gx,'diamond',0,0);P.mount(gc,gx,4);
   var lc=$('#lockCv');
   if(lc){var lx=P.mk(16,16);I.tileIcon(lx,'lock',16);P.mount(lc,lx,4);}

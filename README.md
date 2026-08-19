@@ -27,6 +27,19 @@ The same art, running, built around the loop Growtopia actually runs on:
 **punch → seed → splice → lock**. One self-contained file, no dependencies,
 no fetched assets — every pixel is drawn at load time.
 
+### Getting in
+
+The game boots to a **title screen** over a daylight sky, then a **login
+screen** — pick a name, optionally claim a RealmID — then a **connect log** that
+locates the server and logs you on, then the **world picker**: type any name to
+join it or create it, or tap a chip under Top Worlds, My Worlds or Recently
+Visited. `G` reopens the picker at any time.
+
+You arrive **bare**: no hair, no clothes, gold eyes, tan skin. Every layer after
+that is something you found, spliced or bought. A world nobody has built in yet
+is exactly that — flat grass over solid dirt with the odd pebble, a white exit
+door, and sky.
+
 **Play:** `A`/`D` move · `W` jump · `S` drop through a platform · `1`–`0` hotbar ·
 `E` items · `B` splice book · `G` worlds · `T` chat · `Z`/`X`/`C` punch/place/wrench.
 Click a block to punch it, click empty space to build, walk into a door and press
@@ -52,7 +65,7 @@ not an asset.
 - **Glow**: eyes and wings get a faint bloom pass — enough to read as neon
   without softening the block art
 
-### The interface
+### The interface (and the front end)
 
 Light blue panels with a white bevel and dark text, the way Growtopia does it.
 The default screen carries almost nothing: an identity chip, a currency chip,
