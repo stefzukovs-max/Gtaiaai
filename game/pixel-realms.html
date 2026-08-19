@@ -205,7 +205,7 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
 .panel .bd{padding:1.1cqw;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:.9cqw;min-height:0}
 .eyebrow{font-family:var(--pix);font-size:.8cqw;letter-spacing:.14em;color:var(--faint);text-transform:uppercase}
 
-.invwrap{display:grid;grid-template-columns:13cqw 1fr;gap:1cqw;align-items:start}
+.invwrap{display:grid;grid-template-columns:13cqw 1fr auto;gap:1cqw;align-items:start}
 .doll{background:#0B0819;border:.1cqw solid var(--line2);border-radius:.6cqw;padding:.7cqw;
   display:flex;flex-direction:column;gap:.45cqw;align-items:center}
 .doll canvas{width:11cqw}
@@ -355,6 +355,155 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
 @keyframes bpop{0%{opacity:0;transform:translateX(-50%) scale(.85)}
   14%{opacity:1;transform:translateX(-50%) scale(1)}
   78%{opacity:1}100%{opacity:0}}
+
+/* ============================================================
+   CLEAN SKIN — Growtopia's UI language: light blue panels with
+   a white bevel, dark text, chunky slots, and nothing on screen
+   that isn't earning its place.
+   ============================================================ */
+:root{
+  --sky1:#F2F9FD;--sky2:#C6E1F2;--sky3:#A2CAE4;
+  --ink:#16303F;--ink2:#3C6079;--edge:#4E7FA0;--bevel:#FFFFFF;
+  --slot:#F6FBFE;--slotEdge:#8CB4CE;
+  --sel:#FFA820;--eq:#43C24A;
+}
+/* --- panels ------------------------------------------------ */
+.pane,.panel,.treq{
+  background:linear-gradient(180deg,var(--sky1) 0%,var(--sky2) 62%,var(--sky3) 100%)!important;
+  border:.22cqw solid var(--bevel)!important;
+  border-radius:.7cqw!important;
+  box-shadow:0 0 0 .14cqw var(--edge),0 .45cqw 1.1cqw rgba(8,26,40,.38)!important;
+  color:var(--ink)!important;
+}
+.pane b,.panel b,.pane strong{color:var(--ink)}
+.hud-av .nm,.hud-world .t,.hud-vis .v,.panel h2,.panel .eyebrow{color:var(--ink)!important}
+.hud-av .lv,.hud-world .own,.hud-vis .k,.panel .hint,.hintline,.tip{color:var(--ink2)!important}
+
+/* --- top-left identity chip -------------------------------- */
+.hud-av{top:1cqw;left:1cqw;padding:.35cqw .9cqw .35cqw .35cqw;gap:.55cqw;align-items:center;
+  width:max-content;min-width:0}
+.hud-av .port{width:3.2cqw;height:3.2cqw;border-radius:.5cqw;overflow:hidden;
+  background:#9FC8E0;border:.14cqw solid var(--edge);display:grid;place-items:center}
+.hud-av .port canvas{position:static!important;transform:none!important;
+  left:auto!important;top:auto!important;width:100%!important;height:100%!important;
+  image-rendering:pixelated}
+.hud-av .nm{font-size:1.25cqw;font-weight:700}
+.hud-av .lv{font-size:.85cqw}
+.hud-av .xp{display:none}
+.gems{top:1cqw;left:12.6cqw;padding:.35cqw .8cqw;gap:.5cqw;align-items:center}
+.gems .n{color:var(--ink)!important;font-weight:700;font-size:1.2cqw}
+.gems canvas{width:1.5cqw;height:1.5cqw}
+
+/* --- world title ------------------------------------------- */
+.hud-world{top:1cqw;padding:.35cqw 1.2cqw;min-width:0}
+.hud-world .t{font-size:1.35cqw}
+.hud-world .meta{margin-top:.15cqw;font-size:.85cqw}
+.hud-world .tag{background:rgba(255,255,255,.6);border-color:var(--edge);color:var(--ink2)}
+
+/* --- clutter the reference does not show ------------------- */
+.hud-vis,.rail,#toast{display:none!important}
+.hud-map{top:1cqw;right:1cqw;width:9.6cqw;padding:.22cqw}
+.hud-map .bar{color:var(--ink2)}
+
+/* --- top-right icon cluster -------------------------------- */
+.side{right:1cqw;top:6.4cqw;flex-direction:row;gap:.4cqw}
+.side .s{width:3cqw;height:3cqw;border-radius:.55cqw;font-size:1.35cqw;
+  background:linear-gradient(180deg,#FFFFFF,#C9E3F3)!important;
+  border:.14cqw solid var(--edge)!important;color:var(--ink)!important;
+  box-shadow:0 .18cqw .35cqw rgba(8,26,40,.28)!important}
+.side .s:hover{filter:brightness(1.06)}
+
+/* --- chat, quieter ----------------------------------------- */
+.chat{left:1cqw;top:5.6cqw;width:17cqw}
+.chat .tabs b{color:var(--ink2)}
+.chat .tabs b.on{background:var(--edge);color:#FFFFFF}
+.chat .log{color:var(--ink);height:auto;max-height:10.5cqw;min-height:4cqw;background:transparent}
+.chat .msg{background:transparent}
+.chat .msg .b{color:var(--ink)}
+.chat .msg.sys .b{color:#7A4E10}
+.chat .log>*{background:transparent}
+.chat .av{width:1.9cqw;height:1.9cqw;border-radius:.3cqw;overflow:hidden;flex:none}
+.chat .av canvas{width:100%;height:100%}
+.chat .inp input{background:rgba(255,255,255,.75);border-color:var(--edge);color:var(--ink)}
+.chat .inp input::placeholder{color:#6C90A8}
+
+/* --- slots: the core of the inventory ---------------------- */
+.slot{background:var(--slot)!important;border:.16cqw solid var(--slotEdge)!important;
+  border-radius:.28cqw!important;box-shadow:inset 0 .12cqw 0 rgba(255,255,255,.9)!important}
+.slot .n,.slot .q{color:#16303F!important;text-shadow:0 .1cqw 0 rgba(255,255,255,.85)!important;
+  font-weight:700!important}
+.slot.on,.slot.sel{border-color:var(--sel)!important;box-shadow:0 0 0 .14cqw var(--sel)!important}
+.slot.eq{border-color:var(--eq)!important;box-shadow:0 0 0 .14cqw var(--eq)!important}
+
+/* --- hotbar sits above the mode strip, clear of the nav ---- */
+.hotbar{bottom:5.6cqw;padding:.32cqw;width:44cqw}
+.hotbar .row{gap:.26cqw}
+.hotbar .slot{width:auto;aspect-ratio:1}
+.hotbar .slot .k{color:var(--ink2)!important;font-size:.62cqw}
+/* counts hug the bottom-right corner and never clip */
+.slot .n{position:absolute!important;right:.18cqw!important;bottom:.14cqw!important;
+  line-height:1!important;font-size:.84cqw!important}
+.modes{bottom:1cqw}
+.nav{bottom:1cqw;left:1cqw}
+.nav .b svg{width:1.7cqw;height:1.7cqw}
+.nav .b span{font-size:.72cqw}
+
+/* --- bottom nav / modes ------------------------------------ */
+.nav,.modes{background:linear-gradient(180deg,var(--sky1),var(--sky2))!important}
+.nav .b{color:var(--ink2)!important}
+.nav .b:hover,.nav .b.on{color:var(--ink)!important;background:rgba(255,255,255,.6)}
+.nav .b span{color:inherit}
+.modes .m{color:var(--ink2)!important}
+.modes .m.on{background:var(--edge)!important;color:#FFFFFF!important}
+.modes .m kbd{background:rgba(255,255,255,.7);color:var(--ink)}
+
+/* --- panels ------------------------------------------------ */
+.panel{color:var(--ink)}
+.panel .filters b{background:rgba(255,255,255,.65);border-color:var(--edge);color:var(--ink2)}
+.panel .filters b.on{background:var(--edge);color:#FFFFFF}
+.panel .card,.panel .wentry,.panel .worldrow,.panel .wrow{
+  background:rgba(255,255,255,.62)!important;border-color:var(--edge)!important;color:var(--ink)!important}
+.panel .cta{background:linear-gradient(180deg,#FFFFFF,#9FCFEA)!important;
+  border:.14cqw solid var(--edge)!important;color:var(--ink)!important}
+.panel .cta.go{background:linear-gradient(180deg,#8FE6A8,#3FAE63)!important;color:#08301A!important}
+.panel .cta.no{opacity:.5}
+.doll{background:rgba(255,255,255,.55)!important;border-color:var(--edge)!important}
+.doll .wrow span:first-child{color:var(--ink2)}
+
+/* --- the action column beside the backpack ----------------- */
+.invcol{display:flex;flex-direction:column;gap:.4cqw;padding-left:.6cqw}
+.invcol .a{padding:.55cqw .2cqw;border-radius:.45cqw;text-align:center;cursor:pointer;
+  font-family:var(--pix);font-size:.82cqw;letter-spacing:.06em;color:var(--ink);
+  background:linear-gradient(180deg,#FFFFFF,#B6D9EE);border:.14cqw solid var(--edge)}
+.invcol .a:hover{filter:brightness(1.07)}
+.invcol .a.danger{background:linear-gradient(180deg,#FFD9D9,#EFA0A0)}
+
+/* --- trade request, same skin ------------------------------ */
+.treq .hd{background:linear-gradient(180deg,#FFE3EE,#F5B8CE)!important;
+  border-bottom:.14cqw solid var(--edge)!important;color:#6E1F3C!important}
+.treq .hd .x{background:rgba(255,255,255,.7);color:#6E1F3C}
+.treq .who,.treq .cl{color:var(--ink2)!important}
+.treq .who b,.treq .cl span:last-child{color:var(--ink)!important}
+.treq .mini i{background:var(--slot);border-color:var(--slotEdge)}
+.treq .mini i em{color:var(--ink);text-shadow:0 .1cqw 0 rgba(255,255,255,.85)}
+.treq .go{background:linear-gradient(180deg,#8FE6A8,#3FAE63)!important;color:#08301A!important;
+  border:.14cqw solid var(--edge)}
+.treq .exp{color:#B03A5A!important}
+
+/* --- name tags + bubbles ----------------------------------- */
+.ntag{background:rgba(12,30,44,.82)!important;border:.12cqw solid rgba(255,255,255,.55)!important;
+  border-radius:.35cqw!important;color:#EAF6FF!important}
+.bub{background:#FFFFFF!important;border:.14cqw solid var(--edge)!important;color:#16303F!important;
+  border-radius:.6cqw!important}
+
+/* --- help card --------------------------------------------- */
+#help{background:linear-gradient(180deg,var(--sky1),var(--sky3))!important;
+  border:.22cqw solid var(--bevel)!important;box-shadow:0 0 0 .14cqw var(--edge),
+  0 1cqw 3cqw rgba(8,26,40,.45)!important;color:var(--ink)!important}
+#help h1{color:var(--ink)!important;-webkit-text-fill-color:var(--ink)!important;background:none!important}
+#help p{color:var(--ink2)!important}
+#help kbd{background:rgba(255,255,255,.8);border-color:var(--edge);color:var(--ink)}
+#banner{color:#FFFFFF;text-shadow:0 .2cqw .4cqw rgba(0,0,0,.6)}
 </style>
 <div id="shell"><div id="frame">
   <canvas id="game" width="960" height="540" aria-label="Pixel Realms game world"></canvas>
@@ -2891,7 +3040,7 @@ function renderLog(){
     var av=el('div','av');
     var CA=window.PRS&&window.PRS.chatAvatar;
     if(!m.sys&&CA){var q=document.createElement('canvas');
-      mount(q,CA(m.who),3);av.appendChild(q);}
+      mount(q,CA(m.who),2);av.appendChild(q);}
     else av.style.background='linear-gradient(160deg,#FFC24B,#8A5A18)';
     row.appendChild(av);
     var b=el('div','b');
@@ -3099,29 +3248,29 @@ I.iconOf=function(it){
 </script>
 <script>
 /* ============================================================
-   PIXEL REALMS — ANIME RIG
-   A taller, chibi-proportioned character forge. Big glowing
-   eyes, layered hair with real strands, glowing wings, pets.
-   Supersedes the compact rig for every actor on screen; the
-   old forge still draws item icons.
-   Rig 28 x 34 inside a 68 x 54 frame. Nothing here is a bitmap.
+   PIXEL REALMS — BLOCK RIG
+   Growtopia's proportions: a big square head, dot eyes, a short
+   stocky body. Chunky on purpose — no anti-aliasing, no soft
+   curves, everything on the pixel grid. Nothing is a bitmap.
+   Rig 24 x 32 inside a 56 x 48 frame.
    ============================================================ */
 (function(){
 'use strict';
 var P=window.PR,I=window.PRI,S=window.PRS,Q=window.PRG;
 var mk=P.mk,shade=P.shade,mixc=P.mixc;
 
-var RW=28,RH=38,FW=68,FH=58,BX=20,BY=18;
-var HEAD_B=14,NECK=15,TOR_A=16,TOR_B=25,LEG_A=26,LEG_B=31,BOOT_A=32,BOOT_B=37;
-var CX=14;                                   /* rig centre line */
+var RW=24,RH=32,FW=56,FH=48,BX=16,BY=12;
+var HEAD_A=0,HEAD_B=15,TOR_A=16,TOR_B=25,LEG_A=26,LEG_B=31;
+var CX=12;
+var K='#1A1526';                                /* the outline ink */
 
 /* ---------- pixel helpers, all in rig space ---------- */
-function R(x,a,b,y,c,al){                    /* horizontal run a..b inclusive */
+function R(x,a,b,y,c,al){
   if(b<a)return;
   x.globalAlpha=al===undefined?1:al;
   x.fillStyle=c;x.fillRect(BX+a,BY+y,b-a+1,1);x.globalAlpha=1;
 }
-function D(x,a,y,c,al){                      /* single pixel */
+function D(x,a,y,c,al){
   x.globalAlpha=al===undefined?1:al;
   x.fillStyle=c;x.fillRect(BX+a,BY+y,1,1);x.globalAlpha=1;
 }
@@ -3130,164 +3279,124 @@ function Rect(x,a,y,w,h,c,al){
   x.fillStyle=c;x.fillRect(BX+a,BY+y,w,h);x.globalAlpha=1;
 }
 
-/* ---------- silhouettes ---------- */
-/* half-width of the head at rig row y (0..15) */
-var HEADW=[4.4,6.6,8.0,8.8,9.3,9.5,9.6,9.6,9.4,9.1,8.6,7.9,6.9,5.4,3.4];
-function headSpan(y){var h=HEADW[y];if(h===undefined)return null;
-  return [Math.round(CX-h),Math.round(CX+h)-1];}
-/* torso half-width per row */
-function torsoSpan(y){
-  var t=(y-TOR_A)/(TOR_B-TOR_A);
-  var h=6.1-t*0.7;                            /* shoulders read wider than the waist */
-  if(y===TOR_A)h=5.0;                         /* neck shelf */
-  return [Math.round(CX-h),Math.round(CX+h)-1];
+/* ---------- silhouettes: rectangles with clipped corners ---------- */
+function headSpan(y){
+  if(y<HEAD_A||y>HEAD_B)return null;
+  var inset=(y===HEAD_A||y===HEAD_B)?1:0;
+  return [3+inset,20-inset];
 }
-var K='#160D28';                              /* universal ink */
+function torsoSpan(y){return [7,16];}
+var ARM_L=[4,6],ARM_R=[17,19],ARM_A=TOR_A+1,ARM_B=TOR_B-1;
+var LEGL=[7,10],LEGR=[13,16];
 
 /* ============================================================
-   FACE — the whole point of the rebuild
+   FACE — two dark eyes and a mouth. That is the whole design.
    ============================================================ */
-var EYE_Y=5,EYE_H=7,EYE_W=7,EL=4,ER=17;       /* left/right eye left edge */
-
-function drawEyes(x,eyec,mood,blink){
-  var lid=shade(eyec,-96),deep=shade(eyec,-52),lit=mixc(eyec,'#FFFFFF',0.45);
-  if(blink){                                  /* closed: a soft lash arc */
-    [EL,ER].forEach(function(ex){
-      R(x,ex,ex+EYE_W-1,EYE_Y+3,K);
-      D(x,ex+1,EYE_Y+2,K);D(x,ex+EYE_W-2,EYE_Y+2,K);
-      R(x,ex+1,ex+EYE_W-2,EYE_Y+4,mixc(K,'#FFFFFF',0.35));
-    });
+var EYE_Y=7,EYE_H=5,EL=5,ER=15,EYE_W=4;
+function drawEyes(x,eyec,blink){
+  if(blink){
+    R(x,EL,EL+EYE_W-1,EYE_Y+2,K);R(x,EL,EL+EYE_W-1,EYE_Y+3,K);
+    R(x,ER,ER+EYE_W-1,EYE_Y+2,K);R(x,ER,ER+EYE_W-1,EYE_Y+3,K);
     return;
   }
-  [EL,ER].forEach(function(ex,side){
-    var y0=EYE_Y;
-    /* upper lash — thick, the anime tell */
-    R(x,ex,ex+EYE_W-1,y0,K);
-    R(x,ex-(side?1:0),ex+EYE_W-1+(side?0:0),y0+1,K);
-    /* iris body, dark at the top fading bright at the bottom */
-    for(var r=2;r<EYE_H-1;r++){
-      var t=(r-2)/(EYE_H-4);
-      var col=mixc(deep,eyec,t*t*0.55+t*0.45);
-      R(x,ex+1,ex+EYE_W-2,y0+r,col);
-      D(x,ex,y0+r,lid);D(x,ex+EYE_W-1,y0+r,lid);
-    }
-    /* pupil core */
-    Rect(x,ex+3,y0+3,2,2,shade(eyec,-118));
-    /* the big highlight, top-left of each iris */
-    Rect(x,ex+1,y0+2,2,2,'#FFFFFF');
-    D(x,ex+3,y0+2,'#FFFFFF',0.55);
-    /* small sparkle, bottom-right — reads as wet */
-    D(x,ex+EYE_W-3,y0+EYE_H-3,lit,0.95);
-    D(x,ex+EYE_W-2,y0+EYE_H-3,'#FFFFFF',0.5);
-    /* lower lid */
-    R(x,ex+1,ex+EYE_W-2,y0+EYE_H-1,mixc(lid,'#FFFFFF',0.18));
+  [EL,ER].forEach(function(ex){
+    Rect(x,ex,EYE_Y,EYE_W,EYE_H,K);              /* solid dark mass */
+    Rect(x,ex+1,EYE_Y+1,EYE_W-2,EYE_H-2,eyec);   /* iris inset one pixel */
+    D(x,ex+1,EYE_Y+1,'#FFFFFF');                 /* one glint, top-left */
+    D(x,ex+EYE_W-2,EYE_Y+EYE_H-2,mixc(eyec,'#FFFFFF',0.5),0.8);
   });
 }
-function drawBrows(x,hc){
-  R(x,EL+1,EL+EYE_W-2,EYE_Y-3,hc);D(x,EL,EYE_Y-2,hc);
-  R(x,ER+1,ER+EYE_W-2,EYE_Y-3,hc);D(x,ER+EYE_W-1,EYE_Y-2,hc);
-}
 function drawMouth(x,mood){
-  var my=EYE_Y+EYE_H+1;
-  if(mood==='o'){Rect(x,CX-1,my,2,2,'#93394F');D(x,CX-1,my,'#C86E86',0.8);}
-  else{R(x,CX-1,CX,my,'#A84A5E',0.85);D(x,CX,my,'#C86E86',0.6);}
+  var my=EYE_Y+EYE_H+2;
+  if(mood==='o'){Rect(x,CX-1,my,2,2,'#6E3040');return;}
+  R(x,CX-1,CX,my,'#7A3B46');                  /* a two-pixel line, nothing more */
+  D(x,CX-2,my-1,'#7A3B46',0.55);D(x,CX+1,my-1,'#7A3B46',0.55);
 }
 function drawBlush(x){
-  var by=EYE_Y+EYE_H;                         /* just under the lower lid */
-  for(var i=0;i<2;i++){
-    var inset=i;
-    R(x,EL+inset,EL+2+inset,by+i,'#FF8FAE',0.34);
-    R(x,ER+EYE_W-3-inset,ER+EYE_W-1-inset,by+i,'#FF8FAE',0.34);
-  }
+  R(x,3,5,EYE_Y+EYE_H,'#FF9AAE',0.32);
+  R(x,18,20,EYE_Y+EYE_H,'#FF9AAE',0.32);
 }
 
 /* ============================================================
-   HAIR — bangs, side locks, back mass
+   HAIR — a cap over the skull plus an optional back length
    ============================================================ */
 function hairBack(x,style,h,H){
-  /* the mass behind the head — a lock that narrows past the jaw */
-  var len={long:24,wave:26,pony:16,twin:14,bob:16,spiky:12}[style]||18;
-  for(var y=0;y<len;y++){
+  var len={long:22,wave:24,pony:14,twin:12,bob:18,spiky:11,buzz:8}[style]||16;
+  for(var y=-1;y<len;y++){
     var w;
-    if(y<=HEAD_B)w=HEADW[y]+0.8;              /* hugs the skull */
+    if(y<=HEAD_B)w=9.5;                        /* hugs the skull box */
     else{
       var d=(y-HEAD_B)/Math.max(1,len-HEAD_B);
-      w=HEADW[HEAD_B]+2.4-d*d*3.2;            /* flares at the nape, then tapers */
-      if(style==='spiky'||style==='bob')w-=d*3.4;
-      if(style==='twin')w-=d*4.2;
+      w=9.5-d*d*5.0;
+      if(style==='bob'||style==='spiky')w-=d*4.5;
     }
-    if(w<=0.6)continue;
+    if(w<=1)continue;
     var a=Math.round(CX-w),b=Math.round(CX+w)-1;
-    R(x,a,b,y,y<3?h:mixc(h,H,Math.min(1,0.25+y/len)));
-    D(x,a,y,mixc(H,'#000000',0.30));D(x,b,y,mixc(H,'#000000',0.30));
-    if(y>HEAD_B&&y%4===1)R(x,a+2,a+3,y,mixc(h,'#FFFFFF',0.22),0.6);  /* strand sheen */
+    R(x,a,b,y,y<1?mixc(h,'#FFFFFF',0.25):mixc(h,H,Math.min(1,y/len+0.15)));
+    D(x,a,y,K);D(x,b,y,K);
   }
 }
-function hairFront(x,style,h,H){
-  var lit=mixc(h,'#FFFFFF',0.42);
-  /* crown cap — stops above the brow so the bangs can be read as strands */
-  for(var y=0;y<4;y++){
-    var s=headSpan(y);if(!s)continue;
-    R(x,s[0]-(y>1?1:0),s[1]+(y>1?1:0),y,y<2?lit:h);
-  }
-  /* sheen band — the glossy anime highlight across the crown */
-  R(x,CX-7,CX-3,1,lit,0.9);R(x,CX+2,CX+6,1,lit,0.6);
-  R(x,CX-6,CX-4,2,lit,0.5);
-
-  /* bangs: pointed strands dipping over the brow */
-  var tips;
-  /* tips stop at the lash line — bangs frame the eyes, never cover them */
-  if(style==='spiky')      tips=[[5,4],[8,2],[11,5],[14,2],[17,5],[20,2],[23,4]];
-  else if(style==='twin')  tips=[[5,3],[9,5],[12,2],[16,5],[19,3],[23,4]];
-  else if(style==='bob')   tips=[[5,4],[9,3],[13,5],[16,3],[20,5],[23,4]];
-  else                     tips=[[5,3],[9,5],[12,2],[15,4],[18,2],[21,5],[24,3]];
-  tips.forEach(function(t,i){
-    var tx=t[0],ty=t[1];
-    for(var y=0;y<=ty;y++){
-      var wid=Math.max(0,Math.round((ty-y)*0.42));
-      R(x,tx-wid,tx+wid,y,(i%2)?h:mixc(h,H,0.40));
-    }
-    D(x,tx,ty,H);                              /* strand tip catches the ink */
-    if(ty>3)D(x,tx,ty-1,mixc(h,'#FFFFFF',0.25),0.55);
-  });
-  /* side locks framing the cheeks */
-  var sl={long:15,wave:16,pony:13,twin:12,bob:11,spiky:9}[style]||13;
-  for(var y2=3;y2<sl;y2++){
-    var s2=headSpan(Math.min(y2,HEAD_B));if(!s2)continue;
-    R(x,s2[0]-1,s2[0]-((y2>=5&&y2<=11)?1:0),y2,y2<6?h:mixc(h,H,0.4));
-    R(x,s2[1]+((y2>=5&&y2<=11)?1:0),s2[1]+1,y2,y2<6?h:mixc(h,H,0.4));
-  }
-}
-/* long side pieces sit behind the head so they never cover the face */
 function hairTails(x,style,h,H){
   if(style==='twin'){
     [-1,1].forEach(function(d){
-      for(var y=3;y<26;y++){
-        var t=(y-3)/23, w=2.4+Math.sin(t*3.0)*2.0-t*1.0;
-        if(w<=0.4)continue;
-        var sx=CX+d*(HEADW[4]+3.4)+Math.round(Math.sin(t*2.4)*2.0)*d;
-        R(x,Math.round(sx-w),Math.round(sx+w),y,t<0.18?h:mixc(h,H,t*0.72));
-        D(x,Math.round(sx-w),y,mixc(H,'#000000',0.25));
-        D(x,Math.round(sx+w),y,mixc(H,'#000000',0.25));
-        if(y%5===2)D(x,Math.round(sx),y,mixc(h,'#FFFFFF',0.30),0.6);
+      for(var y=2;y<22;y++){
+        var t=(y-2)/20,w=Math.round(2.6+Math.sin(t*3.0)*1.8-t*0.9);
+        if(w<1)continue;
+        var sx=CX+d*13;
+        R(x,sx-w,sx+w,y,t<0.2?h:mixc(h,H,t*0.8));
+        D(x,sx-w,y,K);D(x,sx+w,y,K);
       }
     });
   }else if(style==='pony'){
-    for(var y2=2;y2<24;y2++){
-      var t2=(y2-2)/22,w2=2.2+Math.sin(t2*2.3)*1.7;
-      var sx2=CX+HEADW[4]+1+Math.round(t2*t2*5);
-      R(x,Math.round(sx2-w2),Math.round(sx2+w2),y2,t2<0.22?h:mixc(h,H,t2*0.78));
-      D(x,Math.round(sx2+w2),y2,mixc(H,'#000000',0.25));
+    for(var y2=1;y2<20;y2++){
+      var t2=(y2-1)/19,w2=Math.round(2.2+Math.sin(t2*2.4)*1.5);
+      var sx2=CX+11+Math.round(t2*t2*4);
+      R(x,sx2-w2,sx2+w2,y2,t2<0.22?h:mixc(h,H,t2*0.8));
+      D(x,sx2+w2,y2,K);
     }
+  }
+}
+function hairFront(x,style,h,H){
+  var lit=mixc(h,'#FFFFFF',0.34);
+  if(style==='buzz'){                          /* barely a cap */
+    for(var y0=0;y0<3;y0++){var s0=headSpan(y0);R(x,s0[0],s0[1],y0,y0<1?lit:h);}
+    return;
+  }
+  /* crown cap sits over the top four rows */
+  for(var y=-1;y<4;y++){
+    var s=headSpan(Math.max(0,y));
+    R(x,s[0]-(y>0?1:0),s[1]+(y>0?1:0),y,y<1?lit:h);
+    D(x,s[0]-(y>0?1:0),y,K);D(x,s[1]+(y>0?1:0),y,K);
+  }
+  R(x,5,10,0,lit,0.85);                        /* one glossy band */
+  /* fringe: blocky steps, never over the eyes */
+  var tips;
+  if(style==='spiky')     tips=[[4,5],[8,3],[12,6],[16,3],[19,5]];
+  else if(style==='bob')  tips=[[4,6],[8,4],[12,6],[16,4],[19,6]];
+  else if(style==='twin') tips=[[4,4],[8,6],[12,3],[16,6],[19,4]];
+  else                    tips=[[4,5],[8,6],[12,3],[15,6],[19,5]];
+  tips.forEach(function(t,i){
+    var tx=t[0],ty=Math.min(t[1],EYE_Y-1);
+    for(var y2=0;y2<=ty;y2++){
+      var wid=(y2<ty-1)?1:0;
+      R(x,tx-wid,tx+wid,y2,(i%2)?h:mixc(h,H,0.35));
+    }
+    D(x,tx,ty,K);
+  });
+  /* sideburns down the cheek edges */
+  var sl={long:14,wave:15,pony:11,twin:10,bob:11,spiky:8}[style]||12;
+  for(var y3=1;y3<sl;y3++){
+    var s3=headSpan(Math.min(y3,HEAD_B));if(!s3)continue;
+    D(x,s3[0]-1,y3,mixc(h,H,0.4));D(x,s3[1]+1,y3,mixc(h,H,0.4));
   }
 }
 
 /* ============================================================
-   WINGS — glowing, feathered, animated
+   WINGS — small, flat, two-tone. Growtopia keeps them simple.
    ============================================================ */
 var WINGS={
-  angel:  {c:['#FFFFFF','#DCE4F5','#9FB0D8'],glow:'#CFE4FF',feather:1},
-  crystal:{c:['#B6F4FF','#63D8FF','#2A8FC4'],glow:'#63D8FF',feather:1},
+  angel:  {c:['#FFFFFF','#D6DEF0','#96A4C8'],glow:'#CFE4FF',feather:1},
+  crystal:{c:['#BEF6FF','#63D8FF','#2A8FC4'],glow:'#63D8FF',feather:1},
   ember:  {c:['#FFD08A','#FF8A2B','#C2400C'],glow:'#FF9A3C',feather:1},
   void:   {c:['#C9A4FF','#8A45E0','#3E1A72'],glow:'#A45CFF',feather:0},
   fairy:  {c:['#FFC7E8','#FF6EC0','#B02A80'],glow:'#FF6EC0',feather:0},
@@ -3295,216 +3404,187 @@ var WINGS={
   moth:   {c:['#EFE0FF','#B79CE8','#6B4EA8'],glow:'#C8A8FF',feather:0},
   aurora: {c:['#B6FFE4','#4FE0B0','#1B8A6A'],glow:'#4FE0B0',feather:1}
 };
-/* Wings mount on the upper back at WING_Y and sweep up and outward.
-   One vertical run per column keeps the silhouette readable at 1px. */
-var WING_Y=TOR_A+2, WING_SPAN=13;
-function drawWings(x,style,flap,back){
-  var W=WINGS[style]||WINGS.angel;
-  var lift=flap*1.6;
+var WING_Y=TOR_A+1,WING_SPAN=10;
+function drawWings(x,style,flap){
+  var W=WINGS[style]||WINGS.angel, lift=flap*1.4;
   for(var side=-1;side<=1;side+=2){
     for(var u=0;u<WING_SPAN;u++){
-      var t=u/(WING_SPAN-1);
-      var xo=CX+side*(10+u);
-      /* leading edge climbs past the shoulder; trailing edge tucks in */
-      var top=Math.round(WING_Y-4-t*13-lift*(0.3+t*0.8));
-      var bot=Math.round(WING_Y+8-t*t*8-lift*t*0.4);
-      if(W.feather){
-        bot+=(u%3===0)?1:((u%3===1)?-1:0);    /* scalloped flight feathers */
-        if(t>0.6)bot-=Math.round((t-0.6)*5);
-      }else{
-        bot-=Math.round(t*t*4);               /* membrane tapers to a point */
-      }
+      var t=u/(WING_SPAN-1), xo=CX+side*(9+u);
+      var top=Math.round(WING_Y-2-t*9-lift*(0.3+t*0.7));
+      var bot=Math.round(WING_Y+5-t*t*6-lift*t*0.4);
+      if(W.feather){bot+=(u%3===0)?1:0;if(t>0.62)bot-=Math.round((t-0.62)*5);}
+      else bot-=Math.round(t*t*3);
       if(bot<top)bot=top;
       for(var y=top;y<=bot;y++){
         var v=(y-top)/Math.max(1,bot-top);
-        var col=(v<0.30)?W.c[0]:(v<0.70?W.c[1]:W.c[2]);
-        if(t>0.74)col=mixc(col,W.c[2],0.40);
-        R(x,xo,xo,y,col,back?0.90:1);
+        R(x,xo,xo,y,(v<0.34)?W.c[0]:(v<0.72?W.c[1]:W.c[2]));
       }
-      D(x,xo,top,mixc(W.c[0],'#FFFFFF',0.55),0.95);
-      D(x,xo,bot,shade(W.c[2],-38),0.80);
-      if(!W.feather&&u%3===1)
-        for(var vy=top+2;vy<bot;vy+=2)D(x,xo,vy,mixc(W.c[1],'#FFFFFF',0.35),0.5);
+      D(x,xo,top,K);D(x,xo,bot,K);             /* hard outline, both edges */
     }
   }
   return W.glow;
 }
 function drawCape(x,pal,flap){
   var c=pal||['#C43A38','#7E1F1E'];
-  for(var y=TOR_A-1;y<BOOT_A+2;y++){
-    var t=(y-(TOR_A-1))/(BOOT_A+2-(TOR_A-1));
-    var w=5.4+t*6.2+Math.sin(t*3.4+flap*0.5)*1.1;
-    var off=Math.round(Math.sin(t*2.2+flap*0.7)*1.6);
-    R(x,Math.round(CX-w)+off,Math.round(CX+w)+off,y,t<0.15?c[0]:mixc(c[0],c[1],t*0.9));
-    D(x,Math.round(CX-w)+off,y,shade(c[1],-30));
-    D(x,Math.round(CX+w)+off,y,shade(c[1],-30));
+  for(var y=TOR_A-1;y<LEG_B;y++){
+    var t=(y-(TOR_A-1))/(LEG_B-(TOR_A-1));
+    var w=Math.round(6+t*4+Math.sin(t*3.0+flap*0.5));
+    var off=Math.round(Math.sin(t*2.0+flap*0.6));
+    R(x,CX-w+off,CX+w+off,y,t<0.2?c[0]:mixc(c[0],c[1],t));
+    D(x,CX-w+off,y,K);D(x,CX+w+off,y,K);
   }
 }
 
 /* ============================================================
-   BODY + GARMENTS
+   BODY + GARMENTS — flat blocks with a one-pixel ink edge
    ============================================================ */
+function outlineBox(x,a,b,y0,y1){
+  for(var y=y0;y<=y1;y++){D(x,a-1,y,K);D(x,b+1,y,K);}
+  R(x,a,b,y0-1,K);R(x,a,b,y1+1,K);
+}
 function drawBody(x,c){
   var sk=c.skin[0],sh=c.skin[1];
-  /* neck — two rows, shaded under the jaw so the head reads as separate */
-  R(x,CX-3,CX+2,NECK-1,mixc(sh,K,0.30));
-  R(x,CX-3,CX+2,NECK,sh);
-  D(x,CX-4,NECK-1,K);D(x,CX+3,NECK-1,K);
-  D(x,CX-4,NECK,K);D(x,CX+3,NECK,K);
-  /* torso block (skin, so bare arms read) */
-  for(var y=TOR_A;y<=TOR_B;y++){
-    var s=torsoSpan(y);
-    R(x,s[0],s[1],y,sk);R(x,s[1]-1,s[1],y,sh);
-    R(x,s[0]-1,s[0]-1,y,K);R(x,s[1]+1,s[1]+1,y,K);
+  /* head box */
+  for(var y=HEAD_A;y<=HEAD_B;y++){
+    var s=headSpan(y);
+    R(x,s[0],s[1],y,sk);
+    R(x,s[1]-1,s[1],y,sh);                     /* light from the left */
+    D(x,s[0]-1,y,K);D(x,s[1]+1,y,K);
   }
+  R(x,headSpan(HEAD_A)[0],headSpan(HEAD_A)[1],HEAD_A-1,K);
+  R(x,headSpan(HEAD_B)[0],headSpan(HEAD_B)[1],HEAD_B+1,K);
+  /* torso */
+  for(var y2=TOR_A;y2<=TOR_B;y2++){
+    var t=torsoSpan(y2);
+    R(x,t[0],t[1],y2,sk);R(x,t[1]-1,t[1],y2,sh);
+  }
+  outlineBox(x,7,16,TOR_A,TOR_B);
   /* arms */
-  for(var y2=TOR_A+1;y2<=TOR_B+1;y2++){
-    R(x,CX-8,CX-7,y2,sk);R(x,CX+7,CX+8,y2,sh);
-    D(x,CX-9,y2,K);D(x,CX+9,y2,K);
+  for(var y3=ARM_A;y3<=ARM_B;y3++){
+    R(x,ARM_L[0],ARM_L[1],y3,sk);R(x,ARM_R[0],ARM_R[1],y3,sh);
   }
+  outlineBox(x,ARM_L[0],ARM_L[1],ARM_A,ARM_B);
+  outlineBox(x,ARM_R[0],ARM_R[1],ARM_A,ARM_B);
   /* legs */
-  for(var y3=LEG_A;y3<=LEG_B;y3++){
-    R(x,CX-5,CX-2,y3,sk);R(x,CX+1,CX+4,y3,sh);
-    D(x,CX-6,y3,K);D(x,CX+5,y3,K);
+  for(var y4=LEG_A;y4<=LEG_B;y4++){
+    R(x,LEGL[0],LEGL[1],y4,sk);R(x,LEGR[0],LEGR[1],y4,sh);
   }
-  /* head fill */
-  for(var y4=0;y4<=HEAD_B;y4++){
-    var s4=headSpan(y4);if(!s4)continue;
-    R(x,s4[0],s4[1],y4,sk);
-    R(x,s4[1]-2,s4[1],y4,mixc(sk,sh,0.5));
-    D(x,s4[0]-1,y4,K);D(x,s4[1]+1,y4,K);
-  }
-  R(x,headSpan(0)[0],headSpan(0)[1],-1,K);
-  R(x,headSpan(HEAD_B)[0]+1,headSpan(HEAD_B)[1]-1,HEAD_B+1,K);
+  outlineBox(x,LEGL[0],LEGL[1],LEG_A,LEG_B);
+  outlineBox(x,LEGR[0],LEGR[1],LEG_A,LEG_B);
 }
 function drawPants(x,col){
   var a=col[0],b=col[1];
-  for(var y=LEG_A-1;y<=LEG_B;y++){
-    R(x,CX-6,CX-1,y,a);R(x,CX,CX+5,y,b);
-    D(x,CX-7,y,K);D(x,CX+6,y,K);
-    if(y===LEG_A-1)R(x,CX-6,CX+5,y,mixc(a,'#FFFFFF',0.2));
+  for(var y=LEG_A-2;y<=LEG_B-2;y++){
+    if(y<LEG_A){R(x,7,16,y,a);R(x,15,16,y,b);continue;}
+    R(x,LEGL[0],LEGL[1],y,a);R(x,LEGR[0],LEGR[1],y,b);
   }
-  R(x,CX-1,CX,LEG_A,K);R(x,CX-1,CX,LEG_A+1,K);
+  outlineBox(x,7,16,LEG_A-2,LEG_A-1);
 }
 function drawBoots(x,col){
   var a=col[0],b=col[1];
-  for(var y=BOOT_A;y<=BOOT_B;y++){
-    R(x,CX-6,CX-1,y,a);R(x,CX,CX+5,y,b);
-    D(x,CX-7,y,K);D(x,CX+6,y,K);
+  for(var y=LEG_B-2;y<=LEG_B;y++){
+    R(x,LEGL[0],LEGL[1],y,a);R(x,LEGR[0],LEGR[1],y,b);
   }
-  R(x,CX-7,CX+6,BOOT_B,K);
-  R(x,CX-6,CX+5,BOOT_A,mixc(a,'#FFFFFF',0.28));   /* cuff */
+  R(x,LEGL[0],LEGL[1],LEG_B-2,mixc(a,'#FFFFFF',0.30));
+  R(x,LEGR[0],LEGR[1],LEG_B-2,mixc(a,'#FFFFFF',0.20));
+  outlineBox(x,LEGL[0],LEGL[1],LEG_B-2,LEG_B);
+  outlineBox(x,LEGR[0],LEGR[1],LEG_B-2,LEG_B);
 }
 function drawShirt(x,col){
   var a=col[0],b=col[1],ac=col[2]||mixc(a,'#FFFFFF',0.4);
-  for(var y=TOR_A;y<=TOR_B;y++){
-    var s=torsoSpan(y);
-    R(x,s[0],s[1],y,a);R(x,s[1]-1,s[1],y,b);
-    if(y===TOR_A)R(x,s[0],s[1],y,mixc(a,'#FFFFFF',0.16));
-    if(y===TOR_B)R(x,s[0],s[1],y,b);
+  for(var y=TOR_A;y<=TOR_B;y++){R(x,7,16,y,a);R(x,15,16,y,b);}
+  R(x,7,16,TOR_A,mixc(a,'#FFFFFF',0.18));      /* collar highlight */
+  D(x,CX-1,TOR_A+2,ac);D(x,CX-1,TOR_A+4,ac);D(x,CX-1,TOR_A+6,ac);
+  for(var y2=ARM_A;y2<=ARM_B;y2++){            /* sleeves */
+    R(x,ARM_L[0],ARM_L[1],y2,a);R(x,ARM_R[0],ARM_R[1],y2,b);
   }
-  /* collar + placket */
-  R(x,CX-3,CX+2,TOR_A,ac);
-  D(x,CX-1,TOR_A+1,ac);D(x,CX-1,TOR_A+3,ac);D(x,CX-1,TOR_A+5,ac);
-  /* sleeves */
-  for(var y2=TOR_A+1;y2<=TOR_B;y2++){
-    R(x,CX-8,CX-7,y2,a);R(x,CX+7,CX+8,y2,b);
-  }
+  outlineBox(x,7,16,TOR_A,TOR_B);
+  outlineBox(x,ARM_L[0],ARM_L[1],ARM_A,ARM_B);
+  outlineBox(x,ARM_R[0],ARM_R[1],ARM_A,ARM_B);
 }
 function drawJacket(x,col){
   var a=col[0],b=col[1],ac=col[2]||'#31E8DF';
-  for(var y=TOR_A;y<=TOR_B+1;y++){
-    var s=torsoSpan(Math.min(y,TOR_B));
-    R(x,s[0]-1,s[1]+1,y,a);
-    R(x,s[1],s[1]+1,y,b);
-    R(x,CX-2,CX+1,y,mixc(a,'#FFFFFF',0.10));   /* open front, inner shirt */
-  }
-  /* lapels + trim */
-  for(var y2=TOR_A;y2<=TOR_B+1;y2++){
-    D(x,CX-3,y2,ac);D(x,CX+2,y2,shade(ac,-40));
-  }
-  R(x,CX-6,CX+5,TOR_A,ac,0.9);                 /* collar */
-  for(var y3=TOR_A+1;y3<=TOR_B+1;y3++){
-    R(x,CX-9,CX-7,y3,a);R(x,CX+6,CX+8,y3,b);
-    D(x,CX-10,y3,K);D(x,CX+9,y3,K);
-  }
-  R(x,CX-9,CX-7,TOR_B+1,ac,0.75);R(x,CX+6,CX+8,TOR_B+1,ac,0.55);  /* cuffs */
+  drawShirt(x,[a,b,ac]);
+  R(x,CX-1,CX,TOR_A+1,mixc(a,'#FFFFFF',0.16)); /* open front */
+  for(var y=TOR_A+1;y<=TOR_B;y++)D(x,CX-2,y,ac);
+  R(x,7,16,TOR_A,ac,0.85);
+  R(x,ARM_L[0],ARM_L[1],ARM_B,ac,0.7);
+  R(x,ARM_R[0],ARM_R[1],ARM_B,ac,0.55);
 }
 function drawChest(x,col){
   var a=col[0],b=col[1],ac=col[2]||'#FFFFFF';
-  for(var y=TOR_A+1;y<=TOR_B-1;y++){
-    var s=torsoSpan(y);
-    R(x,s[0]+1,s[1]-1,y,a);R(x,s[1]-2,s[1]-1,y,b);
-  }
-  R(x,CX-4,CX+3,TOR_A+1,ac,0.9);
+  for(var y=TOR_A+1;y<=TOR_B-1;y++){R(x,8,15,y,a);R(x,14,15,y,b);}
+  R(x,8,15,TOR_A+1,ac,0.9);
   D(x,CX-1,TOR_A+3,ac);D(x,CX,TOR_A+3,ac);
+  outlineBox(x,8,15,TOR_A+1,TOR_B-1);
 }
 function drawNeck(x,col){
   var a=col[0],b=col[1];
-  R(x,CX-5,CX+4,NECK,a);R(x,CX-6,CX+5,NECK+1,a);
-  R(x,CX-6,CX+5,NECK+2,b);
-  D(x,CX-4,NECK+3,a);D(x,CX-3,NECK+4,b);
+  R(x,6,17,TOR_A-1,a);R(x,6,17,TOR_A,b);
+  D(x,5,TOR_A-1,K);D(x,18,TOR_A-1,K);
+  D(x,7,TOR_A+1,a);D(x,7,TOR_A+2,b);
 }
 function drawHand(x,col,swing){
   var a=col[0],b=col[1];
-  var hx=CX+9,hy=TOR_A+3+Math.round(swing*-2);
-  for(var i=0;i<8;i++){R(x,hx,hx+1,hy+i-4,i<3?a:b);}
-  Rect(x,hx-1,hy-5,4,3,a);
-  D(x,hx-1,hy-5,mixc(a,'#FFFFFF',0.5));
+  var hx=ARM_R[1]+2,hy=ARM_A+1+Math.round(swing*-2);
+  for(var i=0;i<9;i++)R(x,hx,hx+1,hy+i-5,i<3?a:b);
+  Rect(x,hx-1,hy-6,4,3,a);
+  D(x,hx-1,hy-6,mixc(a,'#FFFFFF',0.5));
+  outlineBox(x,hx,hx+1,hy-5,hy+3);
 }
 
 /* ============================================================
-   PETS — a companion that follows you
+   PETS — a small companion, same blocky language
    ============================================================ */
 var PETS={
-  shadowcat:{n:'Shadow Cat',body:['#241B36','#150E24'],eye:'#63F0FF',ear:'pointy'},
+  shadowcat:{n:'Shadow Cat',body:['#2A2140','#170F28'],eye:'#63F0FF',ear:'pointy'},
   fluffdog:{n:'Fluff Pup',body:['#E8DCC0','#B8A886'],eye:'#3E2A18',ear:'floppy'},
   bunbun:{n:'Bun Bun',body:['#FFD7E8','#DBA0BE'],eye:'#C43A6E',ear:'long'},
   slime:{n:'Aqua Slime',body:['#7FE6FF','#2A8FC4'],eye:'#0A2A3E',ear:'none'},
   foxfire:{n:'Foxfire',body:['#FF9A3C','#C2500C'],eye:'#FFF0A8',ear:'pointy'},
-  voidling:{n:'Voidling',body:['#8A45E0','#3E1A72'],eye:'#E8C7FF',ear:'pointy'}
+  voidling:{n:'Voidling',body:['#8A45E0','#3E1A72'],eye:'#E8C7FF',ear:'pointy'},
+  dragon:{n:'Purple Dragon',body:['#A855D8','#6B2E96'],eye:'#FFD24B',ear:'wing'}
 };
 function forgePet(key,frame){
   var p=PETS[key]||PETS.shadowcat,x=mk(20,18);
   var a=p.body[0],b=p.body[1],bob=(frame&2)?1:0;
-  function r(x0,x1,y,c,al){x.globalAlpha=al===undefined?1:al;x.fillStyle=c;
-    x.fillRect(x0,y+bob,x1-x0+1,1);x.globalAlpha=1;}
-  /* tail */
-  for(var i=0;i<6;i++)r(3-((i>3)?1:0),4,11-i+((frame&2)?1:0),b);
-  /* body */
-  for(var y=8;y<15;y++){var w=(y<10)?4:5;r(9-w,9+w,y,y<10?a:b);}
-  /* head */
-  for(var y2=2;y2<9;y2++){
-    var h=[3,5,6,6,6,5,4][y2-2];
-    r(10-h,10+h,y2,a);r(10+h-1,10+h,y2,b);
+  function r(x0,x1,y,c){x.fillStyle=c;x.fillRect(x0,y+bob,x1-x0+1,1);}
+  function ink(x0,x1,y0,y1){
+    x.fillStyle=K;
+    for(var y=y0;y<=y1;y++){x.fillRect(x0-1,y+bob,1,1);x.fillRect(x1+1,y+bob,1,1);}
+    x.fillRect(x0,y0-1+bob,x1-x0+1,1);x.fillRect(x0,y1+1+bob,x1-x0+1,1);
   }
-  if(p.ear==='pointy'){for(var i2=0;i2<3;i2++){r(5+i2,6+i2,1+i2,a);r(13-i2,14-i2,1+i2,a);}}
-  if(p.ear==='long'){for(var i3=0;i3<5;i3++){r(6,7,i3-3,a);r(12,13,i3-3,a);}}
-  if(p.ear==='floppy'){for(var i4=0;i4<3;i4++){r(4,5,3+i4,b);r(14,15,3+i4,b);}}
-  /* eyes — the glow is the character */
-  x.fillStyle=p.eye;x.fillRect(7,5+bob,2,2);x.fillRect(11,5+bob,2,2);
-  x.globalAlpha=0.35;x.fillRect(6,4+bob,4,4);x.fillRect(10,4+bob,4,4);x.globalAlpha=1;
+  for(var i=0;i<5;i++)r(3,4,12-i,b);           /* tail */
+  for(var y=9;y<15;y++)r(5,14,y,y<11?a:b);     /* body */
+  ink(5,14,9,14);
+  for(var y2=3;y2<9;y2++)r(5,14,y2,a);         /* head box */
+  r(13,14,3,b);r(13,14,8,b);
+  ink(5,14,3,8);
+  if(p.ear==='pointy'){for(var i2=0;i2<2;i2++){r(5+i2,6+i2,1+i2,a);r(13-i2,14-i2,1+i2,a);}}
+  if(p.ear==='long'){for(var i3=0;i3<4;i3++){r(6,7,i3-2,a);r(12,13,i3-2,a);}}
+  if(p.ear==='floppy'){for(var i4=0;i4<3;i4++){r(3,4,4+i4,b);r(15,16,4+i4,b);}}
+  if(p.ear==='wing'){for(var i5=0;i5<4;i5++){r(1+i5,3+i5,6-i5,b);r(16-i5,18-i5,6-i5,b);}}
+  x.fillStyle=K;x.fillRect(7,5+bob,2,3);x.fillRect(11,5+bob,2,3);
+  x.fillStyle=p.eye;x.fillRect(7,6+bob,2,1);x.fillRect(11,6+bob,2,1);
   x.fillStyle='#FFFFFF';x.fillRect(7,5+bob,1,1);x.fillRect(11,5+bob,1,1);
-  /* legs */
-  x.fillStyle=b;x.fillRect(5,15+bob,2,2);x.fillRect(12,15+bob,2,2);
+  x.fillStyle=b;x.fillRect(5,15+bob,3,2);x.fillRect(12,15+bob,3,2);
   return x;
 }
 
 /* ============================================================
-   GLOW — a cheap bloom that sells the neon
+   GLOW — kept faint; the block art carries itself
    ============================================================ */
 function glowPass(src,spots){
   if(!spots.length)return src;
   var g=mk(FW,FH);
   spots.forEach(function(s){
-    g.globalAlpha=s.a;g.fillStyle=s.c;
+    g.fillStyle=s.c;
     for(var r=s.r;r>=1;r--){
-      g.globalAlpha=s.a/(r*1.6);
-      g.beginPath();g.arc(s.x,s.y,r*2.1,0,6.284);g.fill();
+      g.globalAlpha=s.a/(r*2.2);
+      g.beginPath();g.arc(s.x,s.y,r*2.0,0,6.284);g.fill();
     }
   });
-  g.globalAlpha=1;
-  g.drawImage(src.canvas,0,0);
+  g.globalAlpha=1;g.drawImage(src.canvas,0,0);
   return g;
 }
 
@@ -3514,8 +3594,8 @@ function glowPass(src,spots){
 var HAIRMAP={long:'long',longw:'long',spiky:'spiky',spikeb:'spiky',spikec:'spiky',
   bob:'bob',bobg:'bob',twin:'twin',twinp:'twin',longv:'wave',wave:'wave',pony:'pony'};
 function hairStyleOf(c){
-  var e=c.eq||{};
-  if(e.hair){var m=window.PRW&&PRW.hairLook(e.hair);if(m)return m;}
+  var e=c.eq||{},W=window.PRW;
+  if(e.hair&&W&&W.hairLook){var m=W.hairLook(e.hair);if(m)return m;}
   return HAIRMAP[c.hair]||'long';
 }
 function forgeAnime(c,mode,frame){
@@ -3527,11 +3607,10 @@ function forgeAnime(c,mode,frame){
   if(e.hair&&W.hairPal){var hp=W.hairPal(e.hair);if(hp){hc=hp[0];hC=hp[1];}}
   var style=hairStyleOf(c);
 
-  /* --- back to front --- */
   if(e.back){
-    var gcol=drawWings(x,(W.wingLook&&W.wingLook(e.back))||e.back,flap,true);
-    glow.push({x:BX+CX-15,y:BY+TOR_A,r:8,c:gcol,a:0.45});
-    glow.push({x:BX+CX+15,y:BY+TOR_A,r:8,c:gcol,a:0.45});
+    var gcol=drawWings(x,(W.wingLook&&W.wingLook(e.back))||e.back,flap);
+    glow.push({x:BX+CX-13,y:BY+WING_Y,r:6,c:gcol,a:0.34});
+    glow.push({x:BX+CX+13,y:BY+WING_Y,r:6,c:gcol,a:0.34});
   }
   if(e.cape)drawCape(x,(W.capePal&&W.capePal(e.cape))||null,flap);
   hairBack(x,style,hc,hC);
@@ -3550,29 +3629,29 @@ function forgeAnime(c,mode,frame){
   var cP=e.chest&&W.chestPal&&W.chestPal(e.chest);if(cP)drawChest(x,cP);
   var nP=e.neck&&W.neckPal&&W.neckPal(e.neck);if(nP)drawNeck(x,nP);
 
-  /* --- face --- */
   if(mode!=='back'){
     var eyec=c.eyec||'#63D8FF';
     var blink=frame>0&&(frame%150)>145;
-    drawEyes(x,eyec,c.mood,blink);
+    drawEyes(x,eyec,blink);
     drawMouth(x,c.mood);
     drawBlush(x);
     if(!blink){
-      glow.push({x:BX+EL+3,y:BY+EYE_Y+3,r:4,c:eyec,a:0.55});
-      glow.push({x:BX+ER+3,y:BY+EYE_Y+3,r:4,c:eyec,a:0.55});
+      glow.push({x:BX+EL+1,y:BY+EYE_Y+2,r:3,c:eyec,a:0.34});
+      glow.push({x:BX+ER+1,y:BY+EYE_Y+2,r:3,c:eyec,a:0.34});
     }
   }
   hairFront(x,style,hc,hC);
-  var hP=e.hand&&W.handPal&&W.handPal(e.hand);if(hP)drawHand(x,hP,Math.sin(frame*0.2));
+  var hP=e.hand&&W.handPal&&W.handPal(e.hand);
+  if(hP)drawHand(x,hP,Math.sin(frame*0.2));
   if(e.hat&&W.drawHat)W.drawHat(x,e.hat,BX,BY,CX,R,D,Rect);
 
   return glowPass(x,glow);
 }
 
-/* ---------- exports ---------- */
 var A={forgeAnime:forgeAnime,forgePet:forgePet,PETS:PETS,WINGS:WINGS,
   FW:FW,FH:FH,BX:BX,BY:BY,CX:CX,RH:RH,
-  TOR_A:TOR_A,TOR_B:TOR_B,LEG_A:LEG_A,LEG_B:LEG_B,BOOT_A:BOOT_A,BOOT_B:BOOT_B,
+  TOR_A:TOR_A,TOR_B:TOR_B,LEG_A:LEG_A,LEG_B:LEG_B,BOOT_A:LEG_B-2,BOOT_B:LEG_B,
+  HEAD_A:HEAD_A,HEAD_B:HEAD_B,
   R:R,D:D,Rect:Rect,K:K,headSpan:headSpan,torsoSpan:torsoSpan};
 window.PRCH=A;
 })();
@@ -3857,10 +3936,10 @@ S.petFor=function(o,eq){
 var iconCache={},baseIcon=I.iconOf;
 /* crop windows in rig space: [x0,y0,x1,y1], x relative to CX, y to rig row 0 */
 var CROP={
-  back:[-24,1,24,29], cape:[-14,14,14,38], hair:[-14,-3,14,21],
-  face:[-11,3,11,14],  neck:[-7,12,7,21],  shirt:[-11,14,11,28],
-  chest:[-9,15,9,27],  pants:[-9,24,9,33], feet:[-9,30,9,39],
-  hand:[2,14,14,28],   hat:[-13,-11,13,9]};
+  back:[-20,4,20,26],  cape:[-12,14,12,32], hair:[-12,-3,12,16],
+  face:[-9,4,9,16],    neck:[-8,13,8,21],   shirt:[-9,15,9,27],
+  chest:[-7,16,7,26],  pants:[-7,23,7,32],  feet:[-7,27,7,33],
+  hand:[3,15,13,27],   hat:[-12,-12,12,6]};
 I.iconOf=function(it){
   if(it.t!=='wear'||!W.DATA[it.s])return baseIcon(it);
   var key='w|'+it.s+'|'+it.k;
@@ -3876,7 +3955,7 @@ I.iconOf=function(it){
     shoe:['#3A3358','#241F3E'],eyec:'#63D8FF',hair:'long',eq:{}};
   if(it.s==='face')c.eq.face=it.k; else c.eq[it.s]=it.k;
   if(it.s==='hair')c.hair=null;
-  var full=CH.forgeAnime(c,'front',0),r=CROP[it.s]||[-13,-2,13,26];
+  var full=CH.forgeAnime(c,'front',0),r=CROP[it.s]||[-11,-2,11,20];
   var sx=CH.BX+CH.CX+r[0], sy=CH.BY+r[1], sw=r[2]-r[0], sh=r[3]-r[1];
   /* fit the window inside a 20x20 icon without distorting it */
   var k=Math.min(20/sw,20/sh), dw=Math.max(1,Math.round(sw*k)), dh=Math.max(1,Math.round(sh*k));
@@ -3887,17 +3966,17 @@ I.iconOf=function(it){
 /* the portrait wants a head-and-shoulders crop, not the whole doll */
 function bustOf(src,w,h){
   var x=mk(w,h);
-  /* frame the head and shoulders: rig rows -3..h, centred on CX */
-  x.drawImage(src.canvas,CH.BX+CH.CX-(w>>1),CH.BY-3,w,h,0,0,w,h);
+  /* frame the head: the block rig's face is the whole identity */
+  x.drawImage(src.canvas,CH.BX+CH.CX-(w>>1),CH.BY-2,w,h,0,0,w,h);
   return x;
 }
-S.portraitOf=function(){return bustOf(playerSprite()[0],30,28);};
+S.portraitOf=function(){return bustOf(playerSprite()[0],22,22);};
 var chatCache={};
 S.chatAvatar=function(who){
   var k='c|'+(who==='me'?playerSig():who);
   if(chatCache[k])return chatCache[k];
   var strip=(who==='me')?playerSprite():npcSprite(who);
-  return (chatCache[k]=bustOf(strip[0],26,24));
+  return (chatCache[k]=bustOf(strip[0],22,22));
 };
 })();
 </script>
@@ -4955,7 +5034,7 @@ function open(kind){G.open=kind;modals.classList.add('on');if(AU)AU.resume();}
 
 /* ---------------- inventory ---------------- */
 var invFilter='all';
-function refreshPortrait(){var pv=$('#portCv');if(pv)P.mount(pv,S.portraitOf(),5);}
+function refreshPortrait(){var pv=$('#portCv');if(pv)P.mount(pv,S.portraitOf(),2);}
 function matchFilter(it){
   if(invFilter==='all')return true;
   if(invFilter==='blocks')return it.t==='block';
@@ -4965,6 +5044,7 @@ function matchFilter(it){
   return it.t==='tool';
 }
 function openInv(filter){open('inv');if(filter)invFilter=filter;drawInv();}
+var invSel=-1;
 function drawInv(){
   var used=G.inv.filter(Boolean).length;
   var bd=shell('Backpack',used+' / 200 slots');
@@ -5002,12 +5082,15 @@ function drawInv(){
     ' · gems <b style="color:#FFC24B">◆ '+fmt(G.gems)+'</b> (system currency, not tradeable)'));
   var grid=el('div','g8');
   var lastUsed=0;G.inv.forEach(function(s,i){if(s)lastUsed=i;});
+  var selIdx=invSel;
   var shown=Math.min(200,Math.max(48,lastUsed+9));
   G.inv.slice(0,shown).forEach(function(s,i){
     if(s?!matchFilter(s.it):invFilter!=='all')return;
     var d=slotEl(s,{eq:s&&s.it.t==='wear'&&G.equip[s.it.s]===s.it.k});
+    if(i===selIdx&&s)d.classList.add('sel');
     d.addEventListener('click',function(ev){
       if(!s)return;
+      invSel=i;
       if(ev.shiftKey){
         var mv=S.takeSlot(i,s.n);
         S.spawnDrop(mv.it,mv.n,G.p.x+PW/2+G.p.dir*10,G.p.y+8,true);
@@ -5035,7 +5118,42 @@ function drawInv(){
     });
     grid.appendChild(d);
   });
-  right.appendChild(grid);wrap.appendChild(right);bd.appendChild(wrap);
+  right.appendChild(grid);wrap.appendChild(right);
+
+  /* the action column: everything you can do to the selected stack */
+  var col=el('div','invcol');
+  function sel(){var s=G.inv[invSel];return s?{s:s,i:invSel}:null;}
+  [['RECYCLE','recycle'],['STORE','store'],['DROP','drop'],['INFO','info']].forEach(function(a){
+    var b=el('div','a'+(a[1]==='drop'?' danger':''),a[0]);
+    b.addEventListener('click',function(){
+      var c=sel();
+      if(!c){S.toast('Pick an item first');return;}
+      var it=c.s.it,n=c.s.n,name=I.itemName(it);
+      if(a[1]==='drop'){
+        var mv=S.takeSlot(c.i,n);
+        S.spawnDrop(mv.it,mv.n,G.p.x+PW/2+G.p.dir*10,G.p.y+8,true);
+        S.toast('Dropped '+name);
+      }else if(a[1]==='recycle'){
+        if(it.t==='block'&&(it.k==='lock'||it.k==='diamondlock')){
+          S.toast('Locks cannot be recycled');return;}
+        var back=Math.max(1,Math.round(S.invValue([c.s])*0.5));
+        S.takeSlot(c.i,n);G.gems+=back;
+        S.toast('Recycled '+name+' for '+fmt(back)+' gems');
+        if(AU)AU.chime();
+      }else if(a[1]==='store'){
+        var tmp=G.inv[G.hot];G.inv[G.hot]=G.inv[c.i];G.inv[c.i]=tmp;
+        S.toast('Moved '+name+' to slot '+((G.hot+1)%10));
+      }else{
+        S.toast(name+' · '+(it.t==='wear'?'wearable':it.t)+
+          ' · worth '+fmtLocks(S.invValue([{it:it,n:1}]))+' each · '+n+' held');
+        return;
+      }
+      invSel=-1;drawInv();D.renderHotbar();D.syncHud();refreshPortrait();
+    });
+    col.appendChild(b);
+  });
+  wrap.appendChild(col);
+  bd.appendChild(wrap);
 }
 
 /* ---------------- splice book ---------------- */

@@ -34,21 +34,32 @@ Click a block to punch it, click empty space to build, walk into a door and pres
 
 ### The characters
 
-Avatars are chibi-proportioned and drawn on a **28 × 34 rig** inside a 68 × 58
-frame — a head that is 40% of the figure, and eyes seven pixels tall with a
-lash line, a shaded iris, a white catchlight and a wet-look sparkle. Nothing is
-a bitmap; the whole figure is drawn from span and ellipse math, so a new hair
-style or wing is a function, not an asset.
+Avatars use Growtopia's own proportions: a **24 × 32 rig** in a 56 × 48 frame,
+built from a big square head (half the figure), two bold dark eyes with a
+coloured iris and a single glint, a two-pixel mouth, and a short stocky body on
+two separate legs. Everything sits on the pixel grid with a one-pixel ink
+outline — chunky on purpose, no soft curves. Nothing is a bitmap; the whole
+figure is drawn from block math, so a new hair style or wing is a function,
+not an asset.
 
 - **Twelve equip slots** — back, cape, pants, shirt, chest, feet, hand, face,
   hair, neck, hat and a **pet** that trails behind you
-- **122 wearables**, including eight wing styles with per-feather scalloping,
-  ten hair styles with real strands and side locks, nine hats, and six pets
+- **122 wearables**, including eight wing styles with scalloped flight
+  feathers or veined membranes, ten hair styles, nine hats, and seven pets
 - **Animated**: a 16-frame idle strip per outfit drives the wing flap and the
   blink; walk, jump and climb poses are cut out of the composed frame and
   re-offset, so any outfit animates without per-outfit art
-- **Glow**: eyes and wings get a radial bloom pass, which is what makes the
-  neon read at 32px
+- **Glow**: eyes and wings get a faint bloom pass — enough to read as neon
+  without softening the block art
+
+### The interface
+
+Light blue panels with a white bevel and dark text, the way Growtopia does it.
+The default screen carries almost nothing: an identity chip, a currency chip,
+the world title, a row of icon buttons and the hotbar. Everything else opens on
+demand. The backpack is a grid of chunky slots — orange border for the selected
+stack, green for what you are wearing — with a **RECYCLE / STORE / DROP / INFO**
+column beside it that acts on whatever you picked.
 
 ### Built on Growtopia's data model
 
