@@ -478,6 +478,61 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
 .invcol .a:hover{filter:brightness(1.07)}
 .invcol .a.danger{background:linear-gradient(180deg,#FFD9D9,#EFA0A0)}
 
+/* --- the trade window ---------------------------------------- */
+.tradewin{display:flex;flex-direction:column;gap:.8cqw}
+.offers{display:grid;grid-template-columns:1fr 1fr;gap:.9cqw}
+.off{background:rgba(255,255,255,.55);border:.16cqw solid var(--edge);
+  border-radius:.55cqw;padding:.6cqw}
+.off .slots{display:grid;grid-template-columns:repeat(4,1fr);gap:.4cqw}
+.off .slots .slot{width:auto;aspect-ratio:1;position:relative}
+.off .slots .slot.tick::after{content:"✔";position:absolute;right:.15cqw;top:0;
+  color:#F08A18;font-size:1.5cqw;font-weight:700;text-shadow:0 .1cqw 0 #FFF}
+.off .cap{margin-top:.45cqw;font-size:1.15cqw;color:var(--ink2);text-align:center}
+.off .cap b{color:var(--ink)}
+.off.mine{border-color:#F0A81C}
+.tacts{display:flex;justify-content:space-between;gap:1cqw}
+.tbtn{flex:1;padding:.85cqw;border-radius:.5cqw;text-align:center;cursor:pointer;
+  font-size:2cqw;font-weight:700;letter-spacing:.01em;color:#FFFFFF;
+  border:.16cqw solid rgba(255,255,255,.7);
+  text-shadow:0 .14cqw .28cqw rgba(20,20,20,.45)}
+.tbtn.no{background:linear-gradient(180deg,#F0645E,#C4322C)}
+.tbtn.yes{background:linear-gradient(180deg,#66D46E,#2E9E42)}
+.tbtn.off{opacity:.45;cursor:default;filter:grayscale(.5)}
+.tbtn:not(.off):hover{filter:brightness(1.09)}
+.tinv{display:grid;grid-template-columns:1fr auto;gap:.7cqw}
+.tcol{display:flex;flex-direction:column;gap:.4cqw;width:8cqw}
+.tcol .a{padding:.6cqw .2cqw;border-radius:.45cqw;text-align:center;cursor:pointer;
+  font-family:var(--pix);font-size:.85cqw;letter-spacing:.05em;color:var(--ink);
+  background:linear-gradient(180deg,#FFFFFF,#B6D9EE);border:.14cqw solid var(--edge)}
+.tcol .a.danger{background:linear-gradient(180deg,#FFD9D9,#EFA0A0)}
+
+/* --- trade confirmation -------------------------------------- */
+#tconf{position:absolute;inset:0;z-index:30;display:none;align-items:center;justify-content:center}
+#tconf.on{display:flex}
+#tconf .scrim{position:absolute;inset:0;background:rgba(8,26,44,.55)}
+#tconf .box{position:relative;width:44cqw;padding:1.6cqw 1.8cqw;border-radius:.9cqw;
+  background:linear-gradient(180deg,rgba(180,226,238,.97),rgba(126,190,214,.97));
+  border:.28cqw solid rgba(255,255,255,.9);
+  box-shadow:0 0 0 .16cqw #3C7A96,0 1cqw 3cqw rgba(6,22,38,.5)}
+#tconf h3{margin:0 0 1cqw;font-size:2.6cqw;text-align:center;color:#FFFFFF;
+  text-shadow:0 .18cqw .34cqw rgba(12,44,64,.6)}
+#tconf .lab{font-size:1.9cqw;font-weight:700;margin:.7cqw 0 .35cqw;
+  text-shadow:0 .14cqw .26cqw rgba(12,44,64,.45)}
+#tconf .lab.give{color:#FF6B6B}
+#tconf .lab.get{color:#6BE86B}
+#tconf .ln{display:flex;align-items:center;gap:.7cqw;padding:.22cqw 0;
+  font-size:1.65cqw;color:#FFFFFF;text-shadow:0 .12cqw .24cqw rgba(12,44,64,.5)}
+#tconf .ln canvas{width:2.4cqw;height:2.4cqw;image-rendering:pixelated;flex:none}
+#tconf .ln em{font-style:normal;opacity:.85}
+#tconf .none{font-size:1.5cqw;color:rgba(255,255,255,.7);padding:.2cqw 0}
+#tconf .go{margin-top:1.2cqw;padding:.9cqw;border-radius:.5cqw;text-align:center;cursor:pointer;
+  font-size:2.2cqw;font-weight:700;color:#1B3A18;
+  background:linear-gradient(180deg,#FFF2C4,#E8C86A);border:.16cqw solid rgba(255,255,255,.85)}
+#tconf .cx{margin-top:.5cqw;padding:.7cqw;border-radius:.5cqw;text-align:center;cursor:pointer;
+  font-size:1.8cqw;font-weight:700;color:#123048;
+  background:linear-gradient(180deg,#FFFFFF,#B6D9EE);border:.16cqw solid rgba(255,255,255,.85)}
+#tconf .go:hover,#tconf .cx:hover{filter:brightness(1.07)}
+
 /* --- trade request, same skin ------------------------------ */
 .treq .hd{background:linear-gradient(180deg,#FFE3EE,#F5B8CE)!important;
   border-bottom:.14cqw solid var(--edge)!important;color:#6E1F3C!important}
@@ -946,6 +1001,7 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
   </div>
 
   <div id="modals"><div class="pane panel" id="panel"></div></div>
+  <div id="tconf"><div class="scrim"></div><div class="box" id="tconfBox"></div></div>
 
   <div id="tutCard">
     <div class="st" id="tutStep">Step 1 of 8</div>
@@ -5962,7 +6018,7 @@ function drawTokens(){
 }
 
 /* ---------------- trade ---------------- */
-var trade=null;
+var trade=null,tradeSel=-1;
 function makeOffer(){
   var pool=[];
   I.ACTIVE_SLOTS.forEach(function(sl){
@@ -5971,7 +6027,7 @@ function makeOffer(){
   pool.sort(function(a,b){return a.v-b.v;});
   var e=Math.random()<.75?pool[ri(0,Math.floor(pool.length*0.5))]:pool[ri(0,pool.length-1)];
   var out=[{it:{t:'wear',s:e.s,k:e.k},n:1}];
-  if(Math.random()<.6)out.push({it:{t:'gem',k:pick(['emerald','sapphire','topaz'])},n:ri(1,3)});
+  /* gems are system currency — they never cross a trade window */
   if(Math.random()<.6)out.push({it:{t:'seed',k:pick(['neonp','neonc','neong'])},n:ri(2,6)});
   if(Math.random()<.25)out.push({it:{t:'block',k:'lock'},n:1});
   return out;
@@ -5979,7 +6035,8 @@ function makeOffer(){
 function openTrade(n,theirs){
   clearRequest();
   open('trade');
-  trade={npc:n,theirs:theirs||makeOffer(),yours:new Array(9).fill(null)};
+  trade={npc:n,theirs:(theirs||makeOffer()).slice(0,SLOTS),yours:new Array(SLOTS).fill(null)};
+  tradeSel=-1;
   S.bubble(n.id,pick(D.LINES.trade));
   drawTrade();
 }
@@ -6047,58 +6104,146 @@ function tradeReturnAll(){
   if(!trade)return;
   trade.yours.forEach(function(s,i){if(s){S.addItem(s.it,s.n);trade.yours[i]=null;}});
 }
+var SLOTS=4;
 function drawTrade(){
   var t=trade,name=P.CAST[t.npc.id].name;
-  var bd=shell('Trade &nbsp;·&nbsp; '+name,'priced in World Locks');
+  var bd=shell('Trade','with '+name);
   var theirV=S.invValue(t.theirs),yourV=S.invValue(t.yours);
-  var ok=yourV>=theirV*0.9;
-  var cols=el('div','tradecols');
-  var a=el('div','a');
-  a.appendChild(el('div','lbl','<span>'+name.toUpperCase()+' OFFERS</span><span>'+fmtLocks(theirV)+'</span>'));
-  var ga=el('div','g3');
-  for(var i=0;i<9;i++)ga.appendChild(slotEl(t.theirs[i]||null));
-  a.appendChild(ga);cols.appendChild(a);
-  cols.appendChild(el('div','arrows','<div class="r">⇢</div><div class="l">⇠</div>'));
-  var b=el('div','b');
-  b.appendChild(el('div','lbl','<span>YOU OFFER</span><span>'+fmtLocks(yourV)+'</span>'));
-  var gb=el('div','g3');
-  t.yours.forEach(function(s,ix){
-    var d=slotEl(s);
-    d.addEventListener('click',function(){
-      if(!s)return;S.addItem(s.it,s.n);t.yours[ix]=null;drawTrade();D.renderHotbar();
-    });
-    gb.appendChild(d);
+  var fair=yourV>=theirV*0.9;
+  var win=el('div','tradewin');
+
+  /* --- the two offer panels --- */
+  var offers=el('div','offers');
+  var mine=el('div','off mine');
+  var gm=el('div','slots');
+  for(var i=0;i<SLOTS;i++){
+    (function(ix){
+      var sl=t.yours[ix]||null;
+      var d=slotEl(sl);
+      if(sl)d.classList.add('tick');
+      d.addEventListener('click',function(){
+        if(!sl)return;
+        S.addItem(sl.it,sl.n);t.yours[ix]=null;
+        drawTrade();D.renderHotbar();
+      });
+      gm.appendChild(d);
+    })(i);
+  }
+  mine.appendChild(gm);
+  mine.appendChild(el('div','cap',t.yours.some(Boolean)
+    ? 'Your offer &mdash; <b>'+fmtLocks(yourV)+'</b>'
+    : 'Select item then tap above.'));
+  offers.appendChild(mine);
+
+  var theirs=el('div','off');
+  var gt=el('div','slots');
+  for(var j=0;j<SLOTS;j++){
+    var sd=slotEl(t.theirs[j]||null);
+    if(t.theirs[j])sd.classList.add('tick');
+    gt.appendChild(sd);
+  }
+  theirs.appendChild(gt);
+  theirs.appendChild(el('div','cap','<b>'+name+'</b>\u2019s offer &mdash; '+fmtLocks(theirV)));
+  offers.appendChild(theirs);
+  win.appendChild(offers);
+
+  /* --- cancel / accept --- */
+  var acts=el('div','tacts');
+  var no=el('div','tbtn no btn','Cancel');
+  no.addEventListener('click',function(){
+    tradeReturnAll();trade=null;closePanel();D.renderHotbar();
   });
-  b.appendChild(gb);cols.appendChild(b);
-  bd.appendChild(cols);
-  bd.appendChild(el('div','verdict',ok
-    ? '<span style="color:#7DF06A">✔ '+name+' will accept this</span>'
-    : '<span style="color:#FF5470">Needs '+fmtLocks(Math.max(1,Math.ceil(theirV*0.9-yourV)))+' more</span>'));
-  var cta=el('div','cta '+(ok?'go btn':'no'),'CONFIRM TRADE');
-  if(ok)cta.addEventListener('click',function(){
-    t.theirs.forEach(function(s){S.addItem(s.it,s.n);});
-    S.say(t.npc.id,'Pleasure doing business! 🤝');
-    S.bubble(t.npc.id,'Pleasure doing business! 🤝');
-    S.toast('Trade complete');
-    D.addXp(40);t.npc.think=200;trade=null;closePanel();
-    if(AU)AU.chime();
-    D.syncHud();D.renderHotbar();
-  });
-  bd.appendChild(cta);
-  bd.appendChild(el('div','hintline','Click an item below to add it to your offer. '+
-    'Gems are not tradeable — only real items cross the window.'));
+  var yes=el('div','tbtn yes btn'+(fair?'':' off'),'Accept');
+  if(fair)yes.addEventListener('click',function(){confirmTrade();});
+  acts.appendChild(no);acts.appendChild(yes);
+  win.appendChild(acts);
+  win.appendChild(el('div','hintline',fair
+    ? '<b>'+name+'</b> is happy with this. Tap <b>Accept</b> to see the summary.'
+    : '<b>'+name+'</b> wants '+fmtLocks(Math.max(1,Math.ceil(theirV*0.9-yourV)))+
+      ' more. Gems never cross the window &mdash; only real items do.'));
+
+  /* --- your backpack, with the side actions --- */
+  var wrap=el('div','tinv');
   var grid=el('div','g8');
-  G.inv.forEach(function(s,ix){
-    if(!s)return;
-    var d=slotEl(s);
+  G.inv.forEach(function(sl,ix){
+    if(!sl)return;
+    var d=slotEl(sl);
+    if(ix===tradeSel)d.classList.add('sel');
     d.addEventListener('click',function(){
+      tradeSel=ix;
       var free=t.yours.indexOf(null);
-      if(free<0){S.toast('Offer grid is full');return;}
-      t.yours[free]=S.takeSlot(ix,s.n);drawTrade();D.renderHotbar();
+      if(free<0){S.toast('Your offer is full — tap an item above to take it back');
+        drawTrade();return;}
+      if(sl.it.t==='gem'){S.toast('Gems are not tradeable');return;}
+      t.yours[free]=S.takeSlot(ix,sl.n);
+      tradeSel=-1;drawTrade();D.renderHotbar();
     });
     grid.appendChild(d);
   });
-  bd.appendChild(grid);
+  wrap.appendChild(grid);
+  var col=el('div','tcol');
+  [['TRASH','trash'],['STORE','store']].forEach(function(a){
+    var b=el('div','a'+(a[1]==='trash'?' danger':''),a[0]);
+    b.addEventListener('click',function(){
+      var sl=G.inv[tradeSel];
+      if(!sl){S.toast('Pick an item first');return;}
+      if(a[1]==='trash'){
+        var mv=S.takeSlot(tradeSel,sl.n);
+        S.spawnDrop(mv.it,mv.n,G.p.x+PW/2+G.p.dir*10,G.p.y+8,true);
+        S.toast('Dropped '+I.itemName(mv.it));
+      }else{
+        var tmp=G.inv[G.hot];G.inv[G.hot]=G.inv[tradeSel];G.inv[tradeSel]=tmp;
+        S.toast('Moved to slot '+((G.hot+1)%10));
+      }
+      tradeSel=-1;drawTrade();D.renderHotbar();
+    });
+    col.appendChild(b);
+  });
+  wrap.appendChild(col);
+  win.appendChild(wrap);
+  bd.appendChild(win);
+}
+
+/* ---------------- trade confirmation ---------------- */
+function lineFor(sl){
+  var d=el('div','ln');
+  var cv=document.createElement('canvas');
+  P.mount(cv,I.iconOf(sl.it),2);
+  d.appendChild(cv);
+  var t=document.createElement('span');
+  t.innerHTML='<em>('+sl.n+')</em> '+I.itemName(sl.it);
+  d.appendChild(t);
+  return d;
+}
+function confirmTrade(){
+  var t=trade;if(!t)return;
+  var box=$('#tconfBox');box.innerHTML='';
+  var name=P.CAST[t.npc.id].name;
+  var h=document.createElement('h3');h.textContent='Trade Confirmation';box.appendChild(h);
+  box.appendChild(el('div','lab give',"You'll give:"));
+  var gave=t.yours.filter(Boolean);
+  if(!gave.length)box.appendChild(el('div','none','nothing'));
+  gave.forEach(function(sl){box.appendChild(lineFor(sl));});
+  box.appendChild(el('div','lab get',"You'll get:"));
+  var got=t.theirs.filter(Boolean);
+  if(!got.length)box.appendChild(el('div','none','nothing'));
+  got.forEach(function(sl){box.appendChild(lineFor(sl));});
+  var go=el('div','go btn','Do The Trade!');
+  go.addEventListener('click',function(){
+    got.forEach(function(sl){S.addItem(sl.it,sl.n);});
+    S.say(t.npc.id,'Pleasure doing business! \ud83e\udd1d');
+    S.bubble(t.npc.id,'Pleasure doing business! \ud83e\udd1d');
+    S.toast('Trade complete');
+    D.addXp(40);t.npc.think=200;trade=null;
+    $('#tconf').classList.remove('on');
+    closePanel();
+    if(AU)AU.chime();
+    D.syncHud();D.renderHotbar();
+  });
+  var cx=el('div','cx btn','Cancel');
+  cx.addEventListener('click',function(){$('#tconf').classList.remove('on');});
+  box.appendChild(go);box.appendChild(cx);
+  $('#tconf').classList.add('on');
 }
 
 window.PRUI={openInv:openInv,openSplice:openSplice,openWorlds:openWorlds,openShop:openShop,
