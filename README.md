@@ -32,6 +32,24 @@ no fetched assets — every pixel is drawn at load time.
 Click a block to punch it, click empty space to build, walk into a door and press
 `↑` to travel, click a player to trade. Touch pads appear on coarse-pointer devices.
 
+### The characters
+
+Avatars are chibi-proportioned and drawn on a **28 × 34 rig** inside a 68 × 58
+frame — a head that is 40% of the figure, and eyes seven pixels tall with a
+lash line, a shaded iris, a white catchlight and a wet-look sparkle. Nothing is
+a bitmap; the whole figure is drawn from span and ellipse math, so a new hair
+style or wing is a function, not an asset.
+
+- **Twelve equip slots** — back, cape, pants, shirt, chest, feet, hand, face,
+  hair, neck, hat and a **pet** that trails behind you
+- **122 wearables**, including eight wing styles with per-feather scalloping,
+  ten hair styles with real strands and side locks, nine hats, and six pets
+- **Animated**: a 16-frame idle strip per outfit drives the wing flap and the
+  blink; walk, jump and climb poses are cut out of the composed frame and
+  re-offset, so any outfit animates without per-outfit art
+- **Glow**: eyes and wings get a radial bloom pass, which is what makes the
+  neon read at 32px
+
 ### Built on Growtopia's data model
 
 Items are **table rows, not code**. Each one declares an id, key, name,
@@ -39,12 +57,19 @@ behaviour type, rarity, layer, collision, hit count, grow time, spread rule,
 drop table and props — the same shape as the real game's `items.dat`. Adding a
 block is one line.
 
-- **141 items** across **31 behaviour types** from the decoded `TYPE_*` enum:
+- **144 items** across **31 behaviour types** from the decoded `TYPE_*` enum:
   locks, gateways, providers, chests, pinatas, dice, switcheroos, checkpoints,
   trampolines, weather machines, mannequins, magic eggs, lab benches,
   heart monitors, donation boxes, ice, lava, spikes, portals and more
 - **102 splice recipes**, tracked in a splice book
-- **75 wearables** over **ten equip slots** plus the held hand slot
+
+### The world
+
+A sunset sky in six stops with a sun sitting on the horizon, a crescent moon,
+depth-faded stars, **two parallax bands of floating islands** (rock keels, grass
+lips, blossom trees, lit windows), drifting cloud bands and **34 sakura petals**
+falling at three depths. Shopfronts are lit purple brick with neon signage
+spelled out in real blocks you can punch out of the wall.
 
 ### Rendering
 
@@ -58,8 +83,8 @@ block is one line.
 - **Edge-aware tiling** — a 4-bit neighbour mask picks the right seams, so runs
   of the same block read as one surface
 
-Measured on a 960 × 540 canvas: **60 fps**, `drawWorld` 0.14 ms, `relight`
-0.30 ms, `chunkBuild` 0.25 ms.
+Measured on a 960 × 540 canvas: **60 fps**, `drawWorld` 0.20 ms, `relight`
+0.32 ms, `chunkBuild` 0.23 ms.
 
 **Systems**
 
@@ -79,7 +104,8 @@ Measured on a 960 × 540 canvas: **60 fps**, `drawWorld` 0.14 ms, `relight`
 | Worlds | Type any name in the WORLDS panel — existing worlds load, new names are generated deterministically from the name |
 | Terrain | 100 × 54 tiles: grass, dirt, stone, carved caves, ore veins, bedrock |
 | Inventory | 200 slots, 10-slot hotbar, stacking, rarity borders, shift-click to drop |
-| Wardrobe | Back, cape, pants, shirt, chest, feet, hand, face, hair, neck, hat — the world sprite updates live, with walk/jump/climb poses |
+| Wardrobe | Twelve slots including a pet — the world sprite updates live, with walk/jump/climb poses |
+| Trade requests | Players walk up and send you a live offer card with both grids previewed and a 30-second timer; open it to negotiate |
 | Chat | World chat with speech bubbles, NPC chatter, and `/warp` `/name` `/who` `/splice` commands |
 | Trade | Nine-slot offer grids with live valuation; the NPC accepts only when the value clears |
 | Economy | Gems are untradable system currency; the **World Lock** is the trade unit, and 100 of them fuse into a Diamond Lock |
