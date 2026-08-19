@@ -55,6 +55,13 @@ Click a block to punch it, click empty space to build, walk into a door and pres
 World signage is placed through a 3 × 5 bitmap font, so every neon letter on a
 shop wall is a real block you can punch out and take with you.
 
+## `docs/` — the parity teardown
+
+[`growtopia-parity.html`](docs/growtopia-parity.html) measures this build against the real
+Growtopia: the decoded `items.dat` behaviour enum (we implement 11 of ~50 types), the ten
+clothing slots, the currency model we got backwards, and a phased build prompt that closes the
+gap. [`MEGA-PROMPT.md`](docs/MEGA-PROMPT.md) is that prompt on its own, ready to paste.
+
 ## Running
 
 Both files are plain HTML. Open them directly, or serve the folder:
