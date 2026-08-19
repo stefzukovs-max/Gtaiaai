@@ -28,7 +28,7 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
 #shell{position:fixed;inset:0;display:grid;place-items:center;background:#07060F}
 #frame{
   position:relative;overflow:hidden;background:#120E22;
-  width:min(100vw,calc(100vh * 16 / 9));height:min(100vh,calc(100vw * 9 / 16));
+  width:min(100vw,calc(100dvh * 16 / 9));height:min(100dvh,calc(100vw * 9 / 16));
   container-type:inline-size;
   box-shadow:0 0 0 1px #2E2850, 0 20px 80px -20px #000;
 }
@@ -568,6 +568,46 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
 .clog .bad{color:#FF7A88}
 .clog .good{color:#7DF06A}
 
+/* --- news billboard --- */
+#news{position:absolute;inset:0;z-index:45;display:none;align-items:center;justify-content:center;
+  background:rgba(8,26,44,.72)}
+#news.on{display:flex;animation:scrIn .25s ease-out}
+#news .card{width:min(64cqw,90%);max-height:80cqw;overflow:auto;border-radius:.8cqw;
+  background:linear-gradient(180deg,var(--sky1),var(--sky2));
+  border:.24cqw solid var(--bevel);box-shadow:0 0 0 .16cqw var(--edge),0 1cqw 3cqw rgba(6,20,34,.5)}
+#news .hd{position:relative;padding:1.1cqw;text-align:center;
+  background:linear-gradient(180deg,#FFE9A8,#F0C64E);border-bottom:.14cqw solid var(--edge)}
+#news .hd h3{margin:0;font-family:var(--disp);font-size:2.6cqw;color:#6B4A08;
+  text-shadow:0 .16cqw 0 rgba(255,255,255,.6)}
+#news .hd .x{position:absolute;right:.9cqw;top:50%;transform:translateY(-50%);
+  width:2.4cqw;height:2.4cqw;border-radius:50%;display:grid;place-items:center;cursor:pointer;
+  background:rgba(255,255,255,.7);color:#6B4A08;font-size:1.4cqw;font-weight:700}
+#news .body{padding:1.2cqw 1.6cqw}
+#news .item{padding:.85cqw 0;border-bottom:.1cqw dashed rgba(78,127,160,.35)}
+#news .item:last-child{border-bottom:0}
+#news .item h5{margin:0 0 .25cqw;font-size:1.5cqw;color:var(--ink)}
+#news .item p{margin:0;font-size:1.25cqw;line-height:1.5;color:var(--ink2)}
+#news .item p b{color:var(--ink)}
+#news .go{margin:.4cqw 1.6cqw 1.4cqw;padding:1cqw;border-radius:.5cqw;text-align:center;cursor:pointer;
+  font-family:var(--pix);font-size:1.25cqw;letter-spacing:.1em;color:#08301A;
+  background:linear-gradient(180deg,#8FE6A8,#3FAE63);border:.14cqw solid var(--edge)}
+#news .go:hover{filter:brightness(1.08)}
+
+/* --- tutorial coach card --- */
+#tutCard{position:absolute;left:50%;transform:translateX(-50%);top:6.6cqw;width:34cqw;
+  z-index:12;display:none;padding:.7cqw .9cqw;
+  background:linear-gradient(180deg,var(--sky1),var(--sky2));
+  border:.2cqw solid var(--bevel);border-radius:.6cqw;
+  box-shadow:0 0 0 .14cqw var(--edge),0 .4cqw 1cqw rgba(6,20,34,.4)}
+#tutCard.on{display:block}
+#tutCard .st{font-family:var(--pix);font-size:.78cqw;letter-spacing:.1em;color:#2E7A4A}
+#tutCard .nm{font-size:1.4cqw;font-weight:700;color:var(--ink);margin:.1cqw 0 .25cqw}
+#tutCard .tx{font-size:1.1cqw;line-height:1.45;color:var(--ink2)}
+#tutCard .tx b{color:var(--ink)}
+#tutCard .bar{margin-top:.55cqw;height:.5cqw;border-radius:.25cqw;background:rgba(78,127,160,.28)}
+#tutCard .bar i{display:block;height:100%;border-radius:.25cqw;
+  background:linear-gradient(90deg,#8FE6A8,#3FAE63);transition:width .3s ease}
+
 /* --- world picker --- */
 #worldpick .in{gap:1cqw;justify-content:flex-start;padding-top:2cqw}
 #worldpick .lead{font-size:1.7cqw;color:#EAF6FF;font-weight:700;text-align:center}
@@ -581,6 +621,150 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
 .wchip.top{background:#8E45C8}
 .wchip.mine{background:#2E9E52}
 .wchip.recent{background:rgba(150,196,224,.45)}
+
+/* ============================================================
+   MOBILE — everything below is driven by the frame's own width,
+   so it responds to the game view, not the browser window.
+   Two breakpoints: 'compact' (phone landscape) and 'narrow'
+   (phone portrait, where the frame is taller than it is wide).
+   ============================================================ */
+
+/* the frame fills the viewport on a phone instead of letterboxing */
+@media (pointer:coarse){
+  #shell{padding:0;background:#000}
+  #frame{box-shadow:none;border-radius:0}
+  body{overscroll-behavior:none}
+}
+
+/* ---- touch pads: bigger, thumb-reachable, and they show the action ---- */
+#touch{z-index:14}
+#touch .pad{
+  bottom:auto;width:8cqw;height:8cqw;border-radius:50%;
+  background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(168,208,234,.88));
+  border:.3cqw solid rgba(255,255,255,.95);
+  box-shadow:0 .4cqw 1cqw rgba(8,26,40,.35),inset 0 .3cqw 0 rgba(255,255,255,.6);
+  color:#16303F;font-size:2.6cqw;line-height:1;
+  -webkit-user-select:none;user-select:none;touch-action:none}
+#touch .pad:active{filter:brightness(.9);transform:scale(.94)}
+#touch .l{left:1.6cqw;bottom:12cqw}
+#touch .r{left:10.6cqw;bottom:12cqw}
+#touch .j{right:1.6cqw;bottom:12cqw;color:#16303F}
+#touch .act{position:absolute;right:10.6cqw;bottom:12cqw;pointer-events:auto}
+#touch .up{position:absolute;right:6cqw;bottom:20.5cqw;pointer-events:auto;
+  width:6.4cqw;height:6.4cqw;font-size:2cqw}
+
+/* ---- the swipe-up backpack sheet ---- */
+#sheet{position:absolute;left:0;right:0;bottom:0;z-index:16;display:none;
+  transform:translateY(100%);transition:transform .26s cubic-bezier(.22,.9,.3,1);
+  background:linear-gradient(180deg,var(--sky1),var(--sky2));
+  border-top:.3cqw solid var(--bevel);border-radius:1.2cqw 1.2cqw 0 0;
+  box-shadow:0 -.5cqw 2cqw rgba(6,20,34,.42)}
+#sheet.on{display:block;transform:translateY(0)}
+#sheet.peek{display:block;transform:translateY(calc(100% - 2.6cqw))}
+#sheet .grip{height:2.6cqw;display:grid;place-items:center;cursor:grab;touch-action:none}
+#sheet .grip i{display:block;width:12cqw;height:.7cqw;border-radius:.35cqw;background:rgba(78,127,160,.55)}
+#sheet .bar{display:flex;align-items:center;gap:.6cqw;padding:0 1cqw .5cqw;
+  font-family:var(--pix);font-size:1cqw;letter-spacing:.08em;color:var(--ink2)}
+#sheet .bar b{color:var(--ink);font-size:1.2cqw;letter-spacing:0}
+#sheet .bar .sp{flex:1}
+#sheet .wrap{display:grid;grid-template-columns:1fr auto;gap:.7cqw;padding:0 1cqw 1cqw}
+#sheet .grid{display:grid;grid-template-columns:repeat(10,1fr);gap:.32cqw;
+  max-height:30cqw;overflow-y:auto;-webkit-overflow-scrolling:touch}
+#sheet .grid .slot{width:auto;aspect-ratio:1}
+#sheet .col{display:flex;flex-direction:column;gap:.4cqw;width:9cqw}
+#sheet .col .a{padding:.75cqw .2cqw;border-radius:.45cqw;text-align:center;cursor:pointer;
+  font-family:var(--pix);font-size:.9cqw;letter-spacing:.05em;color:var(--ink);
+  background:linear-gradient(180deg,#FFFFFF,#B6D9EE);border:.14cqw solid var(--edge)}
+#sheet .col .a.danger{background:linear-gradient(180deg,#FFD9D9,#EFA0A0)}
+
+/* ============================================================
+   COMPACT — the frame is narrow. Shrink chrome, drop labels,
+   and move the hotbar clear of the thumbs.
+   ============================================================ */
+@container (max-width: 940px){
+  .hud-av .lv{display:none}
+  .hud-av .nm{font-size:1.6cqw}
+  .hud-av .port{width:4cqw;height:4cqw}
+  .gems{left:auto;right:1cqw;top:1cqw}
+  .gems .n{font-size:1.5cqw}
+  .hud-world{top:1cqw;padding:.3cqw .9cqw}
+  .hud-world .t{font-size:1.7cqw}
+  .hud-world .meta{display:none}
+  .hud-map{display:none}
+  .chat{top:auto;bottom:21cqw;left:1cqw;width:30cqw;opacity:.94}
+  .chat .log{max-height:9cqw;min-height:0;padding:.5cqw}
+  .chat .msg .b{font-size:1.05cqw}
+  .chat .inp{padding:.3cqw}
+  .chat .inp input{font-size:1.1cqw;padding:.4cqw}
+  .chat .tabs{display:none}
+  .side{top:6.4cqw;right:1cqw;gap:.5cqw}
+  .side .s{width:5.4cqw;height:5.4cqw;font-size:2.4cqw;border-radius:.9cqw}
+  .nav{display:none}
+  .modes{bottom:auto;top:6.4cqw;left:1cqw;transform:none}
+  .modes .m{font-size:1.1cqw;padding:.5cqw .7cqw}
+  .modes .m kbd{display:none}
+  .hotbar{bottom:4cqw;width:62cqw;left:50%;transform:translateX(-50%)}
+  .hotbar .row{grid-template-columns:repeat(10,1fr);gap:.3cqw}
+  .hotbar .slot .k{display:none}
+  .slot .n{font-size:1.3cqw!important}
+  .treq{right:1cqw;top:13cqw;width:34cqw}
+  .treq .hd{font-size:1.3cqw}
+  .treq .who{font-size:1.5cqw}
+  .treq .cl{font-size:1.1cqw}
+  .treq .go{font-size:1.6cqw}
+  #tutCard{width:52cqw;top:11cqw;padding:1cqw}
+  #tutCard .nm{font-size:2.2cqw}
+  #tutCard .tx{font-size:1.7cqw}
+  #tutCard .st{font-size:1.2cqw}
+  .panel{width:94cqw!important;max-height:74cqw!important}
+  .invwrap{grid-template-columns:1fr!important}
+  .doll{display:none}
+  #news .card{width:94%}
+  #news .hd h3{font-size:4cqw}
+  #news .item h5{font-size:2.4cqw}
+  #news .item p{font-size:2cqw}
+  #news .go{font-size:2.2cqw}
+  .scr .row{max-width:96%}
+  .scr label{font-size:2.6cqw}
+  .scr input[type=text],.scr input[type=password]{font-size:2.4cqw;padding:1cqw}
+  .scr .note{font-size:2.1cqw;max-width:96%}
+  .sbtn{font-size:3cqw;padding:1.3cqw 4cqw}
+  .mbtn{width:52cqw;font-size:4cqw;padding:2cqw}
+  #title .logo{font-size:12cqw}
+  #title .logo small{font-size:3.4cqw}
+  .clog{font-size:1.8cqw;height:24cqw;max-width:96%}
+  .wchip{font-size:2.2cqw;padding:.7cqw 1.4cqw}
+  .wsec h4{font-size:1.8cqw}
+  #worldpick .lead{font-size:2.4cqw}
+  #sheet .grid{grid-template-columns:repeat(8,1fr);max-height:40cqw}
+  #sheet .col{width:14cqw}
+  #sheet .col .a{font-size:1.5cqw;padding:1.2cqw .2cqw}
+  #sheet .bar b{font-size:2cqw}
+  #sheet .bar{font-size:1.5cqw}
+}
+
+/* ============================================================
+   NARROW — portrait phone. The frame is taller than it is wide,
+   so the world gets the top and the controls own the bottom.
+   ============================================================ */
+@container (max-aspect-ratio: 3/4){
+  .chat{bottom:30cqw;width:56cqw}
+  .hotbar{bottom:2cqw;width:96cqw}
+  .hotbar .slot{border-radius:.5cqw!important}
+  #touch .l{left:3cqw;bottom:24cqw;width:16cqw;height:16cqw;font-size:5cqw}
+  #touch .r{left:22cqw;bottom:24cqw;width:16cqw;height:16cqw;font-size:5cqw}
+  #touch .j{right:3cqw;bottom:24cqw;width:16cqw;height:16cqw;font-size:5cqw}
+  #touch .act{right:22cqw;bottom:24cqw;width:16cqw;height:16cqw;font-size:5cqw}
+  #touch .up{right:12cqw;bottom:42cqw;width:13cqw;height:13cqw;font-size:4cqw}
+  .side{top:auto;bottom:42cqw;right:2cqw;flex-direction:column}
+  .side .s{width:9cqw;height:9cqw;font-size:4cqw}
+  .modes{top:11cqw;left:2cqw}
+  .modes .m{font-size:2cqw}
+  #tutCard{width:92cqw;top:16cqw}
+  #sheet .grid{grid-template-columns:repeat(5,1fr);max-height:52cqw}
+  #sheet .col{width:22cqw}
+  #sheet .col .a{font-size:2.4cqw}
+}
 </style>
 <div id="shell"><div id="frame">
   <canvas id="game" width="960" height="540" aria-label="Pixel Realms game world"></canvas>
@@ -690,6 +874,18 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
     <div class="pad l" data-key="left">◀</div>
     <div class="pad r" data-key="right">▶</div>
     <div class="pad j" data-key="jump">▲</div>
+    <div class="pad act" data-key="act">✊</div>
+    <div class="pad up" data-key="enter">⇧</div>
+  </div>
+
+  <div id="sheet">
+    <div class="grip" id="sheetGrip"><i></i></div>
+    <div class="bar"><b>Backpack</b><span id="sheetCount">0 / 200</span>
+      <span class="sp"></span><span id="sheetHint">double-tap clothing to wear</span></div>
+    <div class="wrap">
+      <div class="grid" id="sheetGrid"></div>
+      <div class="col" id="sheetCol"></div>
+    </div>
   </div>
 
   <div id="toast"></div>
@@ -710,6 +906,21 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
   </div>
 
   <div id="modals"><div class="pane panel" id="panel"></div></div>
+
+  <div id="tutCard">
+    <div class="st" id="tutStep">Step 1 of 8</div>
+    <div class="nm" id="tutName">—</div>
+    <div class="tx" id="tutText">—</div>
+    <div class="bar"><i id="tutBar" style="width:0%"></i></div>
+  </div>
+
+  <div id="news">
+    <div class="card">
+      <div class="hd"><h3>PIXEL REALMS NEWS</h3><span class="x btn" id="newsX">✕</span></div>
+      <div class="body" id="newsBody"></div>
+      <div class="go btn" id="newsGo">START THE TUTORIAL</div>
+    </div>
+  </div>
 
   <!-- ===== front end: title -> login -> connect -> world picker ===== -->
   <div class="scr" id="title">
@@ -2690,7 +2901,8 @@ window.PRI={WEAR:WEAR,WEAR_SLOTS:WEAR_SLOTS,ACTIVE_SLOTS:ACTIVE_SLOTS,TOOLS:TOOL
   itemName:itemName,itemRarity:itemRarity,rarityOf:rarityOf,itemValue:itemValue,
   sameItem:sameItem,stackable:stackable,tradable:tradable,iconOf:iconOf,tileIcon:tileIcon,
   WORLDS:WORLDS,getWorld:getWorld,npc:npc,putDoor:putDoor,putSign:putSign,
-  sign2:sign2,signW:signW,rng:rng,seedOf:seedOf,BIOMES:BIOMES};
+  sign2:sign2,signW:signW,rng:rng,seedOf:seedOf,BIOMES:BIOMES,
+  World:World,terrain:terrain,surfaceTree:surfaceTree};
 })();
 </script>
 <script>
@@ -2708,7 +2920,32 @@ function fmt(n){return Number(n||0).toLocaleString('en-US');}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){
   return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c];});}
 
-var VW=960,VH=540,SC=TS/16,PW=10*SC,PH=28*SC;
+/* The canvas resolution follows the device so a phone fills its screen
+   without stretching. Decided once, before any module copies it. */
+var VW,VH;
+(function(){
+  var iw=window.innerWidth||960, ih=window.innerHeight||540, a=iw/ih;
+  if(!isFinite(a)||a<=0)a=16/9;
+  if(a>=1){VH=540;VW=Math.round(540*Math.min(2.35,Math.max(1.40,a)));}
+  else    {VW=540;VH=Math.round(540/Math.min(1.0,Math.max(0.42,a)));}
+  VW=Math.round(VW/2)*2;VH=Math.round(VH/2)*2;
+  var cvEl=document.getElementById('game');
+  if(cvEl){cvEl.width=VW;cvEl.height=VH;}
+  /* size the frame to the biggest box of that shape that fits */
+  var fr=document.getElementById('frame');
+  function fit(){
+    if(!fr)return;
+    var w=window.innerWidth,h=window.innerHeight,r=VW/VH;
+    var bw=Math.min(w,h*r), bh=bw/r;
+    if(bh>h){bh=h;bw=h*r;}
+    fr.style.width=Math.floor(bw)+'px';
+    fr.style.height=Math.floor(bh)+'px';
+  }
+  fit();
+  addEventListener('resize',fit);
+  addEventListener('orientationchange',function(){setTimeout(fit,180);});
+})();
+var SC=TS/16,PW=10*SC,PH=28*SC;
 var cv=$('#game'),ctx=cv.getContext('2d');ctx.imageSmoothingEnabled=false;
 var ovl=$('#ovl');
 
@@ -3114,6 +3351,8 @@ function stepDrops(){
       if(dist<11*SC){
         if(d.it.t==='gem'&&d.it.k==='__cash'){G.gems+=d.n;burst(d.x,d.y,'#FFC24B',3);}
         else if(!addItem(d.it,d.n))continue;
+        popPickup(d);
+        if(window.PRS&&PRS.tutorialStep)PRS.tutorialStep('pickup');
         G.drops.splice(i,1);continue;
       }
     }else{
@@ -3124,13 +3363,50 @@ function stepDrops(){
     }
   }
 }
+var pops=[];
+function popPickup(d){
+  pops.push({it:d.it,n:d.n,x:d.x,y:d.y,t:performance.now()});
+  if(pops.length>18)pops.shift();
+  burst(d.x,d.y,'#FFFFFF',4);
+}
 function drawDrops(){
   var now=performance.now();
   for(var i=0;i<G.drops.length;i++){
     var d=G.drops[i],ic=I.iconOf(d.it);
-    var bob=Math.sin((now-d.born)/260)*1.4;
+    var age=now-d.born;
+    /* a short pop on spawn, then a slow float */
+    var pop=age<220?(1+Math.sin(age/220*3.14)*0.35):1;
+    var bob=Math.sin(age/260)*1.6*SC;
+    var sz=11*SC*pop;
+    ctx.save();
+    ctx.globalAlpha=age<120?age/120:1;
+    /* a soft shadow under the drop sells the float */
+    ctx.globalAlpha*=0.28;ctx.fillStyle='#000';
+    ctx.beginPath();
+    ctx.ellipse(Math.round(d.x-G.cam.x),Math.round(d.y+7*SC-G.cam.y),4.5*SC,1.6*SC,0,0,6.284);
+    ctx.fill();
+    ctx.globalAlpha=age<120?age/120:1;
     ctx.drawImage(ic.canvas,0,0,16,16,
-      Math.round(d.x-5*SC-G.cam.x),Math.round(d.y-5*SC+bob-G.cam.y),11*SC,11*SC);
+      Math.round(d.x-sz/2-G.cam.x),Math.round(d.y-sz/2+bob-G.cam.y),sz,sz);
+    ctx.restore();
+  }
+  /* collected items drift up and fade */
+  for(var j=pops.length-1;j>=0;j--){
+    var q=pops[j],t=(now-q.t)/620;
+    if(t>=1){pops.splice(j,1);continue;}
+    var ic2=I.iconOf(q.it);
+    ctx.save();
+    ctx.globalAlpha=(1-t)*0.95;
+    var s2=10*SC*(1+t*0.35);
+    ctx.drawImage(ic2.canvas,0,0,16,16,
+      Math.round(q.x-s2/2-G.cam.x),Math.round(q.y-s2/2-t*26*SC-G.cam.y),s2,s2);
+    if(q.n>1){
+      ctx.font='700 '+(7*SC)+'px "Chakra Petch",sans-serif';
+      ctx.fillStyle='#FFFFFF';ctx.strokeStyle='rgba(0,0,0,.75)';ctx.lineWidth=2.5;
+      var tx=Math.round(q.x+5*SC-G.cam.x), ty=Math.round(q.y-t*26*SC-G.cam.y);
+      ctx.strokeText('+'+q.n,tx,ty);ctx.fillText('+'+q.n,tx,ty);
+    }
+    ctx.restore();
   }
 }
 
@@ -3472,30 +3748,42 @@ var LEGL=[7,10],LEGR=[13,16];
 /* ============================================================
    FACE — two dark eyes and a mouth. That is the whole design.
    ============================================================ */
-var EYE_Y=7,EYE_H=5,EL=5,ER=15,EYE_W=4;
-function drawEyes(x,eyec,blink){
+var EYE_Y=6,EYE_H=5,EL=4,ER=14,EYE_W=6;
+function drawEyes(x,eyec,blink,gaze){
   if(blink){
-    R(x,EL,EL+EYE_W-1,EYE_Y+2,K);R(x,EL,EL+EYE_W-1,EYE_Y+3,K);
-    R(x,ER,ER+EYE_W-1,EYE_Y+2,K);R(x,ER,ER+EYE_W-1,EYE_Y+3,K);
+    [EL,ER].forEach(function(ex,side){
+      R(x,ex,ex+EYE_W-1,EYE_Y-2,K);
+      R(x,ex,ex+EYE_W-1,EYE_Y+2,K);
+      D(x,ex+(side?EYE_W-1:0),EYE_Y+3,K);
+    });
     return;
   }
-  [EL,ER].forEach(function(ex){
-    R(x,ex,ex+EYE_W-1,EYE_Y,K);                       /* lid line on top */
-    Rect(x,ex,EYE_Y+1,EYE_W,EYE_H-1,'#FFFFFF');       /* white of the eye */
-    Rect(x,ex,EYE_Y+1,2,EYE_H-2,eyec);                /* iris, pushed inboard */
-    D(x,ex,EYE_Y+1,shade(eyec,-60));
-    D(x,ex+EYE_W-1,EYE_Y+EYE_H-1,'#C8C8D2');          /* lower-lid shadow */
+  var look=(gaze||0);                                  /* -1 left, 0 ahead, 1 right */
+  [EL,ER].forEach(function(ex,side){
+    /* brow: a short heavy row lifted off the lid, tilted at the outer end */
+    R(x,ex+(side?0:1),ex+EYE_W-(side?2:1),EYE_Y-3,K);
+    D(x,ex+(side?EYE_W-1:0),EYE_Y-4,K);
+    /* white of the eye, with a hard ink edge down each side */
+    Rect(x,ex,EYE_Y,EYE_W,EYE_H,'#FFFFFF');
+    R(x,ex,ex+EYE_W-1,EYE_Y,mixc('#FFFFFF',K,0.22));
+    D(x,ex-1,EYE_Y+1,K);D(x,ex+EYE_W,EYE_Y+1,K);
+    D(x,ex-1,EYE_Y+2,K);D(x,ex+EYE_W,EYE_Y+2,K);
+    /* pupil: a solid block that drifts, tinted when a face is equipped */
+    var px0=ex+(side?1:2)+look;
+    Rect(x,px0,EYE_Y+1,2,3,K);
+    if(eyec&&eyec!=='#FFFFFF'){D(x,px0,EYE_Y+1,eyec);D(x,px0+1,EYE_Y+3,shade(eyec,-40));}
+    D(x,px0+1,EYE_Y+1,'#FFFFFF',0.85);                 /* catchlight */
   });
 }
 function drawMouth(x,mood){
-  var my=EYE_Y+EYE_H+2;
+  var my=EYE_Y+EYE_H+3;
   if(mood==='o'){Rect(x,CX-1,my,2,2,'#6E3040');return;}
-  R(x,CX-1,CX,my,'#7A3B46');                  /* a two-pixel line, nothing more */
-  D(x,CX-2,my-1,'#7A3B46',0.55);D(x,CX+1,my-1,'#7A3B46',0.55);
+  R(x,CX-3,CX+1,my,'#6E4438');                /* a wide flat line, Growtopia-style */
+  D(x,CX-4,my-1,'#6E4438',0.6);D(x,CX+2,my-1,'#6E4438',0.6);
 }
 function drawBlush(x){
-  R(x,3,5,EYE_Y+EYE_H,'#FF9AAE',0.32);
-  R(x,18,20,EYE_Y+EYE_H,'#FF9AAE',0.32);
+  R(x,3,5,EYE_Y+EYE_H+1,'#E8877E',0.26);
+  R(x,18,20,EYE_Y+EYE_H+1,'#E8877E',0.26);
 }
 
 /* ============================================================
@@ -3634,11 +3922,14 @@ function drawBody(x,c){
   }
   R(x,headSpan(HEAD_A)[0],headSpan(HEAD_A)[1],HEAD_A-1,K);
   R(x,headSpan(HEAD_B)[0],headSpan(HEAD_B)[1],HEAD_B+1,K);
-  /* torso */
+  /* torso, with a lighter chest panel so a bare figure still has form */
+  var lit=mixc(sk,'#FFFFFF',0.20);
   for(var y2=TOR_A;y2<=TOR_B;y2++){
     var t=torsoSpan(y2);
     R(x,t[0],t[1],y2,sk);R(x,t[1]-1,t[1],y2,sh);
+    if(y2>TOR_A&&y2<TOR_B-1)R(x,t[0]+2,t[1]-2,y2,lit);
   }
+  R(x,9,14,TOR_A+1,mixc(lit,'#FFFFFF',0.25));
   outlineBox(x,7,16,TOR_A,TOR_B);
   /* arms */
   for(var y3=ARM_A;y3<=ARM_B;y3++){
@@ -3814,7 +4105,8 @@ function forgeAnime(c,mode,frame){
   if(mode!=='back'){
     var eyec=c.eyec||'#63D8FF';
     var blink=frame>0&&(frame%150)>145;
-    drawEyes(x,eyec,blink);
+    var gaze=c.gaze!==undefined?c.gaze:((frame%96)<24?-1:((frame%96)>72?1:0));
+    drawEyes(x,eyec,blink,gaze);
     drawMouth(x,c.mood);
     drawBlush(x);
     if(!blink){
@@ -4739,6 +5031,7 @@ function addXp(n){
 
 /* ---------------- drops ---------------- */
 function rollDrops(it,gx,gy){
+  if(S.tutorialStep)S.tutorialStep('punch');
   var list=Q.dropsFor(it),cx=gx*TS+TS/2,cy=gy*TS+TS/2;
   list.forEach(function(d){
     if(Math.random()>d.c)return;
@@ -4755,6 +5048,7 @@ function rollDrops(it,gx,gy){
 
 /* ---------------- punch ---------------- */
 function punch(){
+  var _tut=S.tutorialStep||function(){};
   var a=G.aim;
   if(!a||!a.ok||a.act!=='punch')return;
   var w=W(),gx=a.gx,gy=a.gy,idx=w.i(gx,gy);
@@ -4794,6 +5088,7 @@ function punch(){
   mapDirty=true;
 }
 function harvestTree(gx,gy){
+  if(S.tutorialStep)S.tutorialStep('harvest');
   var w=W(),t=S.treeAt(gx,gy);
   if(!t)return;
   var g=S.treeGrowth(t),idx=w.i(gx,gy),it=ITEMS[ID[t.s]];
@@ -4835,6 +5130,7 @@ function consume(){
   renderHotbar();
 }
 function place(){
+  var _tut=S.tutorialStep||function(){};
   var a=G.aim,s=D.hotItem();
   if(!a||!a.ok||!s)return;
   var w=W(),gx=a.gx,gy=a.gy,idx=w.i(gx,gy);
@@ -4843,12 +5139,12 @@ function place(){
     if(a.act==='placebg')w.setBg(gx,gy,it.id);else w.set(gx,gy,it.id);
     if(it.props)w.data[idx]=JSON.parse(JSON.stringify(it.props));
     if(it.type===T.PROVIDER)w.data[idx].next=Date.now()+it.props.interval;
-    consume();w.placed++;addXp(2);
+    consume();w.placed++;addXp(2);_tut('place');
     S.burst(gx*TS+TS/2,gy*TS+TS/2,S.repColorOf(it.id),5);
     if(window.PRA)PRA.place();
     mapDirty=true;G.placeLock=performance.now()+130;
   }else if(a.act==='plant'){
-    S.plantTree(gx,gy,s.it.k);consume();addXp(4);
+    S.plantTree(gx,gy,s.it.k);consume();addXp(4);_tut('plant');
     S.burst(gx*TS+TS/2,gy*TS+TS*0.6,'#5FC24F',7);
     G.placeLock=performance.now()+200;mapDirty=true;
   }else if(a.act==='splice'){
@@ -4860,6 +5156,7 @@ function place(){
     S.plantTree(gx,gy,res);
     w.data[w.i(gx,gy)].sp=true;
     S.burst(gx*TS+TS/2,gy*TS+TS/2,Q.repColor[res]||'#FFF',24);
+    if(S.tutorialStep)S.tutorialStep('splice');
     var key=[tr.s,s.it.k].sort().join('+');
     var isNew=!G.made[key];
     G.made[key]=1;
@@ -4880,6 +5177,7 @@ function place(){
       S.banner('AREA LOCKED','#31E8DF');
     }else{
       w.owner=G.name;
+      if(S.tutorialStep)S.tutorialStep('lock');
       if(mode==='builder')w.allow=[];
       S.banner('WORLD LOCKED','#FFC24B');
       S.say(null,'World Locked by '+G.name+'.',true);
@@ -5236,7 +5534,7 @@ function matchFilter(it){
   return it.t==='tool';
 }
 function openInv(filter){open('inv');if(filter)invFilter=filter;drawInv();}
-var invSel=-1;
+var invSel=-1,lastWearTap={i:-1,t:0};
 function drawInv(){
   var used=G.inv.filter(Boolean).length;
   var bd=shell('Backpack',used+' / 200 slots');
@@ -5249,7 +5547,7 @@ function drawInv(){
     var k=G.equip[sl];
     var row=el('div',null,'<span>'+sl[0].toUpperCase()+sl.slice(1)+'</span><b>'+
       (k&&I.WEAR[sl][k]?I.WEAR[sl][k][0].replace(/ (Wings|Eyes|Cape|Hat)$/,''):'—')+'</b>');
-    row.title=k?'Click to unequip':'Nothing equipped';
+    row.title=k?'Tap to take it off':'Nothing equipped';
     row.addEventListener('click',function(){
       if(!k)return;
       S.addItem({t:'wear',s:sl,k:k},1);G.equip[sl]=null;
@@ -5269,7 +5567,7 @@ function drawInv(){
     });
   right.appendChild(f);
   right.appendChild(el('div','hintline',
-    '<b>Click</b> to equip or move to hotbar slot '+((G.hot+1)%10)+
+    '<b>Double-tap</b> clothing to wear or remove it · tap a block to send it to slot '+((G.hot+1)%10)+
     ' · <b>shift-click</b> to drop · tap 100 World Locks to fuse a Diamond Lock'+
     ' · gems <b style="color:#FFC24B">◆ '+fmt(G.gems)+'</b> (system currency, not tradeable)'));
   var grid=el('div','g8');
@@ -5298,10 +5596,23 @@ function drawInv(){
         drawInv();D.renderHotbar();return;
       }
       if(s.it.t==='wear'){
+        /* one tap selects; a second tap within 380ms wears or removes it */
+        var now=performance.now();
+        if(lastWearTap.i!==i||now-lastWearTap.t>380){
+          lastWearTap={i:i,t:now};drawInv();return;
+        }
+        lastWearTap={i:-1,t:0};
         var sl=s.it.s,cur=G.equip[sl];
-        G.equip[sl]=s.it.k;S.takeSlot(i,1);
-        if(cur)S.addItem({t:'wear',s:sl,k:cur},1);
-        S.toast('Equipped '+I.itemName(s.it));
+        if(cur===s.it.k){
+          G.equip[sl]=null;S.addItem({t:'wear',s:sl,k:cur},1);
+          S.toast('Removed '+I.itemName(s.it));
+        }else{
+          G.equip[sl]=s.it.k;S.takeSlot(i,1);
+          if(cur)S.addItem({t:'wear',s:sl,k:cur},1);
+          S.toast('Wearing '+I.itemName(s.it));
+          if(S.tutorialStep)S.tutorialStep('wear');
+        }
+        if(window.PRA)PRA.chime();
         drawInv();D.renderHotbar();refreshPortrait();
       }else{
         var tmp=G.inv[G.hot];G.inv[G.hot]=G.inv[i];G.inv[i]=tmp;
@@ -5810,7 +6121,7 @@ function runConnect(){
   steps.forEach(function(st){
     connTimers.push(setTimeout(function(){logLine(box,st[1]);},st[0]));
   });
-  connTimers.push(setTimeout(openPicker,3100));
+  connTimers.push(setTimeout(function(){show(null);S.showNews&&S.showNews();},3100));
 }
 
 /* ---------------- world picker ---------------- */
@@ -5849,6 +6160,7 @@ function openPicker(from){
 /* ---------------- entering the game ---------------- */
 function beginGame(){
   show(null);
+  var nb=$('#news');if(nb)nb.classList.remove('on');
   G.started=true;
   if(AU){AU.resume();if(!G.muted)AU.ambient(S.W().sky);}
 }
@@ -5900,9 +6212,343 @@ if(box)box.addEventListener('click',function(){
 
 /* the in-game WORLDS button reopens the picker instead of a panel */
 U.openWorlds=function(){U.closePanel&&U.closePanel();openPicker(true);};
-S.openPicker=openPicker;
+S.openPicker=function(){show('worldpick');openPicker();};
+S.beginGame=beginGame;
 S.showTitle=function(){paintTitle();show('title');};
 S.anyScreen=anyScreen;
+})();
+</script>
+<script>
+/* ============================================================
+   PIXEL REALMS — NEWS + TUTORIAL
+   A billboard on connect, and a hand-built tutorial world that
+   teaches the loop and pays a World Lock when you finish it.
+   ============================================================ */
+(function(){
+'use strict';
+var P=window.PR,S=window.PRS,D=window.PRD,U=window.PRUI,Q=window.PRG,I=window.PRI;
+var G=S.G,$=function(q){return document.querySelector(q);};
+var ID=Q.ID,TS=Q.TS,SURF=Q.SURF;
+
+/* ---------------- the tutorial world ---------------- */
+var STEPS=[
+  {k:'punch', n:'Punch a block',
+   t:'Tap a <b>dirt block</b> to punch it. Blocks take a few hits — keep tapping until it breaks.'},
+  {k:'pickup',n:'Pick up the drop',
+   t:'Broken blocks fall as <b>drops</b>. Walk over one and it flies into your backpack.'},
+  {k:'place', n:'Place a block',
+   t:'Switch to <b>PLACE</b> and tap empty space to build with what you are holding.'},
+  {k:'plant', n:'Plant a seed',
+   t:'Blocks drop <b>seeds</b>. Hold one and tap a spot with a <b>wall behind it</b> to plant a tree.'},
+  {k:'harvest',n:'Harvest the tree',
+   t:'Trees take real time to grow. Punch a ripe one to <b>harvest</b> the blocks inside.'},
+  {k:'splice',n:'Splice a new block',
+   t:'Plant a <b>different</b> seed on a growing tree to invent a block nobody has made yet.'},
+  {k:'wear',  n:'Wear something',
+   t:'Open <b>ITEMS</b> and <b>double-tap</b> any clothing to put it on. Double-tap again to take it off.'},
+  {k:'lock',  n:'Lock a world',
+   t:'A <b>World Lock</b> claims a world so only you can build there. That is the whole game.'}
+];
+function stepIndex(k){for(var i=0;i<STEPS.length;i++)if(STEPS[i].k===k)return i;return -1;}
+
+function genTutorial(){
+  var R=I.rng(9001);
+  var w=new I.World('TUTORIAL','System','day');
+  w.system=true;w.biome='plains';w.tutorial=true;
+  I.terrain(w,R,I.BIOMES[0],{flat:true,noCaves:true,noOre:true,noLava:true,basic:true});
+  var top=SURF;
+  /* clear the sky: the lesson strip should read against open air */
+  for(var cx=0;cx<w.w;cx++)for(var cy=0;cy<top;cy++)w.setBg(cx,cy,0);
+
+  function station(x0,x1,label){
+    w.fillBg(x0,top-7,x1,top-1,ID.bgbrick);
+    I.sign2(w,x0+1,top-9,label,ID.neonc);
+    w.set(x0,top-8,ID.lantern);w.set(x1,top-8,ID.lantern);
+  }
+  /* 1 — a small dirt wall to punch */
+  station(8,16,'DIG');
+  w.fill(12,top-4,14,top-1,ID.dirt);
+  /* 2 — a brick face to build against and plant on */
+  station(20,30,'FARM');
+  I.putSign(w,21,top-1,'Hold a seed and tap a spot with a\nwall behind it. Trees take real time.');
+  /* 3 — the splice bench */
+  station(34,44,'SPLICE');
+  I.putSign(w,35,top-1,'Plant a DIFFERENT seed on a growing\ntree to invent a brand-new block.');
+  /* 4 — the wardrobe corner */
+  station(48,56,'WEAR');
+  w.set(50,top-1,ID.mannequin);
+  w.set(53,top-1,ID.display);w.set(54,top-1,ID.display);
+  /* 5 — the lock pedestal */
+  station(60,68,'LOCK');
+  w.fill(63,top-1,65,top-1,ID.shopbrick);
+  I.putSign(w,61,top-1,'A World Lock claims a world.\nFinish here and one is yours.');
+  /* a walkway over the whole strip */
+  w.fill(6,top-11,70,top-11,ID.platform);
+  w.spawn={x:9*TS,y:(top-2)*TS};
+  w.visitors=0;
+  w.npcs=[];
+  return w;
+}
+
+/* register the world so travel('TUTORIAL') finds it */
+var baseGet=I.getWorld;
+I.getWorld=function(name){
+  if(name==='TUTORIAL'&&!I.WORLDS.TUTORIAL)I.WORLDS.TUTORIAL=genTutorial();
+  return baseGet(name);
+};
+
+/* ---------------- progress + coaching ---------------- */
+function tut(){return G.tut||(G.tut={i:0,done:false});}
+function inTutorial(){return G.wid==='TUTORIAL'&&!tut().done;}
+function render(){
+  var box=$('#tutCard');if(!box)return;
+  var t=tut();
+  if(!inTutorial()){box.classList.remove('on');return;}
+  var st=STEPS[t.i];
+  box.classList.add('on');
+  $('#tutStep').textContent='Step '+(t.i+1)+' of '+STEPS.length;
+  $('#tutName').textContent=st.n;
+  $('#tutText').innerHTML=st.t;
+  $('#tutBar').style.width=Math.round(t.i/STEPS.length*100)+'%';
+}
+function advance(k){
+  var t=tut();
+  if(!inTutorial())return;
+  if(STEPS[t.i].k!==k)return;
+  t.i++;
+  if(t.i>=STEPS.length){
+    t.done=true;
+    S.addItem({t:'block',k:'lock'},1);
+    S.banner('TUTORIAL COMPLETE','#7DF06A');
+    S.toast('Reward: 1 World Lock. Go claim a world.');
+    S.say(null,'Tutorial complete — you earned a <b>World Lock</b>.',true);
+    if(window.PRA)PRA.chime();
+    D.renderHotbar();D.syncHud();
+    render();
+    return;
+  }
+  S.toast('Step '+(t.i+1)+': '+STEPS[t.i].n);
+  if(window.PRA)PRA.pickup&&PRA.pickup();
+  render();
+}
+S.tutorialStep=advance;
+S.tutorialActive=inTutorial;
+
+/* ---------------- news billboard ---------------- */
+var NEWS=[
+  ['Welcome to Pixel Realms','Punch blocks, plant the seeds they drop, and splice two seeds on one tree to invent a block nobody has made yet.'],
+  ['Locks are the currency','Gems buy from the store and never leave your account. <b>World Locks</b> are what players actually trade — 100 fuse into a Diamond Lock.'],
+  ['Providers pay rent','Place a provider and it yields on a timer. Passive income is how the big worlds get built.'],
+  ['Your world, your rules','Any name you type is a world. Drop a World Lock on it and nobody else can touch it.']
+];
+function showNews(){
+  var b=$('#news');if(!b)return;
+  var list=$('#newsBody');list.innerHTML='';
+  NEWS.forEach(function(n,i){
+    var d=document.createElement('div');d.className='item';
+    d.innerHTML='<h5>'+n[0]+'</h5><p>'+n[1]+'</p>';
+    list.appendChild(d);
+  });
+  var first=!G.tut||!G.tut.done;
+  $('#newsGo').textContent=first?'START THE TUTORIAL':'CHOOSE A WORLD';
+  $('#newsGo').dataset.first=first?'1':'';
+  b.classList.add('on');
+}
+S.showNews=showNews;
+
+document.addEventListener('click',function(e){
+  if(e.target.closest('#newsX')){$('#news').classList.remove('on');S.openPicker&&S.openPicker();return;}
+  var go=e.target.closest('#newsGo');
+  if(!go)return;
+  $('#news').classList.remove('on');
+  if(go.dataset.first){
+    S.beginGame&&S.beginGame();
+    D.travel('TUTORIAL');
+    setTimeout(render,300);
+  }else S.openPicker&&S.openPicker();
+});
+S.renderTutorial=render;
+})();
+</script>
+<script>
+/* ============================================================
+   PIXEL REALMS — TOUCH
+   A thumb layout that does not fight the world: move pads left,
+   act and jump right, and a backpack you drag up from the edge.
+   ============================================================ */
+(function(){
+'use strict';
+var P=window.PR,S=window.PRS,D=window.PRD,U=window.PRUI,Q=window.PRG,I=window.PRI;
+var G=S.G,$=function(q){return document.querySelector(q);};
+var coarse=matchMedia('(pointer: coarse)').matches;
+
+/* ---------------- extra pads ---------------- */
+function bindPad(el,down,up){
+  var id=null;
+  el.addEventListener('pointerdown',function(e){
+    e.preventDefault();e.stopPropagation();
+    id=e.pointerId;el.setPointerCapture&&el.setPointerCapture(id);down();
+  });
+  ['pointerup','pointercancel','pointerleave'].forEach(function(ev){
+    el.addEventListener(ev,function(e){
+      if(id!==null&&e.pointerId!==id)return;
+      id=null;up&&up();
+    });
+  });
+}
+var actPad=document.querySelector('#touch .act');
+if(actPad)bindPad(actPad,function(){G.ptr.down=true;},function(){G.ptr.down=false;});
+var upPad=document.querySelector('#touch .up');
+if(upPad)bindPad(upPad,function(){G.keys.up=true;},function(){G.keys.up=false;});
+/* the act pad shows the mode you are in */
+var MODEGLYPH={punch:'✊',place:'▣',wrench:'🔧'};
+var baseSetMode=D.setMode;
+D.setMode=function(m){
+  baseSetMode(m);
+  if(actPad)actPad.textContent=MODEGLYPH[m]||'✊';
+};
+
+/* ---------------- the swipe-up backpack ---------------- */
+var sheet=$('#sheet'),grip=$('#sheetGrip'),open=false;
+function slotNode(sl,i,sel){
+  var d=document.createElement('div');
+  d.className='slot'+(sel?' sel':'');
+  if(sl){
+    if(sl.it.t==='wear'&&G.equip[sl.it.s]===sl.it.k)d.classList.add('eq');
+    var cv=document.createElement('canvas');
+    P.mount(cv,I.iconOf(sl.it),2);
+    cv.style.cssText='position:absolute;inset:10%;width:80%;height:80%;image-rendering:pixelated';
+    d.appendChild(cv);
+    if(sl.n>1){
+      var n=document.createElement('span');n.className='n';n.textContent=sl.n;d.appendChild(n);
+    }
+  }
+  d.style.position='relative';
+  return d;
+}
+var sel=-1,lastTap={i:-1,t:0};
+function renderSheet(){
+  if(!sheet)return;
+  var grid=$('#sheetGrid');grid.innerHTML='';
+  var used=G.inv.filter(Boolean).length;
+  $('#sheetCount').textContent=used+' / 200';
+  var last=0;G.inv.forEach(function(s2,i){if(s2)last=i;});
+  var shown=Math.min(200,Math.max(40,last+11));
+  G.inv.slice(0,shown).forEach(function(sl,i){
+    var d=slotNode(sl,i,i===sel);
+    d.addEventListener('click',function(){
+      if(!sl){sel=-1;renderSheet();return;}
+      var now=performance.now();
+      var dbl=(lastTap.i===i&&now-lastTap.t<380);
+      lastTap={i:i,t:now};sel=i;
+      if(dbl&&sl.it.t==='wear'){
+        var s3=sl.it.s,cur=G.equip[s3];
+        if(cur===sl.it.k){G.equip[s3]=null;S.addItem({t:'wear',s:s3,k:cur},1);
+          S.toast('Removed '+I.itemName(sl.it));}
+        else{G.equip[s3]=sl.it.k;S.takeSlot(i,1);
+          if(cur)S.addItem({t:'wear',s:s3,k:cur},1);
+          S.toast('Wearing '+I.itemName(sl.it));
+          if(S.tutorialStep)S.tutorialStep('wear');}
+        if(window.PRA)PRA.chime();
+        U.refreshPortrait&&U.refreshPortrait();
+      }else if(dbl){
+        var tmp=G.inv[G.hot];G.inv[G.hot]=G.inv[i];G.inv[i]=tmp;
+        S.toast('Moved to slot '+((G.hot+1)%10));
+      }
+      D.renderHotbar();renderSheet();
+    });
+    grid.appendChild(d);
+  });
+  var col=$('#sheetCol');col.innerHTML='';
+  [['RECYCLE','recycle'],['STORE','store'],['DROP','drop'],['INFO','info']].forEach(function(a){
+    var b=document.createElement('div');
+    b.className='a btn'+(a[1]==='drop'?' danger':'');
+    b.textContent=a[0];
+    b.addEventListener('click',function(){act(a[1]);});
+    col.appendChild(b);
+  });
+}
+function act(kind){
+  var sl=G.inv[sel];
+  if(!sl){S.toast('Pick an item first');return;}
+  var name=I.itemName(sl.it),n=sl.n;
+  if(kind==='drop'){
+    var mv=S.takeSlot(sel,n);
+    S.spawnDrop(mv.it,mv.n,G.p.x+S.PW/2+G.p.dir*10,G.p.y+8,true);
+    S.toast('Dropped '+name);
+  }else if(kind==='recycle'){
+    if(sl.it.t==='block'&&(sl.it.k==='lock'||sl.it.k==='diamondlock')){
+      S.toast('Locks cannot be recycled');return;}
+    var back=Math.max(1,Math.round(S.invValue([sl])*0.5));
+    S.takeSlot(sel,n);G.gems+=back;
+    S.toast('Recycled '+name+' for '+back+' gems');
+  }else if(kind==='store'){
+    var tmp=G.inv[G.hot];G.inv[G.hot]=G.inv[sel];G.inv[sel]=tmp;
+    S.toast('Moved '+name+' to slot '+((G.hot+1)%10));
+  }else{
+    S.toast(name+' · '+n+' held');return;
+  }
+  sel=-1;renderSheet();D.renderHotbar();D.syncHud();
+}
+function setOpen(v){
+  open=v;
+  if(!sheet)return;
+  sheet.classList.toggle('on',v);
+  sheet.classList.toggle('peek',!v&&coarse);
+  if(v)renderSheet();
+}
+S.sheetOpen=function(){return open;};
+S.toggleSheet=function(){setOpen(!open);};
+S.renderSheet=renderSheet;
+
+/* drag the grip: up opens, down closes */
+if(grip){
+  var startY=0,dragging=false;
+  grip.addEventListener('pointerdown',function(e){
+    dragging=true;startY=e.clientY;grip.setPointerCapture&&grip.setPointerCapture(e.pointerId);
+  });
+  grip.addEventListener('pointermove',function(e){
+    if(!dragging)return;
+    var dy=e.clientY-startY;
+    if(dy<-24){setOpen(true);dragging=false;}
+    else if(dy>24){setOpen(false);dragging=false;}
+  });
+  ['pointerup','pointercancel'].forEach(function(ev){
+    grip.addEventListener(ev,function(){
+      if(dragging){setOpen(!open);dragging=false;}
+    });
+  });
+}
+/* a swipe up from the bottom eighth of the screen also opens it */
+var frame=$('#frame');
+if(frame&&coarse){
+  var sy=0,sx=0,tracking=false;
+  frame.addEventListener('touchstart',function(e){
+    var t=e.touches[0];if(!t)return;
+    var r=frame.getBoundingClientRect();
+    tracking=(t.clientY-r.top)>r.height*0.86;
+    sy=t.clientY;sx=t.clientX;
+  },{passive:true});
+  frame.addEventListener('touchend',function(e){
+    if(!tracking)return;tracking=false;
+    var t=e.changedTouches[0];if(!t)return;
+    if(sy-t.clientY>60&&Math.abs(t.clientX-sx)<70)setOpen(true);
+  },{passive:true});
+}
+
+/* on a touch device the backpack button opens the sheet, not the modal */
+if(coarse){
+  document.addEventListener('click',function(e){
+    var b=e.target.closest('[data-act=inv]');
+    if(!b)return;
+    e.preventDefault();e.stopPropagation();
+    U.closePanel&&U.closePanel();
+    setOpen(!open);
+  },true);
+  setTimeout(function(){setOpen(false);},400);
+}
+/* keep the sheet honest while it is open */
+setInterval(function(){if(open)renderSheet();},1400);
 })();
 </script>
 <script>
