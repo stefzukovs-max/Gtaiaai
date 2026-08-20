@@ -124,8 +124,15 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
 .hud-map .bar{display:flex;justify-content:space-between;padding:.2cqw .3cqw .35cqw;
   font-family:var(--pix);font-size:.75cqw;color:var(--faint)}
 
-/* chat */
-.chat{left:1.3cqw;top:10.6cqw;width:19.4cqw;display:flex;flex-direction:column;overflow:hidden}
+/* chat: a panel that hangs from the top edge and slides away */
+.chat{left:50%;transform:translateX(-50%);top:0;width:44cqw;display:flex;flex-direction:column;
+  overflow:hidden;border-radius:0 0 .8cqw .8cqw!important;
+  transition:transform .22s cubic-bezier(.22,.9,.3,1)}
+.chat.hid{transform:translateX(-50%) translateY(calc(-100% + 1.5cqw))}
+.chat .tab{position:absolute;left:50%;bottom:0;transform:translateX(-50%);
+  width:9cqw;height:1.5cqw;display:grid;place-items:center;cursor:pointer}
+.chat .tab i{display:block;width:5cqw;height:.34cqw;border-radius:.2cqw;background:rgba(78,127,160,.6)}
+.chat .log{padding-bottom:1.9cqw}
 .chat .tabs{display:flex;gap:.25cqw;padding:.45cqw;border-bottom:.1cqw solid var(--line)}
 .chat .tabs b{font-family:var(--pix);font-size:.8cqw;padding:.4cqw .6cqw .3cqw;border-radius:.35cqw;
   color:var(--faint);font-weight:400}
@@ -379,9 +386,16 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
 .hud-av .nm,.hud-world .t,.hud-vis .v,.panel h2,.panel .eyebrow{color:var(--ink)!important}
 .hud-av .lv,.hud-world .own,.hud-vis .k,.panel .hint,.hintline,.tip{color:var(--ink2)!important}
 
-/* --- top-left identity chip -------------------------------- */
-.hud-av{top:1cqw;left:1cqw;padding:.35cqw .9cqw .35cqw .35cqw;gap:.55cqw;align-items:center;
+/* --- one small box: who you are and what you have ----------- */
+.hud-av{top:1cqw;left:1cqw;padding:.3cqw .8cqw .3cqw .3cqw;gap:.55cqw;align-items:center;
   width:max-content;min-width:0}
+.hud-av .who{display:flex;flex-direction:column;gap:.1cqw}
+.hud-av .cur{display:flex;align-items:center;gap:.35cqw;line-height:1}
+.hud-av .cur canvas{width:1.3cqw;height:1.3cqw;image-rendering:pixelated}
+.hud-av .cur .n{font-size:1.05cqw;font-weight:700;color:var(--ink)}
+.hud-av .cur .tok{color:#2E8C4A}
+.hud-world[hidden],.hud-vis,.hud-map,.rail,.nav,.gems,.modes{display:none!important}
+.side .s[hidden]{display:none!important}
 .hud-av .port{width:3.2cqw;height:3.2cqw;border-radius:.5cqw;overflow:hidden;
   background:#9FC8E0;border:.14cqw solid var(--edge);display:grid;place-items:center}
 .hud-av .port canvas{position:static!important;transform:none!important;
@@ -407,10 +421,16 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
 
 /* --- top-right icon cluster -------------------------------- */
 .side{right:1cqw;top:6.4cqw;flex-direction:row;gap:.4cqw}
-.side .s{width:3cqw;height:3cqw;border-radius:.55cqw;font-size:1.35cqw;
+.side .s{width:3.2cqw;height:3.2cqw;border-radius:.6cqw;
   background:linear-gradient(180deg,#FFFFFF,#C9E3F3)!important;
-  border:.14cqw solid var(--edge)!important;color:var(--ink)!important;
-  box-shadow:0 .18cqw .35cqw rgba(8,26,40,.28)!important}
+  border:.14cqw solid var(--edge)!important;color:#2C5C78!important;
+  box-shadow:0 .18cqw .35cqw rgba(8,26,40,.28)!important;
+  display:grid;place-items:center}
+.side .s svg{width:62%;height:62%;display:block}
+.side .s.off{color:#9AB4C6!important;opacity:.75}
+.side .s.off::after{content:"";position:absolute;width:70%;height:.16cqw;background:#C25A5A;
+  transform:rotate(-38deg);border-radius:.1cqw}
+.side .s{position:relative;overflow:hidden}
 .side .s:hover{filter:brightness(1.06)}
 
 /* --- chat, quieter ----------------------------------------- */
@@ -482,6 +502,9 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
 .menu{position:absolute;inset:0;z-index:32;display:none;align-items:center;justify-content:center}
 .menu.on{display:flex}
 .menu .scrim{position:absolute;inset:0;background:rgba(8,26,44,.45)}
+.menu .card.wide{min-width:44cqw;max-width:52cqw}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:.45cqw}
+.mgrid .mrow{font-size:1.6cqw;padding:.7cqw .6cqw}
 .menu .card{position:relative;min-width:26cqw;max-width:40cqw;padding:1.3cqw 1.5cqw;
   border-radius:.7cqw;display:flex;flex-direction:column;align-items:stretch;gap:.5cqw;
   background:linear-gradient(180deg,rgba(176,220,236,.97),rgba(126,186,212,.97));
@@ -766,8 +789,9 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
   background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(168,208,234,.88));
   border:.3cqw solid rgba(255,255,255,.95);
   box-shadow:0 .4cqw 1cqw rgba(8,26,40,.35),inset 0 .3cqw 0 rgba(255,255,255,.6);
-  color:#16303F;font-size:2.6cqw;line-height:1;
+  color:#1B4462;display:grid;place-items:center;
   -webkit-user-select:none;user-select:none;touch-action:none}
+#touch .pad svg{width:48%;height:48%;display:block}
 #touch .pad:active{filter:brightness(.9);transform:scale(.94)}
 #touch .l{left:1.6cqw;bottom:12cqw}
 #touch .r{left:10.6cqw;bottom:12cqw}
@@ -790,10 +814,12 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
   font-family:var(--pix);font-size:1cqw;letter-spacing:.08em;color:var(--ink2)}
 #sheet .bar b{color:var(--ink);font-size:1.2cqw;letter-spacing:0}
 #sheet .bar .sp{flex:1}
+#sheet{max-height:62cqh}
 #sheet .wrap{display:grid;grid-template-columns:1fr auto;gap:.7cqw;padding:0 1cqw 1cqw}
-#sheet .grid{display:grid;grid-template-columns:repeat(10,1fr);gap:.32cqw;
-  max-height:30cqw;overflow-y:auto;-webkit-overflow-scrolling:touch}
+#sheet .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:.3cqw;
+  max-height:40cqh;overflow-y:auto;-webkit-overflow-scrolling:touch;align-content:start}
 #sheet .grid .slot{width:auto;aspect-ratio:1}
+#sheet .slot .n{font-size:1.15cqw!important;right:.22cqw!important;bottom:.14cqw!important}
 #sheet .col{display:flex;flex-direction:column;gap:.4cqw;width:9cqw}
 #sheet .col .a{padding:.75cqw .2cqw;border-radius:.45cqw;text-align:center;cursor:pointer;
   font-family:var(--pix);font-size:.9cqw;letter-spacing:.05em;color:var(--ink);
@@ -814,9 +840,9 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
   .hud-world .t{font-size:1.7cqw}
   .hud-world .meta{display:none}
   .hud-map{display:none}
-  /* chat runs along the top so the thumbs own the bottom corners */
-  .chat{top:5.4cqw;bottom:auto;left:14cqw;right:37cqw;width:auto;opacity:.95;
-    background:linear-gradient(180deg,rgba(240,248,253,.90),rgba(196,224,242,.90))!important}
+  /* the chat panel is narrower on a phone but still hangs from the top */
+  .chat{top:0;bottom:auto;left:50%;right:auto;width:52cqw;opacity:1;
+    background:linear-gradient(180deg,#F1F8FD,#C6E1F2)!important}
   .chat .log{height:auto;max-height:7.5cqw;min-height:0;padding:.5cqw .8cqw;gap:.5cqw}
   .chat .msg{gap:.6cqw}
   .chat .msg .b{font-size:1.35cqw;line-height:1.3}
@@ -875,84 +901,47 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
    NARROW — portrait phone. The frame is taller than it is wide,
    so the world gets the top and the controls own the bottom.
    ============================================================ */
-/* the control deck: a solid floor the thumbs own, portrait only */
-#deck{display:none}
-@container (max-aspect-ratio: 3/4){
-  #deck{display:block;position:absolute;left:0;right:0;bottom:0;height:47cqw;z-index:3;
-    background:linear-gradient(180deg,rgba(214,234,247,.97),rgba(168,203,226,.99));
-    border-top:.5cqw solid #FFFFFF;
-    box-shadow:0 -.3cqw 1.2cqw rgba(8,26,40,.35)}
-  /* chat is a thin strip across the top; the input only appears while typing */
-  .chat{top:9.5cqw;bottom:auto;left:2cqw;right:2cqw;width:auto;opacity:.96;
-    background:linear-gradient(180deg,rgba(240,248,253,.92),rgba(196,224,242,.92))!important}
-  .chat .log{height:auto;max-height:15cqw;min-height:0;padding:1cqw 1.2cqw;gap:1cqw}
-  .chat .msg{gap:1.1cqw}
-  .chat .msg .b{font-size:3.4cqw;line-height:1.3}
-  .chat .av{width:5.6cqw;height:5.6cqw}
-  .chat .inp{display:none}
-  .chat.typing .inp{display:flex;padding:.6cqw}
-  .chat.typing .inp input{font-size:2.8cqw;padding:1.1cqw}
-  .chat.typing .inp .s{width:7cqw;height:7cqw;font-size:2.8cqw}
-  .hotbar{bottom:37cqw;width:96cqw;padding:.8cqw}
-  .hotbar .row{gap:.6cqw}
-  .hotbar .slot{border-radius:.9cqw!important}
-  .hotbar .slot .k{font-size:1.5cqw}
-  .slot .n{font-size:2cqw!important}
-  #touch .pad{border-width:.55cqw}
-  #touch .l{left:3cqw;bottom:5cqw;width:18cqw;height:18cqw;font-size:6cqw}
-  #touch .r{left:23cqw;bottom:5cqw;width:18cqw;height:18cqw;font-size:6cqw}
-  #touch .act{right:23cqw;bottom:5cqw;width:18cqw;height:18cqw;font-size:6cqw}
-  #touch .j{right:3cqw;bottom:5cqw;width:18cqw;height:18cqw;font-size:6cqw}
-  #touch .up{right:3cqw;bottom:5cqw;top:auto;width:12cqw;height:12cqw;font-size:4cqw;
-    transform:translateY(-20cqw)}
-  /* the icon rail lies flat on the deck instead of running down the screen */
-  .side{top:auto;bottom:24cqw;right:auto;left:50%;transform:translateX(-50%);
-    flex-direction:row;gap:1.2cqw}
-  .side .s{width:11cqw;height:11cqw;font-size:4.8cqw;border-radius:2.2cqw!important}
-  .nav,.rail,.modes{display:none}
-  .hud-av{padding:.6cqw 1.6cqw .6cqw .6cqw}
-  .hud-av .port{width:7cqw;height:7cqw}
-  .hud-av .nm{font-size:2.9cqw}
-  .gems{left:auto;right:2cqw;top:2cqw;padding:.6cqw 1.4cqw}
-  .gems .n{font-size:2.9cqw}
-  .gems canvas{width:3.4cqw;height:3.4cqw}
-  .hud-world{top:2cqw;padding:.5cqw 1.6cqw}
-  .hud-world .t{font-size:3.1cqw}
-  #tutCard{width:92cqw;top:26cqw}
-  #sheet{z-index:18}
-  #sheet .grid{grid-template-columns:repeat(5,1fr);max-height:52cqw;gap:.7cqw}
-  #sheet .col{width:22cqw}
-  #sheet .col .a{font-size:2.6cqw;padding:1.6cqw .3cqw}
-  #sheet .grip i{width:22cqw;height:1.2cqw}
-  #sheet .bar{font-size:2cqw;padding:0 1.6cqw 1cqw}
-  #sheet .bar b{font-size:2.6cqw}
-}
+/* ============================================================
+   ROTATE — the game is landscape only. In portrait we hold the
+   landscape frame and ask for the device to be turned.
+   ============================================================ */
+#rotate{position:fixed;inset:0;z-index:90;display:none;place-items:center;
+  background:linear-gradient(180deg,#0B1D2C,#061420);color:#DCEEF9;text-align:center;
+  font-family:var(--ui);padding:8vw}
+html.rotate #rotate{display:grid}
+html.rotate #shell{filter:blur(3px) brightness(.5)}
+#rotate .ico{font-size:min(18vw,90px);line-height:1;margin-bottom:4vw;
+  animation:tip 1.8s ease-in-out infinite}
+@keyframes tip{0%,100%{transform:rotate(-12deg)}50%{transform:rotate(78deg)}}
+#rotate h2{margin:0 0 2vw;font-family:var(--disp);font-size:min(7vw,34px);color:#F8D33A;
+  text-shadow:0 2px 0 #7A5008}
+#rotate p{margin:0;font-size:min(4.4vw,17px);color:#9EC6DE;max-width:34ch}
 </style>
+<div id="rotate">
+  <div class="ico">📱</div>
+  <h2>TURN YOUR DEVICE</h2>
+  <p>Pixel Realms is played sideways. Rotate to landscape to start building.</p>
+</div>
 <div id="shell"><div id="frame">
   <canvas id="game" width="960" height="540" aria-label="Pixel Realms game world"></canvas>
   <div id="ovl"></div>
 
-  <div class="pane lyr hud-av">
+  <div class="pane lyr hud-av" id="idbox">
     <div class="port"><canvas id="portCv"></canvas></div>
     <div class="who">
       <div class="nm" id="pName">Player <span class="star">★</span></div>
-      <div class="lv" id="pLv">Lv. 1</div>
-      <div class="xp"><i id="xpBar" style="width:0%"></i><span id="xpTx">0 / 500</span></div>
+      <div class="cur">
+        <canvas id="gemCv" title="Gems"></canvas><span class="n" id="gemN">0</span>
+        <canvas id="lockCv" title="World Locks"></canvas><span class="n" id="lockN">0</span>
+        <span class="n tok" id="tokN" title="Tokens">0</span>
+      </div>
+      <div class="lv" id="pLv" hidden>Lv. 1</div>
+      <div class="xp" hidden><i id="xpBar" style="width:0%"></i><span id="xpTx">0 / 500</span></div>
     </div>
-  </div>
-  <div class="pane lyr gems">
-    <canvas id="gemCv" title="Gems — system currency, not tradeable"></canvas><span class="n" id="gemN">0</span>
-    <canvas id="lockCv" title="World Locks — the trade unit"></canvas><span class="n" id="lockN">0</span>
-    <span class="n" id="tokN" title="Growtokens — earned, never traded" style="color:#7DF06A">0</span>
   </div>
 
-  <div class="pane lyr hud-world">
-    <div class="t"><span class="fav">♥</span> <span id="wName">—</span></div>
-    <div class="meta">
-      <span class="tag owner" id="wRole">Visitor</span>
-      <span class="own" id="wOwnLine">unlocked</span>
-      <span class="tag pub">◍ Public</span>
-    </div>
+  <div class="lyr hud-world" id="hudWorld" hidden>
+    <span id="wName">—</span><span id="wRole"></span><span id="wOwnLine"></span>
   </div>
 
   <div class="pane lyr hud-vis">
@@ -977,31 +966,27 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
     <div class="bar"><span>◈ WORLD MAP</span><span id="mapPos">0, 0</span></div>
   </div>
 
-  <div class="pane lyr chat">
+  <div class="pane lyr chat hid">
     <div class="tabs"><b class="on">World</b><b>Friends</b><b>Guild</b></div>
     <div class="log" id="chatLog"></div>
     <div class="inp">
       <input id="chatIn" maxlength="90" placeholder="Press T to chat, / for commands">
       <div class="s btn" id="chatSend">➤</div>
     </div>
+    <div class="tab btn" id="chatTab"><i></i></div>
   </div>
 
   <div class="side" id="side">
-    <div class="s btn" data-act="inv" title="Inventory (E)">🎒</div>
-    <div class="s btn" data-act="splice" title="Splice book (B)">🌱</div>
-    <div class="s btn" data-act="worlds" title="Worlds (G)">🌍</div>
-    <div class="s btn" data-act="shop" title="Shop">🛒</div>
-    <div class="s btn" data-act="tokens" title="Growtoken store (L)">⬢</div>
-    <div class="s btn" data-act="mute" id="muteBtn" title="Sound (M)">🔊</div>
-    <div class="s btn" data-act="pause" title="Menu (Esc)">☰</div>
+    <div class="s btn" data-act="inv" title="Backpack (E)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="14" rx="2.5"/><path d="M8.5 7V5.5a3.5 3.5 0 017 0V7M4 12h16"/></svg></div>
+    <div class="s btn" data-act="splice" title="Splice book (B)" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-8"/><path d="M12 13C12 8.6 9 6 4.5 6 4.5 10.4 7.5 13 12 13z"/><path d="M12 15c0-3.6 2.7-6 6.5-6 0 3.6-2.7 6-6.5 6z"/></svg></div>
+    <div class="s btn" data-act="worlds" hidden title="Worlds (G)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.8 2.4 14.2 0 17M12 3.5c-2.4 2.8-2.4 14.2 0 17"/></svg></div>
+    <div class="s btn" data-act="shop" hidden title="Gem Store"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16l-1.4 10.5a1.6 1.6 0 01-1.6 1.5H7a1.6 1.6 0 01-1.6-1.5z"/><path d="M8.5 8V6.5a3.5 3.5 0 017 0V8"/><path d="M9.5 12.5h5"/></svg></div>
+    <div class="s btn" data-act="tokens" hidden title="Token store (L)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 4.3v8.6L12 20.2 4.5 15.9V7.3z"/><path d="M12 8.2l3.4 2v3.9L12 16.1l-3.4-2v-3.9z"/></svg></div>
+    <div class="s btn" data-act="mute" hidden id="muteBtn" title="Sound (M)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4z"/><path d="M15.5 9.6a3.6 3.6 0 010 4.8M18.2 7.2a7.2 7.2 0 010 9.6"/></svg></div>
+    <div class="s btn" data-act="pause" title="Menu (Esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="17" height="16" rx="2.5"/><path d="M7.5 9h9M7.5 12.5h9M7.5 16h5.5"/></svg></div>
   </div>
 
   <div class="pane lyr hotbar"><div class="row" id="hotbar"></div></div>
-  <div class="pane lyr modes" id="modes">
-    <div class="m on" data-mode="punch">PUNCH<kbd>Z</kbd></div>
-    <div class="m" data-mode="place">PLACE<kbd>X</kbd></div>
-    <div class="m" data-mode="wrench">WRENCH<kbd>C</kbd></div>
-  </div>
 
   <div class="pane lyr nav">
     <div class="b btn" data-act="inv">
@@ -1033,13 +1018,12 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
       <span>RESET</span></div>
   </div>
 
-  <div id="deck"></div>
   <div id="touch">
-    <div class="pad l" data-key="left">◀</div>
-    <div class="pad r" data-key="right">▶</div>
-    <div class="pad j" data-key="jump">▲</div>
-    <div class="pad act" data-key="act">✊</div>
-    <div class="pad up" data-key="enter">⇧</div>
+    <div class="pad l" data-key="left"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 4.5L7 12l8.5 7.5z"/></svg></div>
+    <div class="pad r" data-key="right"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8.5 4.5L17 12l-8.5 7.5z"/></svg></div>
+    <div class="pad j" data-key="jump"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5l8 9h-4.6v5.5H8.6V14H4z"/></svg></div>
+    <div class="pad act" data-key="act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 11.5V8.2a1.7 1.7 0 013.4 0v2.3M9.4 10.4V7.2a1.7 1.7 0 013.4 0v3.2M12.8 10.6V8.4a1.7 1.7 0 013.4 0v4.1"/><path d="M6 11.5v3.1a5 5 0 005 5h1.6a5 5 0 005-5v-2.7"/></svg></div>
+    <div class="pad up" data-key="enter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V6M6.5 11.5L12 6l5.5 5.5"/></svg></div>
   </div>
 
   <div id="sheet">
@@ -2743,7 +2727,8 @@ var TOOLS={
  sword:['Neon Sword',62],bow:['Void Bow',34],wand:['Star Wand',54],
  potion:['Growth Potion',14],teddy:['Neon Teddy',14],
  shard:['Glass Shard',4],cog:['Brass Cog',8],essence:['Void Essence',30],
- fiber:['Plant Fiber',3],ember:['Ember Core',24]
+ fiber:['Plant Fiber',3],ember:['Ember Core',24],
+ wrench:['Wrench',0]
 };
 var COMPONENTS={shard:1,cog:1,essence:1,fiber:1,ember:1};
 var GEMV={gold:1,diamond:25,emerald:15,ruby:30,amethyst:40,sapphire:20,topaz:18,opal:60};
@@ -3091,14 +3076,12 @@ function esc(s){return String(s).replace(/[&<>"]/g,function(c){
    without stretching. Decided once, before any module copies it. */
 var VW,VH;
 (function(){
-  var iw=window.innerWidth||960, ih=window.innerHeight||540, a=iw/ih;
+  /* The game is landscape only. In portrait we still lay out for landscape
+     and ask the player to turn the device, so nothing has to reflow. */
+  var iw=window.innerWidth||960, ih=window.innerHeight||540;
+  var a=Math.max(iw,ih)/Math.max(1,Math.min(iw,ih));
   if(!isFinite(a)||a<=0)a=16/9;
-  if(a>=1){VH=540;VW=Math.round(540*Math.min(2.35,Math.max(1.40,a)));}
-  else{
-    /* portrait: zoom in so tiles stay chunky, and cap how tall the view gets
-       — the control deck covers the bottom third anyway */
-    VW=384;VH=Math.min(940,Math.round(384/Math.min(0.95,Math.max(0.42,a))));
-  }
+  VH=540;VW=Math.round(540*Math.min(2.35,Math.max(1.40,a)));
   VW=Math.round(VW/2)*2;VH=Math.round(VH/2)*2;
   var cvEl=document.getElementById('game');
   if(cvEl){cvEl.width=VW;cvEl.height=VH;}
@@ -3107,6 +3090,14 @@ var VW,VH;
   function fit(){
     if(!fr)return;
     var w=window.innerWidth,h=window.innerHeight,r=VW/VH;
+    var portrait=h>w;
+    document.documentElement.classList.toggle('rotate',portrait);
+    if(portrait){                      /* hold the landscape shape, letterboxed */
+      var bw2=Math.min(w,h*r);
+      fr.style.width=Math.floor(bw2)+'px';
+      fr.style.height=Math.floor(bw2/r)+'px';
+      return;
+    }
     var bw=Math.min(w,h*r), bh=bw/r;
     if(bh>h){bh=h;bw=h*r;}
     fr.style.width=Math.floor(bw)+'px';
@@ -3696,6 +3687,7 @@ function bubble(target,text){
   G.bubbles.push({target:target,node:n,until:performance.now()+4200});
 }
 function renderLog(){
+  if(window.PRS&&PRS.chatPeek)PRS.chatPeek();
   var log=$('#chatLog');log.innerHTML='';
   G.log.forEach(function(m){
     var c=m.sys?null:(P.CAST[m.who]||null);
@@ -5108,7 +5100,9 @@ function updateAim(){
   var s=hotItem(),a={gx:gx,gy:gy,ok:false,act:null,label:''};
   var build=canBuild(gx,gy);
 
-  if(G.mode==='wrench'){
+  /* The tool is implied by what is in your hand: a wrench configures,
+     a placeable builds, and anything else punches. No mode buttons. */
+  if(s&&s.it.t==='tool'&&s.it.k==='wrench'){
     a.act='wrench';
     if(fgIt&&near&&(fgIt.type===T.SIGN||fgIt.type===T.BULLETIN||fgIt.type===T.DOOR||
         fgIt.type===T.USER_DOOR||fgIt.type===T.PORTAL||fgIt.type===T.PROVIDER||
@@ -5118,15 +5112,14 @@ function updateAim(){
     G.aim=a;return;
   }
   /* interactive furniture takes priority over punching */
-  if(fgIt&&INTERACT[fgIt.type]&&near&&G.mode!=='place'){
+  if(fgIt&&INTERACT[fgIt.type]&&near){
     a.act='use';a.ok=true;a.label=useLabel(gx,gy,fgIt);
     G.aim=a;return;
   }
   var tr0=S.treeAt(gx,gy);
   var wantPlace=false;
-  if(s&&G.mode!=='wrench'){
-    if(G.mode==='place')wantPlace=true;
-    else if(s.it.t==='block')
+  if(s){
+    if(s.it.t==='block')
       wantPlace=(ITEMS[ID[s.it.k]]||{}).layer==='bg'?!bgid:!fgid;
     else if(s.it.t==='seed')
       wantPlace=(!fgid&&!!bgid)||(!!tr0&&tr0.s!==s.it.k&&!!Q.spliceOf(tr0.s,s.it.k));
@@ -5594,11 +5587,11 @@ function renderHotbar(){
     bar.appendChild(d);
   }
 }
+/* Nothing sets the tool any more — it follows the aim, which follows
+   whatever is in your hand. This only repaints the touch action pad. */
 function setMode(m){
   G.mode=m;
-  Array.prototype.forEach.call(document.querySelectorAll('#modes .m'),function(n){
-    n.classList.toggle('on',n.dataset.mode===m);
-  });
+  if(window.PRS&&PRS.paintActPad)PRS.paintActPad(m);
 }
 
 window.PRD=Object.assign({},D,{punch:punch,place:place,use:use,travel:travel,
@@ -5761,7 +5754,12 @@ function matchFilter(it){
   if(invFilter==='gems')return it.t==='gem';
   return it.t==='tool';
 }
-function openInv(filter){open('inv');if(filter)invFilter=filter;drawInv();}
+function openInv(filter){
+  /* the backpack is the swipe-up sheet; the wardrobe keeps its own panel */
+  if(filter==='wear'){open('inv');invFilter='wear';drawInv();return;}
+  closePanel();
+  if(S.toggleSheet)S.toggleSheet();
+}
 var invSel=-1,lastWearTap={i:-1,t:0};
 function drawInv(){
   var used=G.inv.filter(Boolean).length;
@@ -6760,12 +6758,33 @@ if(actPad)bindPad(actPad,function(){G.ptr.down=true;},function(){G.ptr.down=fals
 var upPad=document.querySelector('#touch .up');
 if(upPad)bindPad(upPad,function(){G.keys.up=true;},function(){G.keys.up=false;});
 /* the act pad shows the mode you are in */
-var MODEGLYPH={punch:'✊',place:'▣',wrench:'🔧'};
-var baseSetMode=D.setMode;
-D.setMode=function(m){
-  baseSetMode(m);
-  if(actPad)actPad.textContent=MODEGLYPH[m]||'✊';
-};
+function padModeNow(){
+  var a=G.aim;
+  if(a&&a.act==='wrench')return 'wrench';
+  if(a&&(a.act==='place'||a.act==='plant'||a.act==='splice'))return 'place';
+  return 'punch';
+}
+var MODEART={
+ punch:'<path d="M6 11.5V8.2a1.7 1.7 0 013.4 0v2.3M9.4 10.4V7.2a1.7 1.7 0 013.4 0v3.2'+
+   'M12.8 10.6V8.4a1.7 1.7 0 013.4 0v4.1"/><path d="M6 11.5v3.1a5 5 0 005 5h1.6a5 5 0 005-5v-2.7"/>',
+ place:'<rect x="4.5" y="4.5" width="15" height="15" rx="2"/><path d="M12 8.5v7M8.5 12h7"/>',
+ wrench:'<path d="M15.5 3.5a5.5 5.5 0 00-5 8.2L3.8 18.4a1.8 1.8 0 002.5 2.5l6.7-6.7'+
+   'A5.5 5.5 0 1015.5 3.5z"/><circle cx="15.8" cy="8.2" r="1.6"/>'};
+function paintPad(m){
+  if(!actPad)return;
+  actPad.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '+
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+
+    (MODEART[m]||MODEART.punch)+'</svg>';
+}
+S.paintActPad=paintPad;
+/* the pad mirrors what a tap would actually do right now */
+var padWas='';
+setInterval(function(){
+  if(!G.started)return;
+  var m=padModeNow();
+  if(m!==padWas){padWas=m;paintPad(m);}
+},140);
+paintPad('punch');
 
 /* ---------------- the swipe-up backpack ---------------- */
 var sheet=$('#sheet'),grip=$('#sheetGrip'),open=false;
@@ -6853,7 +6872,7 @@ function setOpen(v){
   open=v;
   if(!sheet)return;
   sheet.classList.toggle('on',v);
-  sheet.classList.toggle('peek',!v&&coarse);
+  sheet.classList.toggle('peek',!v);
   if(v)renderSheet();
 }
 S.sheetOpen=function(){return open;};
@@ -6885,15 +6904,29 @@ if(grip){
   if(!chat||!inp)return;
   function typing(on){
     chat.classList.toggle('typing',!!on);
-    if(on)setTimeout(function(){inp.focus();},30);
+    if(on){chat.classList.remove('hid');setTimeout(function(){inp.focus();},30);}
   }
   var log=chat.querySelector('.log');
-  if(log)log.addEventListener('click',function(){typing(true);});
+  if(log)log.addEventListener('click',function(){chat.classList.remove('hid');typing(true);});
+  var tab=chat.querySelector('.tab');
+  if(tab)tab.addEventListener('click',function(){
+    chat.classList.toggle('hid');
+    if(chat.classList.contains('hid'))typing(false);
+  });
   inp.addEventListener('focus',function(){chat.classList.add('typing');});
   inp.addEventListener('blur',function(){
     setTimeout(function(){if(document.activeElement!==inp)chat.classList.remove('typing');},120);
   });
   window.PRS.chatTyping=typing;
+  /* a new line pulls the panel down for a moment, then it tucks away */
+  var peekT=0;
+  window.PRS.chatPeek=function(){
+    chat.classList.remove('hid');
+    clearTimeout(peekT);
+    peekT=setTimeout(function(){
+      if(!chat.classList.contains('typing'))chat.classList.add('hid');
+    },4200);
+  };
 })();
 
 /* a swipe up from the bottom eighth of the screen also opens it */
@@ -6913,17 +6946,31 @@ if(frame&&coarse){
   },{passive:true});
 }
 
-/* on a touch device the backpack button opens the sheet, not the modal */
-if(coarse){
-  document.addEventListener('click',function(e){
-    var b=e.target.closest('[data-act=inv]');
-    if(!b)return;
-    e.preventDefault();e.stopPropagation();
-    U.closePanel&&U.closePanel();
-    setOpen(!open);
-  },true);
-  setTimeout(function(){setOpen(false);},400);
-}
+/* The backpack is the swipe sheet, everywhere. There is no modal. */
+document.addEventListener('click',function(e){
+  var b=e.target.closest('[data-act=inv]');
+  if(!b)return;
+  e.preventDefault();e.stopPropagation();
+  U.closePanel&&U.closePanel();
+  setOpen(!open);
+},true);
+setTimeout(function(){setOpen(false);},400);
+
+/* a swipe or drag up anywhere along the bottom edge opens it too */
+(function(){
+  var fr2=$('#frame');if(!fr2)return;
+  var sy2=0,sx2=0,track=false;
+  function down(cy,cx){
+    var r=fr2.getBoundingClientRect();
+    track=(cy-r.top)>r.height*0.84;sy2=cy;sx2=cx;
+  }
+  function up(cy,cx){
+    if(!track)return;track=false;
+    if(sy2-cy>44&&Math.abs(cx-sx2)<80)setOpen(true);
+  }
+  fr2.addEventListener('pointerdown',function(e){down(e.clientY,e.clientX);});
+  fr2.addEventListener('pointerup',function(e){up(e.clientY,e.clientX);});
+})();
 /* keep the sheet honest while it is open */
 setInterval(function(){if(open)renderSheet();},1400);
 })();
@@ -6962,14 +7009,34 @@ function closeAll(){['pause','pmenu'].forEach(close);G.menu=null;}
 /* ---------------- pause menu ---------------- */
 function openPause(){
   var card=$('#pauseCard');card.innerHTML='';
+  card.classList.add('wide');
   var x=el('div','x btn','\u2715');
   x.addEventListener('click',function(){close('pause');});
   card.appendChild(x);
-  row(card,'Exit World',null,function(){
-    close('pause');
-    if(U.openWorlds)U.openWorlds();
+
+  var grid=el('div','mgrid');
+  function g(label,fn,cls){
+    var b=el('div','mrow btn'+(cls?' '+cls:''),label);
+    b.addEventListener('click',fn);grid.appendChild(b);return b;
+  }
+  g('Backpack',function(){close('pause');if(S.toggleSheet)S.toggleSheet();});
+  g('Wardrobe',function(){close('pause');U.openInv('wear');});
+  g('Splice Book',function(){close('pause');U.openSplice();});
+  g('Gem Store',function(){close('pause');U.openShop();});
+  g('Token Store',function(){close('pause');U.openTokens();});
+  g('Worlds',function(){close('pause');U.openWorlds();});
+  g('World Map',function(){
+    var m=$('#hudMapWrap')||document.querySelector('.hud-map');
+    if(m)m.classList.toggle('show');
+    S.toast(m&&m.classList.contains('show')?'Map on':'Map off');
   });
-  row(card,'Respawn',null,function(){
+  g('Sound: '+(G.muted?'Off':'On'),function(){
+    G.muted=!G.muted;
+    var mb=$('#muteBtn');if(mb)mb.classList.toggle('off',!!G.muted);
+    S.toast(G.muted?'Sound off':'Sound on');
+    openPause();
+  });
+  g('Respawn',function(){
     close('pause');
     var w=S.W();
     if(G.spawnPt){G.p.x=G.spawnPt.x;G.p.y=G.spawnPt.y;}
@@ -6977,18 +7044,17 @@ function openPause(){
     G.p.vx=G.p.vy=0;G.p.dead=0;
     S.toast('Respawned');
   });
-  row(card,'Options',null,function(){
-    G.muted=!G.muted;
-    var mb=$('#muteBtn');if(mb)mb.textContent=G.muted?'\ud83d\udd07':'\ud83d\udd0a';
-    S.toast(G.muted?'Sound off':'Sound on');
+  g('How To Play',function(){
+    close('pause');
+    var h=$('#help');if(h)h.style.display='';
   });
-  row(card,'Store',null,function(){close('pause');U.openShop();});
-  row(card,'Support',null,function(){
-    S.toast('Punch to break \u00b7 place on a wall to plant \u00b7 splice two seeds on one tree.');
+  g('Save Game',function(){
+    if(window.PRSAVE)PRSAVE();
+    S.toast('Saved');
   });
-  row(card,'Back',null,function(){close('pause');});
-  var f=el('div','foot','Current World: <b>'+(G.wid||'\u2014')+'</b>');
-  card.appendChild(f);
+  g('Exit World',function(){close('pause');if(U.openWorlds)U.openWorlds();},'warn');
+  card.appendChild(grid);
+  card.appendChild(el('div','foot','Current World: <b>'+(G.wid||'\u2014')+'</b>'));
   open('pause');
 }
 
@@ -7146,6 +7212,7 @@ function starter(){
   /* you start with nothing on. Every layer is something you earned. */
   ['back','cape','pants','shirt','chest','feet','hand','face','hair','neck','hat','pet']
     .forEach(function(sl){G.equip[sl]=null;});
+  S.addItem({t:'tool',k:'wrench'},1);
   /* but the clothes are in the bag, waiting */
   [['face','aqua'],['hair','longw'],['shirt','tee'],['pants','jeans'],['feet','sneak']]
     .forEach(function(o){S.addItem({t:'wear',s:o[0],k:o[1]},1);});
@@ -7178,9 +7245,20 @@ addEventListener('keydown',function(e){
   if(e.code==='KeyL'){G.open?U.closePanel():U.openTokens();return;}
   if(e.code==='KeyT'){e.preventDefault();
     if(S.chatTyping)S.chatTyping(true);else $('#chatIn').focus();return;}
-  if(e.code==='KeyZ'){D.setMode('punch');return;}
-  if(e.code==='KeyX'){D.setMode('place');return;}
-  if(e.code==='KeyC'){D.setMode('wrench');return;}
+  /* Z/X/C used to switch tools; the tool now follows your hand, so they
+     jump to the wrench, the last block and bare hands instead. */
+  if(e.code==='KeyC'){
+    /* jump to the wrench wherever it sits in the bag */
+    for(var wi=0;wi<G.inv.length;wi++){
+      var sl=G.inv[wi];
+      if(sl&&sl.it.t==='tool'&&sl.it.k==='wrench'){
+        if(wi>=10){var t2=G.inv[G.hot];G.inv[G.hot]=G.inv[wi];G.inv[wi]=t2;}
+        else G.hot=wi;
+        D.renderHotbar();S.toast('Wrench in hand');return;
+      }
+    }
+    S.toast('No wrench in your bag');return;
+  }
   if(e.code==='KeyM'){toggleMute();return;}
   if(e.code==='KeyF'){useConsumable();return;}
   if(/^Digit[0-9]$/.test(e.code)){
@@ -7288,9 +7366,6 @@ Array.prototype.forEach.call(document.querySelectorAll('#touch .pad'),function(p
     p.addEventListener(ev,function(){G.keys[k]=false;});
   });
 });
-Array.prototype.forEach.call(document.querySelectorAll('#modes .m'),function(m){
-  m.addEventListener('click',function(){D.setMode(m.dataset.mode);});
-});
 
 /* ---------------- chat ---------------- */
 function sendChat(){
@@ -7338,7 +7413,7 @@ $('#chatSend').addEventListener('click',sendChat);
 function toggleMute(){
   G.muted=!G.muted;
   if(AU)AU.setMuted(G.muted);
-  var b=$('#muteBtn');if(b)b.textContent=G.muted?'🔇':'🔊';
+  var b=$('#muteBtn');if(b)b.classList.toggle('off',!!G.muted);
   S.toast(G.muted?'Sound off':'Sound on');
   if(!G.muted&&AU){AU.resume();AU.ambient(W().sky);}
 }
@@ -7384,13 +7459,14 @@ function boot(){
   S.say(null,'<'+G.name+' entered '+G.wid+'>',true);
   S.say(null,'Punch blocks · plant seeds · splice trees · lock a world.',true);
   if(matchMedia('(pointer: coarse)').matches)$('#touch').classList.add('on');
-  var mb=$('#muteBtn');if(mb)mb.textContent=G.muted?'🔇':'🔊';
+  var mb=$('#muteBtn');if(mb)mb.classList.toggle('off',!!G.muted);
   $('#help').style.display='none';
   if(window.PRS.showTitle)PRS.showTitle();
   var gc=$('#gemCv'),gx=P.mk(16,16);P.drawGem(gx,'diamond',0,0);P.mount(gc,gx,4);
   var lc=$('#lockCv');
   if(lc){var lx=P.mk(16,16);I.tileIcon(lx,'lock',16);P.mount(lc,lx,4);}
-  setInterval(function(){if(G.started)save(true);},12000);
+  window.PRSAVE=function(){save(false);};
+setInterval(function(){if(G.started)save(true);},12000);
   addEventListener('beforeunload',function(){save(true);});
   setInterval(function(){
     var w=W();w.visitors=clamp(w.visitors+ri(-2,2),2,50);D.syncHud();
