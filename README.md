@@ -129,6 +129,9 @@ Measured on a 960 × 540 canvas: **60 fps**, `drawWorld` 0.20 ms, `relight`
 | Terrain | 100 × 54 tiles: grass, dirt, stone, carved caves, ore veins, bedrock |
 | Inventory | 200 slots, 10-slot hotbar, stacking, rarity borders, shift-click to drop |
 | Wardrobe | Twelve slots including a pet — the world sprite updates live, with walk/jump/climb poses |
+| Menus | A pause menu (Exit World / Respawn / Options / Store / Support) and a player card (Trade / Send Message / Add as friend / View worn clothes / Ignore / Report) |
+| Gem store | A branded storefront with category aisles — Seeds, Blocks, Style, Locks — priced in gems you dug up yourself |
+| Break feel | Blocks shatter into four spinning quarters of their own art; the punch swings on an arc with a motion streak and squashes on impact |
 | Trade requests | Players walk up and send you a live offer card with both grids previewed and a 30-second timer; open it to negotiate |
 | Chat | World chat with speech bubbles, NPC chatter, and `/warp` `/name` `/who` `/splice` commands |
 | Trade | Nine-slot offer grids with live valuation; the NPC accepts only when the value clears |

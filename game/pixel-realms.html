@@ -478,6 +478,74 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
 .invcol .a:hover{filter:brightness(1.07)}
 .invcol .a.danger{background:linear-gradient(180deg,#FFD9D9,#EFA0A0)}
 
+/* --- stacked button menus: pause, and the player card --------- */
+.menu{position:absolute;inset:0;z-index:32;display:none;align-items:center;justify-content:center}
+.menu.on{display:flex}
+.menu .scrim{position:absolute;inset:0;background:rgba(8,26,44,.45)}
+.menu .card{position:relative;min-width:26cqw;max-width:40cqw;padding:1.3cqw 1.5cqw;
+  border-radius:.7cqw;display:flex;flex-direction:column;align-items:stretch;gap:.5cqw;
+  background:linear-gradient(180deg,rgba(176,220,236,.97),rgba(126,186,212,.97));
+  border:.28cqw solid rgba(255,255,255,.9);
+  box-shadow:0 0 0 .16cqw #3C7A96,0 1cqw 3cqw rgba(6,22,38,.48)}
+.menu .card > .hd{display:flex;align-items:center;gap:.7cqw;margin-bottom:.4cqw}
+.menu .card > .hd canvas{width:3cqw;height:3cqw;image-rendering:pixelated;flex:none;
+  border-radius:.35cqw;background:rgba(255,255,255,.55);border:.14cqw solid rgba(255,255,255,.8)}
+.menu .card > .hd .nm{font-size:2cqw;font-weight:700;color:#FFFFFF;
+  text-shadow:0 .16cqw .3cqw rgba(10,40,60,.6)}
+.menu .card > .hd .nm i{font-style:normal;color:#8CF06A}
+.menu .x{position:absolute;right:-1.1cqw;top:-1.1cqw;width:2.9cqw;height:2.9cqw;border-radius:.45cqw;
+  display:grid;place-items:center;cursor:pointer;font-size:1.5cqw;color:#123048;
+  background:linear-gradient(180deg,#FFFFFF,#B6D9EE);border:.18cqw solid #3C7A96;
+  box-shadow:0 .2cqw .5cqw rgba(6,22,38,.4)}
+.mrow{padding:.62cqw 1.4cqw;border-radius:.4cqw;text-align:center;cursor:pointer;
+  font-size:1.85cqw;font-weight:700;color:#FFFFFF;
+  background:linear-gradient(180deg,rgba(226,242,251,.55),rgba(158,203,228,.55));
+  border:.14cqw solid rgba(255,255,255,.6);
+  text-shadow:0 .14cqw .28cqw rgba(14,44,64,.55)}
+.mrow:hover{background:linear-gradient(180deg,rgba(240,250,255,.8),rgba(178,218,240,.8))}
+.mrow.warn{color:#FFD9D9}
+.mrow.note{font-size:1.3cqw;font-weight:400;cursor:default;background:none;border:0;
+  color:rgba(255,255,255,.85);padding:.2cqw}
+.mrow.note:hover{background:none}
+.menu .foot{margin-top:.6cqw;text-align:center;font-size:1.25cqw;color:#FFFFFF;
+  background:rgba(10,40,60,.34);border-radius:.35cqw;padding:.4cqw .8cqw;
+  text-shadow:0 .12cqw .24cqw rgba(6,30,48,.55)}
+.menu .foot b{color:#FFE9A8}
+
+/* --- the gem store ------------------------------------------- */
+.storebanner{position:relative;overflow:hidden;border-radius:.6cqw;margin-bottom:.8cqw;
+  padding:1cqw 1.3cqw;display:flex;align-items:center;gap:1cqw;min-height:6.4cqw;
+  background:linear-gradient(115deg,#2E9AD6 0%,#5FC8E8 38%,#8FE0C4 72%,#F0D96A 100%);
+  border:.2cqw solid rgba(255,255,255,.85);
+  box-shadow:inset 0 .3cqw 0 rgba(255,255,255,.45),0 .3cqw .9cqw rgba(8,40,60,.28)}
+.storebanner::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(115deg,rgba(255,255,255,.13) 0 .6cqw,transparent .6cqw 2.2cqw)}
+.storebanner .mark{position:relative;width:4.4cqw;height:4.4cqw;flex:none;border-radius:.5cqw;
+  display:grid;place-items:center;background:rgba(255,255,255,.9);
+  border:.16cqw solid rgba(255,255,255,.95);box-shadow:0 .2cqw .5cqw rgba(8,40,60,.3)}
+.storebanner .mark canvas{width:3.2cqw;height:3.2cqw;image-rendering:pixelated}
+.storebanner .tt{position:relative;flex:1;min-width:0}
+.storebanner .tt h4{margin:0;font-family:var(--disp);font-size:1.9cqw;line-height:1.15;color:#FFFFFF;
+  letter-spacing:.02em;text-shadow:0 .16cqw 0 #1E6E96,0 .34cqw .5cqw rgba(6,34,52,.4)}
+.storebanner .tt p{margin:.3cqw 0 0;font-size:1.05cqw;line-height:1.3;color:rgba(255,255,255,.94);
+  text-shadow:0 .12cqw .24cqw rgba(6,34,52,.45)}
+.storebanner .bal{position:relative;display:flex;align-items:center;gap:.45cqw;flex:none;
+  padding:.5cqw 1cqw;border-radius:2cqw;background:rgba(10,40,60,.35);
+  border:.14cqw solid rgba(255,255,255,.7);
+  font-weight:700;font-size:1.6cqw;color:#FFFFFF;text-shadow:0 .12cqw .24cqw rgba(6,34,52,.6)}
+.storebanner .bal canvas{width:1.8cqw;height:1.8cqw;image-rendering:pixelated}
+.shoptabs{display:flex;gap:.35cqw;margin-bottom:.7cqw;flex-wrap:wrap}
+.shoptabs b{font-family:var(--pix);font-size:.9cqw;letter-spacing:.06em;cursor:pointer;
+  padding:.45cqw .8cqw;border-radius:.35cqw;font-weight:400;
+  background:rgba(255,255,255,.6);border:.12cqw solid var(--edge);color:var(--ink2)}
+.shoptabs b.on{background:var(--edge);color:#FFFFFF}
+.shopgrid .card{position:relative;overflow:hidden}
+.shopgrid .card .tagr{position:absolute;left:0;top:0;padding:.18cqw .5cqw;
+  font-family:var(--pix);font-size:.62cqw;letter-spacing:.06em;color:#0E2434;
+  background:linear-gradient(180deg,#FFE9A8,#E8C247);border-bottom-right-radius:.35cqw}
+.shopgrid .card .p{display:inline-flex;align-items:center;gap:.3cqw;justify-content:center}
+.shopgrid .card.no{opacity:.55}
+
 /* --- the trade window ---------------------------------------- */
 .tradewin{display:flex;flex-direction:column;gap:.8cqw}
 .offers{display:grid;grid-template-columns:1fr 1fr;gap:.9cqw}
@@ -925,6 +993,7 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
     <div class="s btn" data-act="shop" title="Shop">🛒</div>
     <div class="s btn" data-act="tokens" title="Growtoken store (L)">⬢</div>
     <div class="s btn" data-act="mute" id="muteBtn" title="Sound (M)">🔊</div>
+    <div class="s btn" data-act="pause" title="Menu (Esc)">☰</div>
   </div>
 
   <div class="pane lyr hotbar"><div class="row" id="hotbar"></div></div>
@@ -1002,6 +1071,8 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
 
   <div id="modals"><div class="pane panel" id="panel"></div></div>
   <div id="tconf"><div class="scrim"></div><div class="box" id="tconfBox"></div></div>
+  <div class="menu" id="pause"><div class="scrim"></div><div class="card" id="pauseCard"></div></div>
+  <div class="menu" id="pmenu"><div class="scrim"></div><div class="card" id="pmenuCard"></div></div>
 
   <div id="tutCard">
     <div class="st" id="tutStep">Step 1 of 8</div>
@@ -3510,6 +3581,42 @@ function drawDrops(){
   }
 }
 
+/* A broken block throws four quarters of its own art, which reads far
+   better than coloured dust because you can see what you hit. */
+var shards=[];
+function shatter(gx,gy,id){
+  var art=tileArt(id,0,0);if(!art)return;
+  var cx=gx*TS+TS/2, cy=gy*TS+TS/2, h=TS/2;
+  for(var q=0;q<4;q++){
+    var ox=(q%2)?1:0, oy=(q>1)?1:0;
+    shards.push({
+      cv:art.canvas, sx:ox*8, sy:oy*8,
+      x:cx+(ox?h/2:-h/2), y:cy+(oy?h/2:-h/2),
+      vx:(ox?1:-1)*(0.9+Math.random()*1.5)*SC,
+      vy:-(1.4+Math.random()*1.7)*SC,
+      rot:(Math.random()-.5)*0.5, spin:(Math.random()-.5)*0.34,
+      life:34+((Math.random()*14)|0), max:48, sz:h
+    });
+  }
+  if(shards.length>96)shards.splice(0,shards.length-96);
+}
+function drawShards(){
+  for(var i=shards.length-1;i>=0;i--){
+    var p=shards[i];
+    p.vy+=0.44*SC;p.x+=p.vx;p.y+=p.vy;p.rot+=p.spin;p.vx*=0.99;
+    if(p.vy>0&&hitsSolid(p.x-2*SC,p.y+p.vy,4*SC,4*SC)){p.vy*=-0.32;p.vx*=0.6;p.spin*=0.5;}
+    if(--p.life<=0){shards.splice(i,1);continue;}
+    var t=p.life/p.max;
+    ctx.save();
+    ctx.globalAlpha=Math.min(1,t*1.6);
+    ctx.translate(Math.round(p.x-G.cam.x),Math.round(p.y-G.cam.y));
+    ctx.rotate(p.rot);
+    var z=p.sz*(0.55+t*0.45);
+    ctx.drawImage(p.cv,p.sx,p.sy,8,8,-z/2,-z/2,z,z);
+    ctx.restore();
+  }
+}
+
 /* ---------------- particles ---------------- */
 function burst(wx,wy,col,n,heavy){
   for(var i=0;i<(n||8);i++)
@@ -3618,6 +3725,7 @@ window.PRS={G:G,W:W,VW:VW,VH:VH,PW:PW,PH:PH,cv:cv,ctx:ctx,ovl:ovl,
   itemAt:itemAt,typeAt:typeAt,
   plantTree:plantTree,treeAt:treeAt,treeGrowth:treeGrowth,drawTree:drawTree,
   spawnDrop:spawnDrop,stepDrops:stepDrops,drawDrops:drawDrops,burst:burst,drawParticles:drawParticles,
+  shatter:shatter,drawShards:drawShards,
   addItem:addItem,takeSlot:takeSlot,removeItem:removeItem,countOf:countOf,invValue:invValue,
   toast:toast,banner:banner,say:say,bubble:bubble,renderLog:renderLog,esc:esc,
   el:el,$:$,clamp:clamp,fmt:fmt,EYEC:EYEC};
@@ -4741,14 +4849,32 @@ function drawActors(){
   var pbase=S.playerSprite();
   drawActor(S.poseFor(G.p,S.playerSig(),pbase),G.p.x,G.p.y,G.p.dir,0,G.p.dead?0.4:1);
   if(G.punchFx>0&&G.aim){
-    var t=G.punchFx/9, u=TS/16;
+    var t=G.punchFx/9, u=TS/16, e=1-t;              /* e: 0 wind-up -> 1 impact */
     var hx=G.p.x+PW/2, hy=G.p.y+10*SC;
     var tx=G.aim.gx*TS+TS/2, ty=G.aim.gy*TS+TS/2;
-    var fx=hx+(tx-hx)*(0.45+0.5*(1-t)), fy=hy+(ty-hy)*(0.45+0.5*(1-t));
-    ctx.fillStyle='#F2D6C0';
-    ctx.fillRect(Math.round(fx-3*u-G.cam.x),Math.round(fy-3*u-G.cam.y),6*u,6*u);
-    ctx.fillStyle='#150C26';
-    ctx.fillRect(Math.round(fx-3*u-G.cam.x),Math.round(fy-3*u-G.cam.y),6*u,Math.max(1,u));
+    /* the fist travels along an arc that overshoots slightly, then snaps back */
+    var reach=0.34+Math.sin(e*3.14159)*0.62;
+    var ax=tx-hx, ay=ty-hy, len=Math.hypot(ax,ay)||1;
+    var nx=-ay/len, ny=ax/len;                       /* perpendicular, for the swing */
+    var bow=Math.sin(e*3.14159)*7*u*(G.p.dir<0?-1:1);
+    var fx=hx+ax*reach+nx*bow, fy=hy+ay*reach+ny*bow;
+    /* a motion streak behind the fist */
+    ctx.save();
+    ctx.globalAlpha=0.30*Math.sin(e*3.14159);
+    ctx.strokeStyle='#FFFFFF';ctx.lineWidth=Math.max(1,2*u);ctx.lineCap='round';
+    ctx.beginPath();
+    ctx.moveTo(hx+ax*0.28-G.cam.x,hy+ay*0.28-G.cam.y);
+    ctx.quadraticCurveTo(hx+ax*0.6+nx*bow*1.6-G.cam.x,hy+ay*0.6+ny*bow*1.6-G.cam.y,
+      fx-G.cam.x,fy-G.cam.y);
+    ctx.stroke();
+    ctx.restore();
+    /* the fist itself, squashing on impact */
+    var w=(6+e*2)*u, h=(6-e*1.2)*u;
+    ctx.fillStyle='#D8C3A4';
+    ctx.fillRect(Math.round(fx-w/2-G.cam.x),Math.round(fy-h/2-G.cam.y),w,h);
+    ctx.fillStyle='#1A1526';
+    ctx.fillRect(Math.round(fx-w/2-G.cam.x),Math.round(fy-h/2-G.cam.y),w,Math.max(1,u));
+    ctx.fillRect(Math.round(fx-w/2-G.cam.x),Math.round(fy+h/2-u-G.cam.y),w,Math.max(1,u));
     G.punchFx--;
   }
 }
@@ -5171,7 +5297,8 @@ function punch(){
   if(layer==='fg')w.set(gx,gy,0);else w.setBg(gx,gy,0);
   if(it.type===T.LOCK)releaseLock(gx,gy,it);
   delete w.data[idx];
-  S.burst(gx*TS+TS/2,gy*TS+TS/2,S.repColorOf(target),14,true);
+  S.shatter(gx,gy,target);
+  S.burst(gx*TS+TS/2,gy*TS+TS/2,S.repColorOf(target),9,true);
   if(window.PRA)PRA.breakBlock(it.hits);
   rollDrops(it,gx,gy);
   if(it.type===T.PINATA){
@@ -5961,28 +6088,70 @@ var STOCK=[
 ];
 function priceOf(e){return Math.max(2,Math.round(I.itemValue(e.it)*e.n*0.6));}
 function openShop(){open('shop');drawShop();}
+var shopTab='all';
+var SHOP_TABS=[['all','All'],['seed','Seeds'],['block','Blocks'],['wear','Style'],['lock','Locks']];
+function shopCat(e){
+  var it=e.it;
+  if(it.t==='seed')return 'seed';
+  if(it.t==='wear')return 'wear';
+  if(it.t==='block'&&(it.k==='lock'||it.k==='smalllock'||it.k==='diamondlock'))return 'lock';
+  return 'block';
+}
+function gemChip(scale){
+  var c=document.createElement('canvas');
+  var gx=P.mk(16,16);P.drawGem(gx,'diamond',0,0);
+  P.mount(c,gx,scale||2);return c;
+}
 function drawShop(){
-  var bd=shell('Lumiix &nbsp;·&nbsp; Shop','◆ '+fmt(G.gems)+' gems');
-  bd.appendChild(el('div','hintline',
-    'Gems are the system currency — earned by mining, spent here, and <b>never tradeable</b>. '+
-    'World Locks are what players price in.'));
-  var grid=el('div','shopgrid');
+  var bd=shell('Gem Store','system currency \u00b7 never tradeable');
+
+  /* --- the storefront banner --- */
+  var ban=el('div','storebanner');
+  var mark=el('div','mark');mark.appendChild(gemChip(3));
+  ban.appendChild(mark);
+  var tt=el('div','tt','<h4>PIXEL REALMS GEM STORE</h4>'+
+    '<p>Seeds, blocks, locks and style &mdash; paid for with gems you dug up yourself.</p>');
+  ban.appendChild(tt);
+  var bal=el('div','bal');bal.appendChild(gemChip(2));
+  var bn=document.createElement('span');bn.textContent=fmt(G.gems);bal.appendChild(bn);
+  ban.appendChild(bal);
+  bd.appendChild(ban);
+
+  /* --- category tabs --- */
+  var tabs=el('div','shoptabs');
+  SHOP_TABS.forEach(function(t){
+    var b=el('b',shopTab===t[0]?'on btn':'btn',t[1]);
+    b.addEventListener('click',function(){shopTab=t[0];drawShop();});
+    tabs.appendChild(b);
+  });
+  bd.appendChild(tabs);
+
+  var grid=el('div','shopgrid'),shown=0;
   STOCK.forEach(function(e){
+    if(shopTab!=='all'&&shopCat(e)!==shopTab)return;
+    shown++;
     var p=priceOf(e),afford=G.gems>=p;
     var card=el('div','card btn'+(afford?'':' no'));
+    if(e.n>1)card.appendChild(el('div','tagr','x'+e.n));
     var c=document.createElement('canvas');P.mount(c,I.iconOf(e.it),4);card.appendChild(c);
-    card.appendChild(el('div','n',I.itemName(e.it)+(e.n>1?' ×'+e.n:'')));
-    card.appendChild(el('div','p','◆ '+fmt(p)));
+    card.appendChild(el('div','n',I.itemName(e.it)));
+    var pr=el('div','p');pr.appendChild(gemChip(1));
+    var ps=document.createElement('span');ps.textContent=fmt(p);pr.appendChild(ps);
+    card.appendChild(pr);
     card.addEventListener('click',function(){
-      if(G.gems<p){S.toast('Not enough gems');return;}
+      if(G.gems<p){S.toast('Not enough gems — go break some blocks');return;}
       G.gems-=p;S.addItem(e.it,e.n);
-      S.toast('Bought '+I.itemName(e.it));
+      S.toast('Bought '+I.itemName(e.it)+(e.n>1?' x'+e.n:''));
       if(AU)AU.pickup();
       D.syncHud();D.renderHotbar();drawShop();
     });
     grid.appendChild(card);
   });
+  if(!shown)grid.appendChild(el('div','hintline','Nothing in this aisle yet.'));
   bd.appendChild(grid);
+  bd.appendChild(el('div','hintline',
+    'Gems come from breaking blocks and harvesting trees. They buy from the store and '+
+    '<b>never change hands</b> &mdash; players price in <b>World Locks</b>.'));
 }
 var TOKEN_STOCK=[
  {it:{t:'wear',s:'back',k:'crystal'},n:1,p:12},{it:{t:'wear',s:'back',k:'dragon'},n:1,p:10},
@@ -6761,6 +6930,143 @@ setInterval(function(){if(open)renderSheet();},1400);
 </script>
 <script>
 /* ============================================================
+   PIXEL REALMS — STACKED MENUS
+   The pause menu and the player card: a column of soft buttons
+   over a dimmed world, the way the phone build does it.
+   ============================================================ */
+(function(){
+'use strict';
+var P=window.PR,S=window.PRS,D=window.PRD,U=window.PRUI,I=window.PRI;
+var G=S.G,$=function(q){return document.querySelector(q);};
+var AU=window.PRA;
+
+function el(tag,cls,html){
+  var d=document.createElement(tag);
+  if(cls)d.className=cls;
+  if(html!==undefined)d.innerHTML=html;
+  return d;
+}
+function row(card,label,cls,fn){
+  var b=el('div','mrow btn'+(cls?' '+cls:''),label);
+  if(fn)b.addEventListener('click',fn);
+  card.appendChild(b);
+  return b;
+}
+function close(id){var n=$('#'+id);if(n)n.classList.remove('on');G.menu=null;}
+function open(id){
+  ['pause','pmenu'].forEach(function(k){var n=$('#'+k);if(n)n.classList.toggle('on',k===id);});
+  G.menu=id;
+}
+function closeAll(){['pause','pmenu'].forEach(close);G.menu=null;}
+
+/* ---------------- pause menu ---------------- */
+function openPause(){
+  var card=$('#pauseCard');card.innerHTML='';
+  var x=el('div','x btn','\u2715');
+  x.addEventListener('click',function(){close('pause');});
+  card.appendChild(x);
+  row(card,'Exit World',null,function(){
+    close('pause');
+    if(U.openWorlds)U.openWorlds();
+  });
+  row(card,'Respawn',null,function(){
+    close('pause');
+    var w=S.W();
+    if(G.spawnPt){G.p.x=G.spawnPt.x;G.p.y=G.spawnPt.y;}
+    else if(w&&w.spawn){G.p.x=w.spawn.x;G.p.y=w.spawn.y;}
+    G.p.vx=G.p.vy=0;G.p.dead=0;
+    S.toast('Respawned');
+  });
+  row(card,'Options',null,function(){
+    G.muted=!G.muted;
+    var mb=$('#muteBtn');if(mb)mb.textContent=G.muted?'\ud83d\udd07':'\ud83d\udd0a';
+    S.toast(G.muted?'Sound off':'Sound on');
+  });
+  row(card,'Store',null,function(){close('pause');U.openShop();});
+  row(card,'Support',null,function(){
+    S.toast('Punch to break \u00b7 place on a wall to plant \u00b7 splice two seeds on one tree.');
+  });
+  row(card,'Back',null,function(){close('pause');});
+  var f=el('div','foot','Current World: <b>'+(G.wid||'\u2014')+'</b>');
+  card.appendChild(f);
+  open('pause');
+}
+
+/* ---------------- the player card ---------------- */
+var ignored={},friends={};
+function openPlayerCard(n){
+  var card=$('#pmenuCard');card.innerHTML='';
+  var base=P.CAST[n.id]||{},name=base.name||n.id;
+  var lvl=3+((n.id.length*7)%40);
+
+  var hd=el('div','hd');
+  if(S.chatAvatar){
+    var cv=document.createElement('canvas');
+    P.mount(cv,S.chatAvatar(n.id),2);
+    hd.appendChild(cv);
+  }
+  hd.appendChild(el('div','nm',name+' <i>('+lvl+')</i>'));
+  card.appendChild(hd);
+  var x=el('div','x btn','\u2715');
+  x.addEventListener('click',function(){close('pmenu');});
+  card.appendChild(x);
+
+  row(card,'Trade',null,function(){close('pmenu');U.openTrade(n);});
+  row(card,'Send Message',null,function(){
+    close('pmenu');
+    var chat=document.querySelector('.chat');
+    if(S.chatTyping)S.chatTyping(true);
+    var inp=$('#chatIn');
+    if(inp){inp.value='@'+name+' ';setTimeout(function(){inp.focus();},40);}
+  });
+  card.appendChild(el('div','mrow note',
+    friends[n.id]?'You are friends.':'(Not on your friends list)'));
+  row(card,'Add as friend',null,function(){
+    friends[n.id]=1;S.toast(name+' added to friends');
+    openPlayerCard(n);
+  });
+  row(card,'View worn clothes',null,function(){
+    var eq=S.npcEquip?S.npcEquip(n.id):null;
+    if(!eq){S.toast(name+' is wearing nothing special');return;}
+    var worn=Object.keys(eq).filter(function(k){return eq[k];}).map(function(k){
+      var e=I.WEAR[k]&&I.WEAR[k][eq[k]];
+      return e?e[0]:eq[k];
+    });
+    S.toast(name+' is wearing: '+(worn.join(', ')||'nothing'));
+  });
+  row(card,'Ignore Player',null,function(){
+    ignored[n.id]=1;close('pmenu');
+    S.toast('Ignoring '+name);
+  });
+  row(card,'Report Player','warn',function(){
+    close('pmenu');
+    S.toast('Report sent. Thanks for keeping the worlds friendly.');
+  });
+  row(card,'Continue',null,function(){
+    close('pmenu');
+    var t=window.PRD.LINES?window.PRD.LINES.idle:null;
+    if(t){var line=t[(Math.random()*t.length)|0];S.bubble(n.id,line);S.say(n.id,line);}
+  });
+  open('pmenu');
+}
+S.isIgnored=function(id){return !!ignored[id];};
+
+/* ---------------- wiring ---------------- */
+document.addEventListener('click',function(e){
+  if(e.target.closest('[data-act=pause]')){openPause();return;}
+  var m=e.target.closest('.menu .scrim');
+  if(m){closeAll();}
+});
+document.addEventListener('keydown',function(e){
+  if(e.code==='Escape'&&G.menu){e.preventDefault();closeAll();return;}
+  if(e.code==='Escape'&&G.started&&!G.open&&!G.scr){e.preventDefault();openPause();}
+},true);
+
+U.openPause=openPause;U.openPlayerCard=openPlayerCard;U.closeMenus=closeAll;
+})();
+</script>
+<script>
+/* ============================================================
    PIXEL REALMS — input, persistence, boot, main loop
    ============================================================ */
 (function(){
@@ -6949,7 +7255,8 @@ function onDown(e){
   D.updateAim();
   var n=npcAt(G.ptrPos.x,G.ptrPos.y);
   if(n){
-    if(n.role==='trade')U.openTrade(n);
+    if(U.openPlayerCard)U.openPlayerCard(n);
+    else if(n.role==='trade')U.openTrade(n);
     else if(n.role==='shop')U.openShop();
     else{var t=pick(D.LINES.idle);S.bubble(n.id,t);S.say(n.id,t);}
     return;
@@ -7096,7 +7403,7 @@ function frame(){
   S.stepDrops();
   D.camUpdate();D.updateAim();
   if(G.ptr.down&&!G.open&&G.started&&!G.p.dead)act(false);
-  D.drawWorld();S.drawDrops();D.drawActors();S.drawParticles();
+  D.drawWorld();S.drawDrops();D.drawActors();S.drawShards();S.drawParticles();
   D.syncOverlays();
   if(G.tick%24===0){D.drawMap();D.syncHud();U.refreshPortrait();}
   requestAnimationFrame(frame);
