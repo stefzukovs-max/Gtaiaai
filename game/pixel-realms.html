@@ -535,6 +535,41 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
   text-shadow:0 .12cqw .24cqw rgba(6,30,48,.55)}
 .menu .foot b{color:#FFE9A8}
 
+/* --- the earning guide --------------------------------------- */
+.wlbar{display:flex;align-items:center;gap:.8cqw;margin-bottom:.9cqw;
+  background:rgba(255,255,255,.6);border:.16cqw solid var(--edge);
+  border-radius:.55cqw;padding:.7cqw .9cqw}
+.wlbar canvas{width:2.6cqw;height:2.6cqw;image-rendering:pixelated;flex:none}
+.wlbar .t{flex:1;min-width:0}
+.wlbar .t b{font-size:1.35cqw}
+.wlbar .t .m{font-size:1.05cqw;color:var(--ink2)}
+.wlbar .track{height:.9cqw;border-radius:.5cqw;overflow:hidden;margin-top:.35cqw;
+  background:rgba(20,60,86,.18)}
+.wlbar .track i{display:block;height:100%;border-radius:.5cqw;
+  background:linear-gradient(90deg,#3FD9C0,#5FC8E8 55%,#F0D96A)}
+.steps{display:grid;gap:.5cqw;margin-bottom:.9cqw}
+.step2{display:grid;grid-template-columns:2.2cqw 1fr;gap:.7cqw;align-items:start;
+  background:rgba(255,255,255,.55);border:.14cqw solid var(--edge);
+  border-radius:.45cqw;padding:.6cqw .8cqw}
+.step2 .n2{width:2.2cqw;height:2.2cqw;border-radius:50%;display:grid;place-items:center;
+  background:var(--edge);color:#FFFFFF;font-family:var(--pix);font-size:1cqw}
+.step2 .b2{font-size:1.2cqw;line-height:1.45;color:var(--ink)}
+.step2 .b2 b{color:#1B5C7E}
+.step2 .b2 em{font-style:normal;color:#8A5A18;font-weight:700}
+.croptab{width:100%;border-collapse:collapse;font-size:1.15cqw}
+.croptab th{text-align:left;font-family:var(--pix);font-size:.8cqw;letter-spacing:.06em;
+  color:var(--ink2);font-weight:400;padding:.35cqw .5cqw;border-bottom:.14cqw solid var(--edge)}
+.croptab td{padding:.35cqw .5cqw;border-bottom:.1cqw solid rgba(78,127,160,.22);color:var(--ink)}
+.croptab td.r{text-align:right;font-variant-numeric:tabular-nums}
+.croptab tr.best td{background:rgba(255,216,122,.35);font-weight:700}
+.croptab td .ic{display:inline-block;width:1.5cqw;height:1.5cqw;vertical-align:-.3cqw;
+  margin-right:.4cqw;image-rendering:pixelated}
+/* the panel body is a flex column, so this must refuse to shrink */
+.cropwrap{flex:0 0 auto;overflow-x:auto;border:.14cqw solid var(--edge);
+  border-radius:.5cqw;background:rgba(255,255,255,.5)}
+.steps{flex:0 0 auto}
+.wlbar{flex:0 0 auto}
+
 /* --- the gem store ------------------------------------------- */
 .storebanner{position:relative;overflow:hidden;border-radius:.6cqw;margin-bottom:.8cqw;
   padding:1cqw 1.3cqw;display:flex;align-items:center;gap:1cqw;min-height:6.4cqw;
@@ -2394,7 +2429,7 @@ function It(key,name,o){
     art:o.art||A.solid('#6C6784','#4E4966','#3C3852','#2A2740'),
     props:o.props||null,
     drops:o.drops||null,
-    grow:o.grow||Math.min(150000,10000+r*1800)
+    grow:o.grow||Math.min(600000,45000+r*9000)
   };
   ID[key]=it.id;ITEMS.push(it);return it;
 }
@@ -2863,7 +2898,7 @@ function itemValue(it){
   if(!it)return 0;
   if(it.t==='gem')return GEMV[it.k]||1;
   if(it.t==='block'&&ITEMS[ID[it.k]]&&ITEMS[ID[it.k]].type===T.LOCK)
-    return it.k==='diamondlock'?90000:(it.k==='lock'?900:400);
+    return it.k==='diamondlock'?240000:(it.k==='lock'?2400:800);
   return Math.max(1,Math.round(r*r*0.32+r*2));
 }
 function sameItem(a,b){
@@ -5890,7 +5925,7 @@ var G=S.G,W=S.W,cv=S.cv,el=S.el,$=S.$,clamp=S.clamp,fmt=S.fmt,esc=S.esc;
 var PW=S.PW,PH=S.PH;
 
 /* one World Lock is the unit players price in; gems are the system currency */
-var LOCK_GEMS=400;
+var LOCK_GEMS=2400;   /* one World Lock, in gems — what everything prices against */
 function fmtLocks(v){
   var wl=Math.floor(v/LOCK_GEMS), rem=v-wl*LOCK_GEMS;
   if(wl>=100)return (wl/100).toFixed(2)+' DL';
@@ -6279,6 +6314,101 @@ var STOCK=[
 ];
 function priceOf(e){return Math.max(2,Math.round(I.itemValue(e.it)*e.n*0.6));}
 function openShop(){open('shop');drawShop();}
+/* ============================================================
+   HOW TO EARN — the starting guide, written against the real
+   numbers this build ships with rather than round figures.
+   ============================================================ */
+var GUIDE_CROPS=['dirt','wood','stone','glass','brick','neonp'];
+function cropRate(k){
+  var it=ITEMS[ID[k]];if(!it)return null;
+  var seed=I.itemValue({t:'seed',k:k})*0.6;
+  var blockV=I.itemValue({t:'block',k:k});
+  var growS=(it.grow||1)/1000;
+  /* a harvest averages 3.5 blocks, 1.5 seeds and 7+r*0.8 loose gems;
+     blocks turn into gems at the recycler's half rate */
+  var realised=(7+Math.round(it.rarity*0.8))+3.5*blockV*0.5;
+  return {k:k,name:it.name,seed:seed,growS:growS,
+    per:realised,rate:(realised-seed)/growS*60};
+}
+function openGuide(){open('guide');drawGuide();}
+function drawGuide(){
+  var bd=shell('How To Earn','from nothing to your first World Lock');
+  var lockPrice=Math.max(2,Math.round(I.itemValue({t:'block',k:'lock'})*0.6));
+
+  /* --- live progress toward the next lock --- */
+  var have=G.gems, pctv=Math.min(100,Math.round(have/lockPrice*100));
+  var wl=el('div','wlbar');
+  var lc=document.createElement('canvas');
+  P.mount(lc,I.iconOf({t:'block',k:'lock'}),3);wl.appendChild(lc);
+  var t=el('div','t','<b>'+fmt(have)+' / '+fmt(lockPrice)+' gems</b>'+
+    '<div class="m">'+(have>=lockPrice
+      ? 'You can buy a World Lock right now.'
+      : fmt(lockPrice-have)+' gems to your next World Lock')+'</div>'+
+    '<div class="track"><i style="width:'+pctv+'%"></i></div>');
+  wl.appendChild(t);
+  bd.appendChild(wl);
+
+  /* --- the path --- */
+  var best=null;
+  GUIDE_CROPS.forEach(function(k){var r=cropRate(k);if(r&&(!best||r.rate>best.rate))best=r;});
+  var steps=[
+    ['Punch anything.','Every block you break drops <b>gems</b>, and often a <b>seed</b> of '+
+     'itself. Bare hands are enough — you do not need a tool.'],
+    ['Plant that seed.','Seeds only take on a <b>background wall</b>. Clear the block in front, '+
+     'then place the seed on the wall behind it.'],
+    ['Wait, then harvest.','A dirt tree takes <em>'+Math.round(cropRate('dirt').growS)+'s</em>. '+
+     'Harvesting returns more seeds than you planted, so a farm pays for its own expansion.'],
+    ['Build a farm, not a tree.','One dirt tree earns about <em>'+cropRate('dirt').rate.toFixed(0)+
+     ' gems a minute</em>. Twenty of them earn <em>'+(cropRate('dirt').rate*20).toFixed(0)+
+     '</em> — a World Lock roughly every <em>'+
+     (lockPrice/(cropRate('dirt').rate*20)).toFixed(0)+' minutes</em>.'],
+    ['Climb the crop ladder.','Better seeds cost more and grow slower, but pay far more per minute. '+
+     '<b>'+best.name+'</b> is the best in the store right now at <em>'+best.rate.toFixed(0)+
+     ' gems a minute</em> per tree.'],
+    ['Splice for what nobody has.','Plant a <b>different</b> seed on a growing tree to invent a '+
+     'new block. Spliced blocks are rarer, so they are worth more.'],
+    ['Turn blocks into gems.','Open the backpack, pick a stack you do not need and hit '+
+     '<b>RECYCLE</b> — half its value comes back as gems.'],
+    ['Buy the lock. Place it.','A World Lock is <em>'+fmt(lockPrice)+' gems</em> in the store. '+
+     'Drop it in a world and that world is yours — nobody else can build there.']
+  ];
+  var sw=el('div','steps');
+  steps.forEach(function(st,i){
+    sw.appendChild(el('div','step2','<div class="n2">'+(i+1)+'</div>'+
+      '<div class="b2"><b>'+st[0]+'</b> '+st[1]+'</div>'));
+  });
+  bd.appendChild(sw);
+
+  /* --- what each crop actually pays --- */
+  bd.appendChild(el('div','eyebrow','What the seeds pay'));
+  var tab=document.createElement('table');tab.className='croptab';
+  tab.innerHTML='<thead><tr><th>Crop</th><th>Seed</th><th>Grows in</th>'+
+    '<th>Per harvest</th><th>Gems / min</th></tr></thead>';
+  var tb=document.createElement('tbody');
+  GUIDE_CROPS.map(cropRate).filter(Boolean)
+    .sort(function(a,b){return a.rate-b.rate;})
+    .forEach(function(r){
+      var tr=document.createElement('tr');
+      if(r.k===best.k)tr.className='best';
+      var ic=document.createElement('canvas');
+      P.mount(ic,I.iconOf({t:'seed',k:r.k}),2);ic.className='ic';
+      var td=document.createElement('td');td.appendChild(ic);
+      td.appendChild(document.createTextNode(r.name));
+      tr.appendChild(td);
+      [fmt(Math.round(r.seed))+'g',Math.round(r.growS)+'s',
+       fmt(Math.round(r.per))+'g',fmt(Math.round(r.rate))+'g'].forEach(function(v){
+        var c=document.createElement('td');c.className='r';c.textContent=v;tr.appendChild(c);
+      });
+      tb.appendChild(tr);
+    });
+  tab.appendChild(tb);
+  var wrap=el('div','cropwrap');wrap.appendChild(tab);
+  bd.appendChild(wrap);
+  bd.appendChild(el('div','hintline',
+    'Rates assume you recycle the blocks. Keep them instead and they are worth double '+
+    '&mdash; but only to somebody willing to trade for them.'));
+}
+
 var shopTab='all';
 var SHOP_TABS=[['all','All'],['seed','Seeds'],['block','Blocks'],['wear','Style'],['lock','Locks']];
 function shopCat(e){
@@ -6608,6 +6738,7 @@ function confirmTrade(){
 
 window.PRUI={openInv:openInv,openSplice:openSplice,openWorlds:openWorlds,openShop:openShop,
   openTokens:openTokens,openTrade:openTrade,openEditor:openEditor,openLab:openLab,
+  openGuide:openGuide,
   showRequest:showRequest,clearRequest:clearRequest,
   closePanel:closePanel,refreshPortrait:refreshPortrait,fmtLocks:fmtLocks,
   LOCK_GEMS:LOCK_GEMS,tradeReturnAll:function(){tradeReturnAll();trade=null;},
@@ -7069,6 +7200,15 @@ function renderSheet(){
       var now=performance.now();
       var dbl=(lastTap.i===i&&now-lastTap.t<380);
       lastTap={i:i,t:now};sel=i;
+      /* a hundred World Locks fuse into a Diamond Lock — this lived on
+         the old modal backpack and has to live here now */
+      if(dbl&&sl.it.t==='block'&&sl.it.k==='lock'&&sl.n>=100){
+        sl.n-=100;if(sl.n<=0)G.inv[i]=null;
+        S.addItem({t:'block',k:'diamondlock'},1);
+        S.banner('DIAMOND LOCK','#63D8FF');
+        if(window.PRA)PRA.chime();
+        D.renderHotbar();renderSheet();return;
+      }
       if(dbl&&sl.it.t==='wear'){
         var s3=sl.it.s,cur=G.equip[s3];
         if(cur===sl.it.k){G.equip[s3]=null;S.addItem({t:'wear',s:s3,k:cur},1);
@@ -7294,6 +7434,7 @@ function openPause(){
     G.p.vx=G.p.vy=0;G.p.dead=0;
     S.toast('Respawned');
   });
+  g('How To Earn',function(){close('pause');U.openGuide();});
   g('How To Play',function(){
     close('pause');
     var h=$('#help');if(h)h.style.display='';
