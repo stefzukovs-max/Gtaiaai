@@ -129,6 +129,9 @@ Measured on a 960 × 540 canvas: **60 fps**, `drawWorld` 0.20 ms, `relight`
 | Terrain | 100 × 54 tiles: grass, dirt, stone, carved caves, ore veins, bedrock |
 | Inventory | 200 slots, 10-slot hotbar, stacking, rarity borders, shift-click to drop |
 | Wardrobe | Twelve slots including a pet — the world sprite updates live, with walk/jump/climb poses |
+| Name tags | A drawn country flag and a green handle over a dark plate. Flags are pixel designs, not emoji — emoji flags do not render on Windows at all. Your own comes from the browser's locale, read locally |
+| Chat | A dark translucent log hanging from the top edge, one timestamped line per message, tucked behind a tab until something arrives |
+| Announcements | Splices, fuses and milestones land in a centred blue box with the item names picked out in gold |
 | Earning | A **How To Earn** guide on the pause menu: live progress toward your next World Lock, the eight-step path from bare hands to owning a world, and a table of what every starter crop actually pays per minute — all computed from the shipping numbers, not written by hand |
 | Rarity | Every item wears its tier: a coloured rim and bloom in the slot, a sheen that sweeps the good stuff, sparks on mythic and ancient, and a matching halo on the drop in the world |
 | Cosmetic tiers | Wings take a bright leading-edge trim and capes a lit hem at legendary and up; anyone wearing that grade trails sparks and stands in a ground bloom in their tier's colour |
