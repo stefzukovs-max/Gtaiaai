@@ -134,6 +134,8 @@ Measured on a 960 × 540 canvas: **60 fps**, `drawWorld` 0.20 ms, `relight`
 | Announcements | Splices, fuses and milestones land in a centred blue box with the item names picked out in gold |
 | Earning | A **How To Earn** guide on the pause menu: live progress toward your next World Lock, the eight-step path from bare hands to owning a world, and a table of what every starter crop actually pays per minute — all computed from the shipping numbers, not written by hand |
 | Rarity | Every item wears its tier: a coloured rim and bloom in the slot, a sheen that sweeps the good stuff, sparks on mythic and ancient, and a matching halo on the drop in the world |
+| Held items | Every hand slot is a real object: a sword has a bevelled blade, a crossguard and a pommel; a staff has an orb; a scythe sweeps outward; a bow has limbs and a string; picks, torches and lanterns have heads and housings |
+| Crowns and capes | The crown is a shaded gold band with five points and four set jewels; capes carry three lit-and-shadowed folds so they stop reading as a flat gradient |
 | Cosmetic tiers | Wings take a bright leading-edge trim and capes a lit hem at legendary and up; anyone wearing that grade trails sparks and stands in a ground bloom in their tier's colour |
 | Menus | A pause menu (Exit World / Respawn / Options / Store / Support) and a player card (Trade / Send Message / Add as friend / View worn clothes / Ignore / Report) |
 | Gem store | A branded storefront with category aisles — Seeds, Blocks, Style, Locks — priced in gems you dug up yourself |

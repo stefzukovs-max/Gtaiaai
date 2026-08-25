@@ -4329,17 +4329,29 @@ function drawWings(x,style,flap,trim){
 }
 function drawCape(x,pal,flap,trim){
   var c=pal||['#C43A38','#7E1F1E'];
+  var lit=mixc(c[0],'#FFFFFF',0.30), dk=shade(c[1],-30);
   var lastY=LEG_B-1,lastA=0,lastB=0;
   for(var y=TOR_A-1;y<LEG_B;y++){
     var t=(y-(TOR_A-1))/(LEG_B-(TOR_A-1));
     var w=Math.round(6+t*4+Math.sin(t*3.0+flap*0.5));
     var off=Math.round(Math.sin(t*2.0+flap*0.6));
-    R(x,CX-w+off,CX+w+off,y,t<0.2?c[0]:mixc(c[0],c[1],t));
-    D(x,CX-w+off,y,K);D(x,CX+w+off,y,K);
-    if(trim){D(x,CX-w+off+1,y,trim,0.55);D(x,CX+w+off-1,y,trim,0.55);}
-    lastY=y;lastA=CX-w+off;lastB=CX+w+off;
+    var a0=CX-w+off, b0=CX+w+off;
+    R(x,a0,b0,y,t<0.2?lit:mixc(c[0],c[1],t));
+    /* three vertical folds, lit on one side and shaded on the other,
+       which is what stops a cape reading as a flat gradient */
+    [-0.55,0,0.55].forEach(function(f,fi){
+      var fx=Math.round(CX+off+f*w+Math.sin(t*2.4+fi)*1.2);
+      if(fx<=a0||fx>=b0)return;
+      D(x,fx,y,fi===1?lit:mixc(c[1],lit,0.35),0.8);
+      D(x,fx+1,y,dk,0.6);
+    });
+    R(x,b0-1,b0,y,dk);                            /* the far edge falls away */
+    D(x,a0,y,K);D(x,b0,y,K);
+    if(trim){D(x,a0+1,y,trim,0.55);D(x,b0-1,y,trim,0.55);}
+    lastY=y;lastA=a0;lastB=b0;
   }
   if(trim)R(x,lastA+1,lastB-1,lastY,trim,0.85);   /* a bright hem on the good ones */
+  else R(x,lastA+1,lastB-1,lastY,dk);
 }
 
 /* ============================================================
@@ -4434,13 +4446,76 @@ function drawNeck(x,col){
   D(x,5,TOR_A-1,K);D(x,18,TOR_A-1,K);
   D(x,7,TOR_A+1,a);D(x,7,TOR_A+2,b);
 }
-function drawHand(x,col,swing){
-  var a=col[0],b=col[1];
-  var hx=ARM_R[1]+2,hy=ARM_A+1+Math.round(swing*-2);
-  for(var i=0;i<9;i++)R(x,hx,hx+1,hy+i-5,i<3?a:b);
-  Rect(x,hx-1,hy-6,4,3,a);
-  D(x,hx-1,hy-6,mixc(a,'#FFFFFF',0.5));
-  outlineBox(x,hx,hx+1,hy-5,hy+3);
+/* Held items are drawn as real objects — a blade has a guard and a
+   pommel, a staff has an orb, a bow has a string. The palette gives the
+   two body tones; a third is mixed so everything still reads at 1px. */
+function drawHand(x,col,swing,key){
+  var a=col[0],b=col[1],lit=mixc(a,'#FFFFFF',0.45),ink=K;
+  var hx=ARM_R[1]+2, hy=ARM_A+2+Math.round(swing*-2);
+  function shaft(top,bot){
+    for(var y=top;y<=bot;y++)R(x,hx,hx+1,y,y<top+2?lit:b);
+    D(x,hx-1,bot,ink);D(x,hx+2,bot,ink);
+  }
+  function grip(){
+    for(var i=0;i<4;i++)R(x,hx,hx+1,hy+i,i%2?b:mixc(b,ink,0.35));
+  }
+  if(key==='pick'){
+    shaft(hy-5,hy+4);grip();
+    R(x,hx-4,hx+5,hy-6,a);R(x,hx-3,hx+4,hy-7,lit);
+    D(x,hx-5,hy-5,b);D(x,hx+6,hy-5,b);
+    D(x,hx-5,hy-6,ink);D(x,hx+6,hy-6,ink);
+  }else if(key==='staff'||key==='wand'){
+    shaft(hy-7,hy+4);grip();
+    Rect(x,hx-2,hy-11,5,4,a);
+    Rect(x,hx-1,hy-10,3,2,lit);
+    D(x,hx,hy-10,'#FFFFFF');
+    D(x,hx-3,hy-9,ink);D(x,hx+3,hy-9,ink);
+    D(x,hx,hy-12,ink);D(x,hx,hy-6,ink);
+  }else if(key==='scythe'){
+    shaft(hy-9,hy+4);grip();
+    for(var c=0;c<8;c++){                          /* the blade sweeps outward */
+      var cy=hy-11+Math.round(c*c*0.16);
+      R(x,hx+1+c,hx+3+c,cy,c<4?lit:a);
+      R(x,hx+2+c,hx+3+c,cy+1,shade(a,-30));
+      D(x,hx+4+c,cy,ink);D(x,hx+4+c,cy+1,ink);
+      D(x,hx+c,cy,ink);
+    }
+    R(x,hx-1,hx+1,hy-11,b);                        /* the collar */
+    D(x,hx,hy-12,ink);
+  }else if(key==='bow'){
+    for(var y2=-8;y2<=8;y2++){
+      var w2=Math.round(Math.cos(y2/8*1.35)*4);
+      R(x,hx+w2,hx+w2+1,hy+y2-2,Math.abs(y2)>6?b:a);
+    }
+    for(var y3=-8;y3<=8;y3++)D(x,hx,hy+y3-2,mixc(lit,'#FFFFFF',0.4),0.85);
+    D(x,hx+4,hy-10,ink);D(x,hx+4,hy+6,ink);
+  }else if(key==='torchh'||key==='lantern2'){
+    shaft(hy-2,hy+4);grip();
+    Rect(x,hx-2,hy-7,5,5,b);
+    Rect(x,hx-1,hy-6,3,3,a);
+    D(x,hx,hy-5,lit);
+    outlineBox(x,hx-2,hx+2,hy-7,hy-3);
+  }else{
+    /* blade: three wide with a lit bevel down the middle */
+    for(var y4=hy-12;y4<=hy-2;y4++){
+      R(x,hx-1,hx+1,y4,a);
+      D(x,hx,y4,lit);
+      D(x,hx+1,y4,shade(a,-28));
+      D(x,hx-2,y4,ink);D(x,hx+2,y4,ink);
+    }
+    R(x,hx-1,hx+1,hy-13,lit);D(x,hx,hy-14,lit);   /* the point */
+    D(x,hx-2,hy-13,ink);D(x,hx+2,hy-13,ink);D(x,hx,hy-15,ink);
+    /* crossguard */
+    R(x,hx-4,hx+5,hy-1,mixc(b,'#FFFFFF',0.35));
+    R(x,hx-4,hx+5,hy,b);
+    R(x,hx-4,hx+5,hy+1,shade(b,-40));
+    D(x,hx-5,hy,ink);D(x,hx+6,hy,ink);
+    R(x,hx-4,hx+5,hy-2,ink);R(x,hx-4,hx+5,hy+2,ink);
+    grip();
+    Rect(x,hx-1,hy+5,3,2,b);                      /* pommel */
+    D(x,hx,hy+5,mixc(b,'#FFFFFF',0.4));
+    outlineBox(x,hx-1,hx+1,hy+5,hy+6);
+  }
 }
 
 /* ============================================================
@@ -4556,7 +4631,7 @@ function forgeAnime(c,mode,frame){
   }
   if(!noHair)hairFront(x,style,hc,hC);
   var hP=e.hand&&W.handPal&&W.handPal(e.hand);
-  if(hP)drawHand(x,hP,Math.sin(frame*0.2));
+  if(hP)drawHand(x,hP,Math.sin(frame*0.2),e.hand);
   if(e.hat&&W.drawHat)W.drawHat(x,e.hat,BX,BY,CX,R,D,Rect);
 
   return glowPass(x,glow);
@@ -4680,10 +4755,28 @@ W.drawHat=function(x,key,BX,BY,CX,R,D,Rect){
   var top=CH.headSpan(0),wide=CH.headSpan(4);
   function span(y){return CH.headSpan(Math.max(0,Math.min(14,y)));}
   if(st==='crown'){
-    R(x,wide[0]+1,wide[1]-1,1,a);R(x,wide[0]+1,wide[1]-1,2,b);
-    for(var i=0;i<5;i++){var px=wide[0]+1+i*Math.round((wide[1]-wide[0]-2)/4);
-      D(x,px,-1,a);D(x,px,0,a);D(x,px,-2,i%2?ac:a);}
-    D(x,CX,1,ac);D(x,CX-4,1,ac);D(x,CX+4,1,ac);
+    var lo=wide[0]+1, hi=wide[1]-1;
+    var lit=P.mixc(a,'#FFFFFF',0.5), dk=P.shade(b,-40);
+    /* the band: highlight, body, shadow, then an ink foot */
+    R(x,lo,hi,1,lit);R(x,lo,hi,2,a);R(x,lo,hi,3,b);R(x,lo,hi,4,dk);
+    D(x,lo-1,2,CH.K);D(x,hi+1,2,CH.K);D(x,lo-1,3,CH.K);D(x,hi+1,3,CH.K);
+    R(x,lo,hi,5,CH.K);
+    /* five points rising off the band */
+    var step=(hi-lo)/4;
+    for(var i=0;i<5;i++){
+      var px=Math.round(lo+i*step), tall=(i%2)?3:4;
+      for(var t=1;t<=tall;t++)R(x,px-(t<tall?1:0),px+(t<tall?1:0),1-t,t<2?a:lit);
+      D(x,px,1-tall,'#FFFFFF');
+      D(x,px-2,0,CH.K);D(x,px+2,0,CH.K);
+    }
+    /* four jewels set into the band, the way the reference reads them */
+    var JEW=['#E8354E','#3E7BE0','#D94BC8','#4FD06A'];
+    for(var j=0;j<4;j++){
+      var jx=Math.round(lo+1+j*((hi-lo-2)/3));
+      Rect(x,jx,2,2,2,JEW[j]);
+      D(x,jx,2,P.mixc(JEW[j],'#FFFFFF',0.6));
+      D(x,jx+1,3,P.shade(JEW[j],-50));
+    }
   }else if(st==='cap'){
     for(var y=0;y<4;y++){var s=span(y);R(x,s[0],s[1],y,y<2?a:b);}
     R(x,wide[0]-3,CX+1,4,b);R(x,wide[0]-3,CX,3,a);
