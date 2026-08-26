@@ -273,6 +273,66 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 
 .empty-note{padding:2.4cqw;text-align:center;color:var(--ink3);font-size:.95cqw}
 
+/* ---- missions ---- */
+.mrow{display:flex;gap:.9cqw;align-items:center;padding:.7cqw .9cqw;
+  border-radius:11px;border:1px solid var(--line);margin-bottom:.5cqw;
+  background:rgba(255,255,255,.028)}
+.mrow.done{border-color:rgba(87,208,122,.42);background:rgba(87,208,122,.07)}
+.mrow .mi{flex:1;min-width:0}
+.mrow h4{font-size:.98cqw;font-weight:600;margin-bottom:.14cqw}
+.mrow p{font-size:.82cqw;color:var(--ink2);margin-bottom:.34cqw}
+.mrow .rw{font-size:.76cqw;color:var(--gold);letter-spacing:.04em}
+.mrow .pg{height:.42cqw;min-height:5px;border-radius:99px;
+  background:rgba(6,9,14,.7);overflow:hidden;border:1px solid var(--line)}
+.mrow .pg>i{display:block;height:100%;
+  background:linear-gradient(90deg,var(--acc2),var(--acc))}
+.mrow .ct{font-size:.76cqw;color:var(--ink3);min-width:4cqw;text-align:right}
+.mtype{font-size:.66cqw;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink3);padding:.16cqw .5cqw;border-radius:6px;
+  border:1px solid var(--line);white-space:nowrap}
+
+/* ---- NPC dialogue ---- */
+.dlg{position:absolute;left:50%;bottom:12cqw;transform:translateX(-50%);
+  width:min(46cqw,720px);display:none;gap:1.0cqw;padding:1.0cqw 1.2cqw;
+  border-radius:14px;
+  background:linear-gradient(180deg,rgba(20,27,42,.96),rgba(10,15,24,.95));
+  border:1px solid var(--line2);backdrop-filter:blur(12px);
+  box-shadow:0 16px 44px rgba(0,0,0,.55)}
+.dlg.on{display:flex}
+.dlg .face{width:4.4cqw;height:4.4cqw;min-width:46px;min-height:46px;
+  border-radius:11px;flex:0 0 auto;
+  background:linear-gradient(160deg,#2C3A52,#151E2C);
+  border:1px solid var(--line2);display:grid;place-items:center;
+  font-family:var(--disp);font-size:1.6cqw;color:var(--acc)}
+.dlg .txt{flex:1;min-width:0}
+.dlg .who{font-size:.98cqw;font-weight:700}
+.dlg .role{font-size:.72cqw;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink3);margin-bottom:.4cqw}
+.dlg .line{font-size:.95cqw;line-height:1.5;color:var(--ink)}
+.dlg .offer{font-size:.86cqw;color:var(--acc);margin-top:.4cqw}
+.dlg .cls{font-size:.76cqw;color:var(--ink3);margin-top:.5cqw}
+
+/* ---- chat ---- */
+.chat{position:absolute;left:50%;top:0;transform:translateX(-50%);
+  width:min(40cqw,600px);display:flex;flex-direction:column;
+  border-radius:0 0 14px 14px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(8,12,20,.90),rgba(8,12,20,.55));
+  border:1px solid var(--line);border-top:0;
+  transform:translate(-50%,calc(-100% + 1.8cqw));transition:transform .28s ease}
+.chat.on{transform:translate(-50%,0)}
+.chat .log{max-height:15cqh;overflow:auto;padding:.6cqw .9cqw;
+  display:flex;flex-direction:column;gap:.24cqw}
+.chat .ln{font-size:.85cqw;line-height:1.42;color:var(--ink2)}
+.chat .ln .ts{color:var(--ink3);font-size:.72cqw;margin-right:.3cqw}
+.chat .ln b{color:var(--acc)}
+.chat .ln.sys{color:var(--gold)}
+.chat .tab{align-self:center;padding:.2cqw 1.1cqw .3cqw;font-size:.72cqw;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);
+  cursor:pointer;border:0;background:transparent}
+.chat .inp{display:flex;border-top:1px solid var(--line)}
+.chat input{flex:1;background:transparent;border:0;outline:0;color:var(--ink);
+  font-family:var(--ui);font-size:.88cqw;padding:.5cqw .9cqw}
+
 /* ---- vitals and the fishing rig ---- */
 .vitals{position:absolute;left:1.4cqw;top:9.2cqw;width:14cqw}
 .bar{height:.72cqw;min-height:8px;border-radius:99px;overflow:hidden;
@@ -7852,7 +7912,13 @@ var state={
   missions:{},          /* id -> {progress, done, claimed} */
   collections:{fish:{},blocks:{},cosmetics:{}},
   achievements:{},
-  stats:{placed:0,broken:0,caught:0,killed:0,walked:0,visits:0},
+  titles:[],
+  title:null,
+  met:{},               /* npcId -> times talked to */
+  visited:{},           /* districtId -> true */
+  friends:[],
+  stats:{placed:0,broken:0,caught:0,killed:0,walked:0,visits:0,
+         crafted:0,sold:0},
   buffs:{}
 };
 
@@ -7930,6 +7996,12 @@ function snapshot(){
     equipped:Object.assign({},state.equipped),
     plots:state.plots.slice(),
     stats:Object.assign({},state.stats),
+    titles:state.titles.slice(),
+    title:state.title,
+    met:Object.assign({},state.met),
+    visited:Object.assign({},state.visited),
+    friends:state.friends.slice(),
+    achievements:JSON.parse(JSON.stringify(state.achievements)),
     collections:{
       fish:Object.assign({},state.collections.fish),
       blocks:Object.assign({},state.collections.blocks),
@@ -7981,6 +8053,7 @@ H.place=function(p){
   V.set(x,y,z,p.key,p.rot|0,state.name);
   state.stats.placed++;
   addXp(2+it.rarity,'building');
+  Net.request('track',{kind:'place',key:p.key,n:1});
   return {ok:true,state:snapshot()};
 };
 
@@ -7995,6 +8068,7 @@ H.break=function(p){
   for(var i=0;i<drops.length;i++)give(drops[i][0],drops[i][1]);
   state.stats.broken++;
   addXp(1+it.rarity,'building');
+  Net.request('track',{kind:'break',key:it.key,n:1});
   return {ok:true,drops:drops,state:snapshot()};
 };
 
@@ -8029,6 +8103,7 @@ H.mine=function(p){
   give(got[0],got[1]);
   state.stats.broken++;
   var lv=addXp(4+ (D.byKey(got[0]).rarity*3),'mining');
+  Net.request('track',{kind:'mine',key:got[0],n:got[1]});
   return {ok:true,got:got[0],n:got[1],levelled:lv,state:snapshot()};
 };
 
@@ -8044,7 +8119,9 @@ H.craft=function(p){
   }
   for(var j=0;j<it.recipe.length;j++)take(it.recipe[j][0],it.recipe[j][1]*n);
   give(p.key,n);
+  state.stats.crafted+=n;
   addXp(6*it.rarity*n,'building');
+  Net.request('track',{kind:'craft',key:p.key,n:n});
   return {ok:true,state:snapshot()};
 };
 
@@ -8111,6 +8188,9 @@ H.sell=function(p){
     ? Math.round(D.fishValue(it,p.weight)*0.55)
     : D.sellPrice(it);
   state.coins+=each*n;
+  state.stats.sold+=n;
+  Net.request('track',{kind:'sell',key:p.key,n:n});
+  Net.request('track',{kind:'coins',key:null,n:each*n});
   return {ok:true,earned:each*n,state:snapshot()};
 };
 
@@ -8173,6 +8253,27 @@ var SRV={
   skill:function(name){return state.skills[name]||0;},
   equippedTool:function(){return state.equipped.tool;},
   buff:function(name){return !!state.buffs[name];},
+  /* Mission and achievement rows are handed out live rather than
+     copied: the tracker has to write to them, and it runs inside the
+     boundary. Everything the *client* sees still goes through
+     snapshot(), which copies. */
+  mission:function(id){
+    return state.missions[id]||(state.missions[id]={p:0,done:false,
+      claimed:false,day:-1,week:-1});
+  },
+  achievement:function(id){
+    return state.achievements[id]||(state.achievements[id]={p:0,done:false});
+  },
+  title:function(t){
+    if(state.titles.indexOf(t)<0)state.titles.push(t);
+    if(!state.title)state.title=t;
+  },
+  meet:function(id){state.met[id]=(state.met[id]||0)+1;},
+  metCount:function(id){return state.met[id]||0;},
+  visit:function(id){
+    if(state.visited[id])return false;
+    state.visited[id]=true;state.stats.visits++;return true;
+  },
   snapshot:snapshot
 };
 
@@ -8696,6 +8797,33 @@ U.init=function(){
   els.catch=el('div','catch');
   hud.appendChild(els.catch);
 
+  /* NPC dialogue */
+  els.dlg=el('div','dlg');
+  hud.appendChild(els.dlg);
+
+  /* chat: a tab stuck to the top edge that pulls down */
+  els.chat=el('div','chat pe');
+  els.chat.innerHTML=
+    '<div class="log" id="uchatlog"></div>'+
+    '<div class="inp"><input id="uchatin" placeholder="Say something…" '+
+      'maxlength="120"></div>'+
+    '<button class="tab" id="uchattab">Chat</button>';
+  hud.appendChild(els.chat);
+  els.chatLog=els.chat.querySelector('#uchatlog');
+  els.chatIn=els.chat.querySelector('#uchatin');
+  els.chat.querySelector('#uchattab').addEventListener('click',function(){
+    els.chat.classList.toggle('on');
+  });
+  els.chatIn.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){
+      var v=els.chatIn.value.trim();
+      els.chatIn.value='';
+      if(v)U.say(snap?snap.name:'You',v);
+      els.chatIn.blur();
+    }else if(e.key==='Escape'){els.chatIn.blur();}
+    e.stopPropagation();
+  });
+
   els.world=el('div');
   els.world.style.cssText='position:absolute;inset:0;pointer-events:none';
   hud.appendChild(els.world);
@@ -9089,7 +9217,17 @@ function renderProfile(bd,tab){
     return;
   }
   if(tab==='Achievements'){
-    bd.appendChild(el('div','empty-note','Achievements arrive with the mission board.'));
+    Net.request('missions',{},function(r){if(r.ok)missionCache=r;});
+    var A=(missionCache&&missionCache.achievements)||[];
+    A.forEach(function(a){
+      var row=el('div','mrow'+(a.done?' done':''));
+      row.innerHTML='<div class="mtype">'+(a.done?'earned':'locked')+'</div>'+
+        '<div class="mi"><h4>'+a.name+'</h4>'+
+        '<div class="pg"><i style="width:'+
+          Math.round(100*a.progress/Math.max(1,a.goal))+'%"></i></div></div>'+
+        '<div class="ct">'+a.progress+' / '+a.goal+'</div>';
+      bd.appendChild(row);
+    });
     return;
   }
   var s=snap;
@@ -9151,10 +9289,62 @@ function renderShop(bd,tab){
   }
 }
 
+var missionCache=null;
 function renderMissions(bd,tab){
-  bd.appendChild(el('div','empty-note',
-    'The mission board is not open yet. Visit the Mission District.'));
+  Net.request('missions',{},function(r){
+    if(r.ok)missionCache=r;
+  });
+  if(!missionCache){
+    bd.appendChild(el('div','empty-note','Reading the board…'));
+    return;
+  }
+  var list=tab==='Story'?missionCache.story
+          :tab==='Weekly'?missionCache.weekly:missionCache.daily;
+  if(!list||!list.length){
+    bd.appendChild(el('div','empty-note',
+      tab==='Story'?'Nothing new. Come back as you level up.'
+                   :'Nothing posted right now.'));
+    return;
+  }
+  list.forEach(function(m){
+    var row=el('div','mrow'+(m.done?' done':''));
+    var rw=[];
+    if(m.reward.coins)rw.push(m.reward.coins.toLocaleString()+' coins');
+    if(m.reward.xp)rw.push(m.reward.xp+' XP');
+    if(m.reward.items)m.reward.items.forEach(function(it){
+      var d=D.byKey(it[0]);
+      if(d)rw.push(d.name+(it[1]>1?' ×'+it[1]:''));
+    });
+    if(m.reward.title)rw.push('Title: '+m.reward.title);
+    row.innerHTML=
+      '<div class="mtype">'+m.type+'</div>'+
+      '<div class="mi"><h4>'+m.name+'</h4><p>'+m.desc+'</p>'+
+      '<div class="pg"><i style="width:'+
+        Math.round(100*m.progress/Math.max(1,m.goal))+'%"></i></div>'+
+      '<div class="rw">'+rw.join(' · ')+'</div></div>'+
+      '<div class="ct">'+m.progress+' / '+m.goal+'</div>';
+    if(m.done&&!m.claimed){
+      var b=el('button','btn pri','Claim');
+      b.style.marginLeft='.6cqw';
+      b.addEventListener('click',function(){
+        Net.request('claim',{id:m.id},function(r2){
+          if(r2.ok){
+            U.sync(r2.state);
+            U.toast('Reward claimed','good');
+            if(r2.reward.items)r2.reward.items.forEach(function(it){
+              U.toastItem(it[0],it[1]);});
+            missionCache=null;render('missions');
+          }else U.toast(r2.why,'bad');
+        });
+      });
+      row.appendChild(b);
+    }else if(m.claimed){
+      row.appendChild(el('div','ct','✓'));
+    }
+    bd.appendChild(row);
+  });
 }
+U.refreshMissions=function(){missionCache=null;};
 
 function renderMap(bd){
   bd.appendChild(el('div','empty-note','The harbour map is being drawn.'));
@@ -9259,6 +9449,55 @@ U.plates=function(list){
     pl.hb.style.width=Math.round(100*d.hp/d.hpMax)+'%';
   }
 };
+
+/* ---------------- NPC dialogue ---------------- */
+U.dialogue=function(d){
+  if(!els.dlg)return;
+  if(!d){els.dlg.classList.remove('on');return;}
+  els.dlg.innerHTML=
+    '<div class="face">'+(d.name[0]||'?')+'</div>'+
+    '<div class="txt"><div class="who">'+d.name+'</div>'+
+    '<div class="role">'+d.role+'</div>'+
+    '<div class="line">'+d.line+'</div>'+
+    (d.offer?'<div class="offer">'+d.offer+'</div>':'')+
+    '<div class="cls">Press <b>E</b> again to leave</div></div>';
+  els.dlg.classList.add('on');
+};
+
+/* ---------------- chat ----------------
+   Local and simulated, and the module says so: until there is a
+   server the other voices in the harbour are fiction. The plumbing is
+   real, so wiring it to a socket later is a transport change. */
+var chatLines=[];
+function stamp(){
+  var d=new Date();
+  function p2(v){return (v<10?'0':'')+v;}
+  return p2(d.getHours())+':'+p2(d.getMinutes());
+}
+U.say=function(who,text,kind){
+  chatLines.push({who:who,text:text,at:stamp(),kind:kind});
+  while(chatLines.length>80)chatLines.shift();
+  if(!els.chatLog)return;
+  var ln=el('div','ln'+(kind?' '+kind:''));
+  ln.innerHTML='<span class="ts">'+stamp()+'</span>'+
+    (kind==='sys'?'':'<b>'+who+':</b> ')+text;
+  els.chatLog.appendChild(ln);
+  while(els.chatLog.children.length>80)
+    els.chatLog.removeChild(els.chatLog.firstChild);
+  els.chatLog.scrollTop=els.chatLog.scrollHeight;
+  /* peek the panel open briefly so a new line is not missed */
+  els.chat.classList.add('on');
+  clearTimeout(els._chatT);
+  els._chatT=setTimeout(function(){
+    if(document.activeElement!==els.chatIn)els.chat.classList.remove('on');
+  },5200);
+};
+U.focusChat=function(){
+  if(!els.chatIn)return;
+  els.chat.classList.add('on');
+  els.chatIn.focus();
+};
+U.chatFocused=function(){return document.activeElement===els.chatIn;};
 
 LH.UI=U;
 })();
@@ -9948,11 +10187,16 @@ Net.register('land',function(p,srv){
   if(!hooked||hooked.token!==p.token)
     return {ok:false,why:'Nothing on the line.'};
   var fish=hooked.item, weight=hooked.weight;
+  /* checked before the fish is granted, or every catch looks familiar */
+  var wasKnown=!!srv.snapshot().collections.fish[fish.key];
   hooked=null;
   if(!srv.give(fish.key,1))return {ok:false,why:'Your bag is full.'};
   var value=D.fishValue(fish,weight);
   srv.xp(Math.min(400,14+fish.rarity*16+Math.round(value*0.04)),'fishing');
   srv.stat('caught');
+  Net.request('track',{kind:'catch',key:fish.key,n:1});
+  if(fish.rarity>=3)Net.request('track',{kind:'catchRare',key:fish.key,n:1});
+  if(!wasKnown)Net.request('track',{kind:'discoverFish',key:fish.key,n:1});
   return {ok:true,key:fish.key,name:fish.name,weight:weight,
     rarity:fish.rarity,value:value,state:srv.snapshot()};
 });
@@ -9992,6 +10236,7 @@ Net.register('attack',function(p,srv){
     srv.coins(Math.round(e.S.xp*1.6));
     srv.xp(Math.min(500,e.S.xp),'combat');
     srv.stat('killed');
+    Net.request('track',{kind:'kill',key:e.kind,n:1});
   }
   return {ok:true,damage:roll,crit:crit,killed:!!(r&&r.killed),
     loot:loot,hp:e.hp,hpMax:e.hpMax,state:srv.snapshot()};
@@ -10016,6 +10261,357 @@ Net.register('respawn',function(p,srv){
 });
 
 LH.Activities={rollFish:rollFish};
+})();
+
+/* ============================================================
+   LH.Quests — missions, achievements and the NPCs who hand them out.
+
+   Missions are data, and progress is tracked by *event kind* rather
+   than by mission: an activity handler calls track('catch','f_bass',1)
+   once, and every mission, achievement and collection that cares
+   about catching updates itself. Adding a mission is a table row; it
+   never means editing fishing.
+
+   Dailies rotate on a date-derived seed so everyone in the harbour
+   gets the same three on the same day — which is the only reason a
+   daily is worth talking to anyone about.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,D=LH.Data,Net=LH.Net;
+var Q={};
+
+var MISSIONS=[], MID={};
+
+/* goal: [kind, key|null, count]. A null key means "any of that kind",
+   which is what lets one row cover "catch five fish" and another
+   cover "catch a Bluefin Tuna". */
+function Ms(id,name,type,o){
+  var m={
+    id:id,name:name,type:type,
+    desc:o.desc||'',
+    goal:o.goal,
+    reward:o.reward||{},
+    npc:o.npc||null,
+    needs:o.needs||null,      /* prerequisite mission id */
+    level:o.level||1,
+    repeat:type==='daily'||type==='weekly'
+  };
+  MID[id]=m;MISSIONS.push(m);
+  return m;
+}
+
+/* ---------------- story ---------------- */
+Ms('s_arrive','Find Your Feet','story',{
+  npc:'harbourmaster',level:1,
+  desc:'Talk to the Harbourmaster and take a look around Lumen Harbor.',
+  goal:['talk','harbourmaster',1],
+  reward:{coins:60,xp:40,items:[['bait_worm',10]]}});
+Ms('s_firstcatch','A Line in the Water','story',{
+  npc:'harbourmaster',needs:'s_arrive',level:1,
+  desc:'Catch your first fish from the harbour.',
+  goal:['catch',null,1],
+  reward:{coins:80,xp:70,items:[['rod_oak',1]]}});
+Ms('s_firstore','Something Worth Digging','story',{
+  npc:'foreman',needs:'s_firstcatch',level:2,
+  desc:'Mine anything at the quarry face.',
+  goal:['mine',null,3],
+  reward:{coins:90,xp:80,items:[['pick_copper',1]]}});
+Ms('s_firstplot','Somewhere of Your Own','story',{
+  npc:'clerk',needs:'s_firstore',level:3,
+  desc:'Claim a building plot and place your first block on it.',
+  goal:['place',null,1],
+  reward:{coins:150,xp:160,items:[['plank',48],['lantern',6]]}});
+Ms('s_firstfight','Keeping the Peace','story',{
+  npc:'warden',needs:'s_firstplot',level:4,
+  desc:'Deal with three creatures troubling the island.',
+  goal:['kill',null,3],
+  reward:{coins:180,xp:200,items:[['sword_copper',1]]}});
+Ms('s_facility','Something in the Facility','story',{
+  npc:'warden',needs:'s_firstfight',level:8,
+  desc:'Something has taken up residence in the old quarry works. '+
+       'Find out what, and put a stop to it.',
+  goal:['kill','guardian',1],
+  reward:{coins:1400,xp:900,items:[['lens_old',1],['hat_visor',1]],
+          title:'Guardian-Breaker'}});
+
+/* ---------------- dailies ---------------- */
+Ms('d_fish5','Fresh Catch','daily',{
+  desc:'Catch five fish of any kind.',goal:['catch',null,5],
+  reward:{coins:140,xp:110}});
+Ms('d_fish_rare','Something Worth Mounting','daily',{
+  desc:'Land a rare fish or better.',goal:['catchRare',null,1],
+  reward:{coins:320,xp:220,items:[['bait_shrimp',6]]}});
+Ms('d_mine20','Working the Face','daily',{
+  desc:'Mine twenty pieces of anything.',goal:['mine',null,20],
+  reward:{coins:160,xp:130}});
+Ms('d_kill10','Pest Control','daily',{
+  desc:'Defeat ten creatures.',goal:['kill',null,10],
+  reward:{coins:200,xp:170}});
+Ms('d_build30','Making Progress','daily',{
+  desc:'Place thirty blocks on your own land.',goal:['place',null,30],
+  reward:{coins:150,xp:140}});
+Ms('d_craft5','At the Bench','daily',{
+  desc:'Craft five items.',goal:['craft',null,5],
+  reward:{coins:130,xp:120}});
+Ms('d_visit','Doing the Rounds','daily',{
+  desc:'Visit three districts.',goal:['visit',null,3],
+  reward:{coins:110,xp:90}});
+Ms('d_sell','Turning a Profit','daily',{
+  desc:'Sell fifteen items.',goal:['sell',null,15],
+  reward:{coins:180,xp:100}});
+
+/* ---------------- weeklies ---------------- */
+Ms('w_angler','The Week’s Angler','weekly',{
+  desc:'Catch forty fish.',goal:['catch',null,40],
+  reward:{coins:1200,xp:900,items:[['bait_lure',8]]}});
+Ms('w_builder','Something Substantial','weekly',{
+  desc:'Place three hundred blocks.',goal:['place',null,300],
+  reward:{coins:1400,xp:1000,items:[['aurorablock',6]]}});
+Ms('w_hunter','Thinning the Woods','weekly',{
+  desc:'Defeat sixty creatures.',goal:['kill',null,60],
+  reward:{coins:1500,xp:1100,items:[['sword_iron',1]]}});
+Ms('w_collector','A Full Case','weekly',{
+  desc:'Discover eight different fish.',goal:['discoverFish',null,8],
+  reward:{coins:1800,xp:1300,items:[['rod_crystal',1]]}});
+
+Q.MISSIONS=MISSIONS;
+Q.byId=function(id){return MID[id]||null;};
+
+/* ---------------- achievements ----------------
+   Same tracking, but permanent and never claimed — they fire once and
+   stay fired. */
+var ACH=[
+  ['a_firstfish','First Fish','catch',null,1,{xp:40}],
+  ['a_angler','Legendary Angler','catchRare',null,25,{xp:900,items:[['hat_brim',1]]}],
+  ['a_lumen','The Lumen Angler','catch','f_lumen',1,{xp:2000,title:'Deep Reader'}],
+  ['a_builder','Master Builder','place',null,1000,{xp:1200,items:[['statue',1]]}],
+  ['a_quarry','Down to the Rock','mine',null,500,{xp:800}],
+  ['a_hunter','Monster Hunter','kill',null,200,{xp:1000}],
+  ['a_rich','Millionaire','coins',null,1000000,{xp:4000,title:'Harbour Magnate'}],
+  ['a_explorer','World Explorer','visit',null,9,{xp:600,items:[['b_satchel',1]]}],
+  ['a_collector','Collector','discoverFish',null,14,{xp:1600,items:[['trophy',1]]}]
+];
+Q.ACH=ACH;
+
+/* ---------------- daily rotation ----------------
+   Seeded from the date so the whole harbour sees the same set. */
+function dayIndex(){
+  return Math.floor(Date.now()/86400000);
+}
+function weekIndex(){
+  return Math.floor(Date.now()/(86400000*7));
+}
+function pickRotating(pool,n,seed){
+  var rng=M.rng(seed>>>0||1);
+  var copy=pool.slice(),out=[];
+  while(out.length<n&&copy.length){
+    out.push(copy.splice((rng()*copy.length)|0,1)[0]);
+  }
+  return out;
+}
+Q.todaysDailies=function(){
+  var pool=MISSIONS.filter(function(m){return m.type==='daily';});
+  return pickRotating(pool,3,dayIndex()*7919);
+};
+Q.thisWeek=function(){
+  var pool=MISSIONS.filter(function(m){return m.type==='weekly';});
+  return pickRotating(pool,2,weekIndex()*104729);
+};
+Q.dayIndex=dayIndex;
+Q.weekIndex=weekIndex;
+
+/* ---------------- NPCs ----------------
+   Each one owns a district, a role and a short dialogue. They exist to
+   make the systems legible: the person who explains fishing stands
+   next to the water. */
+var NPCS={
+  harbourmaster:{
+    name:'Mira Vance',role:'Harbourmaster',at:'harbour',
+    lines:[
+      'You are new. Everyone here was, once.',
+      'The harbour will feed you if you let it. Rod, bait, patience.',
+      'Big ones run. Let them. The line only breaks if you argue.'
+    ],
+    offer:'Take a rod down to the jetty and see what bites.'
+  },
+  foreman:{
+    name:'Dell Okonjo',role:'Quarry Foreman',at:'quarry',
+    lines:[
+      'Mind the face. It comes down when it feels like it.',
+      'Copper near the surface, iron under that. Deeper is better and worse.',
+      'A better pick opens new rock. It does not just dig faster.'
+    ],
+    offer:'Bring me anything you pull out of that face.'
+  },
+  clerk:{
+    name:'Rosalind Ash',role:'Land Registry',at:'plots',
+    lines:[
+      'Every plot on this island is on my ledger. Yours could be.',
+      'First one is free. The island would rather you built than not.',
+      'Build what you like. I only record that it is yours.'
+    ],
+    offer:'Claim a plot at the marker and put something on it.'
+  },
+  warden:{
+    name:'Ivo Karr',role:'Warden',at:'missions',
+    lines:[
+      'Something walked out of the old works last month. It has not walked back.',
+      'The slimes are harmless. The shades are not. Learn the difference early.',
+      'Do not go up to the quarry alone until you can handle what is down here.'
+    ],
+    offer:'Clear a few of the ones near the road and we will talk again.'
+  },
+  merchant:{
+    name:'Bao Ling',role:'Market Trader',at:'market',
+    lines:[
+      'Everything has a price. Most of them are mine.',
+      'I buy what you dig, catch or break. I sell what you have not found yet.',
+      'Rare things are rare because they are rare. I do not set that part.'
+    ],
+    offer:'Bring me your catch and your ore.'
+  },
+  mechanic:{
+    name:'Tess Aurelio',role:'Garage',at:'garage',
+    lines:[
+      'The island is small until you have to cross it on foot.',
+      'I am still building the first one. Come back when it runs.',
+      'Anything with wheels beats anything with legs. Do not quote me.'
+    ],
+    offer:'Nothing running yet. Soon.'
+  }
+};
+Q.NPCS=NPCS;
+Q.npcList=function(){return Object.keys(NPCS);};
+
+LH.Quests=Q;
+})();
+
+/* ============================================================
+   Mission and social handlers, inside the authority.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,D=LH.Data,Net=LH.Net,Q=LH.Quests;
+
+/* Every activity funnels through one tracker. Missions, achievements
+   and the "discovered" counters all read the same event, so a new
+   mission never means editing the thing it measures. */
+function activeSet(srv){
+  var out=[];
+  var s=srv.snapshot();
+  Q.todaysDailies().forEach(function(m){out.push(m);});
+  Q.thisWeek().forEach(function(m){out.push(m);});
+  Q.MISSIONS.forEach(function(m){
+    if(m.type!=='story')return;
+    var st=s.missions[m.id];
+    if(st&&st.claimed)return;
+    if(m.needs){
+      var pre=s.missions[m.needs];
+      if(!pre||!pre.claimed)return;
+    }
+    if(s.level<m.level)return;
+    out.push(m);
+  });
+  return out;
+}
+
+Net.register('track',function(p,srv){
+  var kind=p.kind,key=p.key,n=p.n||1;
+  var s=srv.snapshot();
+  var completed=[];
+
+  /* rotate: a daily from a previous day resets rather than carrying */
+  var today=Q.dayIndex(), week=Q.weekIndex();
+
+  activeSet(srv).forEach(function(m){
+    var g=m.goal;
+    if(g[0]!==kind)return;
+    if(g[1]&&g[1]!==key)return;
+    var st=srv.mission(m.id);
+    if(m.type==='daily'&&st.day!==today){st.p=0;st.done=false;st.claimed=false;st.day=today;}
+    if(m.type==='weekly'&&st.week!==week){st.p=0;st.done=false;st.claimed=false;st.week=week;}
+    if(st.done)return;
+    st.p+=n;
+    if(st.p>=g[2]){st.p=g[2];st.done=true;completed.push(m.id);}
+  });
+
+  /* achievements use the same events but never reset */
+  Q.ACH.forEach(function(a){
+    if(a[2]!==kind)return;
+    if(a[3]&&a[3]!==key)return;
+    var st=srv.achievement(a[0]);
+    if(st.done)return;
+    st.p+=n;
+    if(st.p>=a[4]){
+      st.done=true;
+      var rw=a[5]||{};
+      if(rw.xp)srv.xp(rw.xp);
+      if(rw.items)rw.items.forEach(function(it){srv.give(it[0],it[1]);});
+      if(rw.title)srv.title(rw.title);
+      completed.push('ach:'+a[0]);
+    }
+  });
+
+  return {ok:true,completed:completed,state:srv.snapshot()};
+});
+
+Net.register('missions',function(p,srv){
+  var s=srv.snapshot();
+  var today=Q.dayIndex(), week=Q.weekIndex();
+  function pack(m){
+    var st=s.missions[m.id]||{p:0,done:false,claimed:false};
+    /* a stale daily reads as fresh rather than complete */
+    if(m.type==='daily'&&st.day!==today)st={p:0,done:false,claimed:false};
+    if(m.type==='weekly'&&st.week!==week)st={p:0,done:false,claimed:false};
+    return {id:m.id,name:m.name,desc:m.desc,type:m.type,
+      goal:m.goal[2],progress:Math.min(st.p||0,m.goal[2]),
+      done:!!st.done,claimed:!!st.claimed,
+      reward:m.reward,npc:m.npc};
+  }
+  return {ok:true,
+    daily:Q.todaysDailies().map(pack),
+    weekly:Q.thisWeek().map(pack),
+    story:activeSet(srv).filter(function(m){return m.type==='story';}).map(pack),
+    achievements:Q.ACH.map(function(a){
+      var st=(s.achievements||{})[a[0]]||{p:0,done:false};
+      return {id:a[0],name:a[1],goal:a[4],progress:Math.min(st.p||0,a[4]),
+        done:!!st.done};
+    })};
+});
+
+Net.register('claim',function(p,srv){
+  var m=Q.byId(p.id);
+  if(!m)return {ok:false,why:'No such mission.'};
+  var st=srv.mission(m.id);
+  if(!st.done)return {ok:false,why:'Not finished yet.'};
+  if(st.claimed)return {ok:false,why:'Already claimed.'};
+  st.claimed=true;
+  var rw=m.reward||{};
+  if(rw.coins)srv.coins(rw.coins);
+  if(rw.xp)srv.xp(rw.xp);
+  if(rw.items)rw.items.forEach(function(it){srv.give(it[0],it[1]);});
+  if(rw.title)srv.title(rw.title);
+  return {ok:true,reward:rw,state:srv.snapshot()};
+});
+
+Net.register('talk',function(p,srv){
+  var npc=Q.NPCS[p.id];
+  if(!npc)return {ok:false,why:'Nobody there.'};
+  srv.meet(p.id);
+  Net.request('track',{kind:'talk',key:p.id,n:1});
+  var seen=srv.metCount(p.id);
+  return {ok:true,name:npc.name,role:npc.role,
+    line:npc.lines[Math.min(seen-1,npc.lines.length-1)],
+    offer:npc.offer,state:srv.snapshot()};
+});
+
+Net.register('visit',function(p,srv){
+  if(srv.visit(p.id))Net.request('track',{kind:'visit',key:p.id,n:1});
+  return {ok:true,state:srv.snapshot()};
+});
+
+LH.QuestNet=true;
 })();
 
 /* ============================================================
@@ -10145,7 +10741,7 @@ LH.Sky=S;
 var M=LH.M,GL=LH.GL,R=LH.Render,App=LH.App,Cam=LH.Cam,Geo=LH.Geo;
 var T=LH.Terrain,W=LH.World,P=LH.Props,Act=LH.Actors,I=LH.Input,Pl=LH.Player,Sky=LH.Sky;
 var V=LH.Voxels,D=LH.Data,Net=LH.Net,UI=LH.UI,Icon=LH.Icon;
-var En=LH.Enemies,Fish=LH.Fishing;
+var En=LH.Enemies,Fish=LH.Fishing,Quests=LH.Quests;
 var G={};
 
 G.player=null;
@@ -10212,6 +10808,37 @@ App.stage('Waking the harbour',function(){
     npc.speed=1.5+rng()*0.9;
     G.crowd.push(npc);
   }
+  /* The named residents. Each stands in the district their role
+     belongs to, so the person who explains fishing is beside the
+     water and the land registry is on the plots. */
+  G.npcs=[];
+  var NPCSPOT={
+    harbourmaster:['harbour',6,4],  foreman:['quarry',-6,-8],
+    clerk:['plots',0,-10],          warden:['missions',-6,-9],
+    merchant:['market',-4,-8],      mechanic:['garage',-6,-4]
+  };
+  Quests.npcList().forEach(function(id,i){
+    var def=Quests.NPCS[id], spot=NPCSPOT[id];
+    var pad=T.pad(spot[0]);
+    var nx=pad.x+spot[1], nz=pad.z+spot[2];
+    var kit=Act.defaultKit(600+i*41);
+    kit.hair.style=['swept','bun','long','crop','braids','spiked'][i%6];
+    kit.shirt.style=['jacket','hoodie','jacket','jacket','tee','hoodie'][i%6];
+    kit.shirt.color=['#2E5C7A','#7A4A2E','#4A3A6A','#3A4A3A','#7A2E4A','#4A4A2E'][i%6];
+    kit.shirt.sleeve='long';
+    kit.pants.color=Geo.shade(kit.shirt.color,-50);
+    kit.shoes.color='#26292F';
+    if(i%2)kit.hat.style=['cap','beanie','brim'][i%3];
+    kit.hat.color=kit.shirt.color;
+    var a=Act.Actor({x:nx,y:T.heightAt(nx,nz),z:nz,kit:kit,name:def.name,
+      facing:Math.atan2(pad.x-nx,pad.z-nz)});
+    a.npcId=id;
+    a.pos[1]=W.groundAt(nx,nz);
+    G.npcs.push(a);
+    W.point('npc_'+id,'npc',nx,nz,{y:a.pos[1],r:3.4,
+      label:def.name,prompt:'Talk to '+def.name,data:{npc:id}});
+  });
+
   /* Populate. Species are placed by terrain rather than by hand: crabs
      on the shore, slimes in the meadows, wisps in the deep woods,
      rogues on the roads, and one guardian in the quarry. */
@@ -10336,8 +10963,19 @@ G.interact=function(pt){
   if(!pt)return;
   var p=G.player;
   switch(pt.kind){
+    case 'npc':
+      /* pressing again while the card is up closes it */
+      if(G.talking===pt.data.npc){G.talking=null;UI.dialogue(null);break;}
+      Net.request('talk',{id:pt.data.npc},function(r){
+        if(!r.ok){UI.toast(r.why,'bad');return;}
+        UI.sync(r.state);
+        G.talking=pt.data.npc;
+        UI.dialogue(r);
+        UI.refreshMissions();
+      });
+      break;
     case 'shop': UI.open('shop');break;
-    case 'missions': UI.open('missions');break;
+    case 'missions': UI.refreshMissions();UI.open('missions');break;
     case 'portal':
       UI.toast('Your world is not built yet — claim a plot first.','bad');
       break;
@@ -10539,6 +11177,9 @@ App.onUpdate(function(dt,time){
   if(I.pressed('map'))UI.open('map');
   if(I.pressed('menu')){if(UI.isOpen())UI.close();else UI.open('menu');}
   if(I.pressed('emote'))G.player.anim.play('wave',true);
+  if(I.pressed('chat'))UI.focusChat();
+  /* typing in chat must not also drive the character */
+  if(UI.chatFocused()){I.move.x=0;I.move.y=0;}
 
   /* A panel takes the input: movement and world actions stop, which is
      what stops a click on a shop button also punching the ground. */
@@ -10600,6 +11241,17 @@ App.onUpdate(function(dt,time){
 
   En.update(dt,G.player.pos,onEnemyHit);
   updatePlates();
+  updateNpcs(dt);
+  trackDistrict();
+  chatter(dt);
+
+  /* walking away ends a conversation */
+  if(G.talking){
+    var talkPt=W.nearestPoint(G.player.pos[0],G.player.pos[2],5.0);
+    if(!talkPt||talkPt.kind!=='npc'||talkPt.data.npc!==G.talking){
+      G.talking=null;UI.dialogue(null);
+    }
+  }
 
   /* reticle and prompt reflect what the aim found */
   if(Fish.active()){
@@ -10641,6 +11293,64 @@ App.onUpdate(function(dt,time){
   I.end();
 });
 
+/* NPCs turn to face you when you are close, and idle otherwise. It is
+   a small thing and it is most of what makes them read as people
+   rather than statues. */
+function updateNpcs(dt){
+  if(!G.npcs)return;
+  for(var i=0;i<G.npcs.length;i++){
+    var a=G.npcs[i];
+    var d=M.dist2(a.pos,G.player.pos);
+    if(d<6){
+      a.faceToward(Math.atan2(G.player.pos[0]-a.pos[0],
+        G.player.pos[2]-a.pos[2]),dt,5);
+      if(a.anim.state==='idle'&&G.talking===a.npcId&&Math.random()<0.004)
+        a.anim.play('wave');
+    }
+    if(a.anim.state!=='wave')a.anim.play('idle');
+    a.update(dt);
+  }
+}
+
+/* Entering a district is worth recording once: the exploration
+   achievement and one of the dailies both measure it. */
+var lastDistrict=null;
+function trackDistrict(){
+  var best=null,bd=1e9;
+  for(var i=0;i<T.PADS.length;i++){
+    var P=T.PADS[i];
+    var d=Math.hypot(G.player.pos[0]-P[1],G.player.pos[2]-P[2]);
+    if(d<P[3]&&d<bd){bd=d;best=P[0];}
+  }
+  if(best&&best!==lastDistrict){
+    lastDistrict=best;
+    Net.request('visit',{id:best},function(r){if(r.ok)UI.sync(r.state);});
+  }else if(!best)lastDistrict=null;
+}
+
+/* Ambient chatter. Simulated, and the UI says so the first time — the
+   people in the harbour are fiction until there is a server. */
+var CHATTER=[
+  ['Skylar','anyone seen a crystal koi in the river? third day looking'],
+  ['Zenn','selling iron, cheap, meet me at the market'],
+  ['Mochi','the guardian in the quarry is NOT a fair fight at level 10'],
+  ['Noctis','built a whole lighthouse on plot 3, come look'],
+  ['Lumi','tuna running off the jetty right now'],
+  ['Kestrel','does anyone actually use the arena'],
+  ['Vale','glow lure is worth every coin'],
+  ['Orin','wisps drop silver more than the wiki says'],
+  ['Wren','first shade kill, never doing that again without a real sword'],
+  ['Juno','who keeps leaving crates on the harbour deck']
+];
+var chatT=14, chatI=0;
+function chatter(dt){
+  chatT-=dt;
+  if(chatT>0)return;
+  chatT=22+Math.random()*30;
+  var c=CHATTER[(chatI++)%CHATTER.length];
+  UI.say(c[0],c[1]);
+}
+
 function camSolid(x,y,z){
   if(y<T.heightAt(x,z)+0.35)return true;
   if(V.solid(Math.floor(x),Math.floor(y),Math.floor(z)))return true;
@@ -10661,6 +11371,11 @@ App.onDraw(function(dt,time){
     /* Skip characters far enough away to be a couple of pixels. */
     if(M.dist2(n.pos,G.player.pos)>150)continue;
     Act.submit(n);Act.submitPet(n,time);
+  }
+  if(G.npcs)for(var q=0;q<G.npcs.length;q++){
+    var np=G.npcs[q];
+    if(M.dist2(np.pos,G.player.pos)>110)continue;
+    Act.submit(np);
   }
   En.submit(time,G.player.pos);
 
@@ -10709,7 +11424,10 @@ App.onDraw(function(dt,time){
 if(LH.App.start()){
   LH.Input.attach(document.getElementById('gl'));
   LH.App.runBoot(function(){
-    /* nothing yet — the UI hooks in here */
+    LH.UI.say('','Welcome to Lumen Harbor. Press <b>E</b> to interact, '+
+      '<b>Tab</b> for your backpack, <b>Esc</b> for the menu.','sys');
+    LH.UI.say('','Other people here are simulated — there is no server '+
+      'behind them yet.','sys');
   });
 }
 LH.Game=G;
