@@ -111,7 +111,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
    Everything else opens on demand.
    ============================================================ */
 #hud{position:absolute;inset:0;pointer-events:none;z-index:20;
-  font-family:var(--ui);container-type:size}
+  font-family:var(--ui);container-type:size;
+  opacity:1;transition:opacity .35s ease}
+/* The front end owns the screen while it is up; the HUD behind it is
+   just clutter over a title card. */
+#hud.hidden{opacity:0;pointer-events:none}
 #hud .pe{pointer-events:auto}
 
 /* ---- identity ---- */
@@ -272,6 +276,81 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .btn[disabled]{opacity:.38;pointer-events:none}
 
 .empty-note{padding:2.4cqw;text-align:center;color:var(--ink3);font-size:.95cqw}
+
+/* ============================================================
+   FRONT END — title, character creation, and the first minutes.
+   Full-frame overlays that own the boot flow. The world renders
+   behind them from the first frame, so character creation is a
+   live preview rather than a separate screen.
+   ============================================================ */
+#front{position:absolute;inset:0;z-index:70;display:none;
+  pointer-events:auto}
+#front.on{display:block}
+#front .veil{position:absolute;inset:0;
+  background:linear-gradient(105deg,rgba(4,7,13,.94) 0%,rgba(4,7,13,.86) 38%,
+    rgba(4,7,13,.30) 66%,rgba(4,7,13,.10) 100%)}
+#front .pane{position:absolute;left:0;top:0;bottom:0;width:min(38cqw,560px);
+  padding:3.2cqw 3.0cqw;display:flex;flex-direction:column;
+  justify-content:center;gap:1.1cqw}
+.fbrand{font-family:var(--disp);font-weight:700;letter-spacing:.20em;
+  font-size:clamp(26px,3.4cqw,54px);text-transform:uppercase;line-height:1;
+  background:linear-gradient(180deg,#EAF6FF 0%,#7FE9DA 55%,#1E8C7E 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 6px 26px rgba(59,224,200,.32))}
+.fsub{font-size:.92cqw;letter-spacing:.30em;text-transform:uppercase;
+  color:var(--ink3);margin-top:-.4cqw}
+.fbody{font-size:.95cqw;line-height:1.6;color:var(--ink2);max-width:30cqw}
+.fstep{font-size:.74cqw;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--acc2)}
+.frow{display:flex;gap:.5cqw;flex-wrap:wrap;align-items:center}
+.fbtn{padding:.66cqw 1.5cqw;border-radius:10px;font-size:.98cqw;font-weight:600;
+  letter-spacing:.06em;cursor:pointer;border:1px solid var(--line2);
+  background:rgba(255,255,255,.05);color:var(--ink);transition:all .15s;
+  font-family:var(--ui)}
+.fbtn:hover{background:rgba(59,224,200,.14);border-color:var(--acc);color:var(--acc)}
+.fbtn.pri{background:linear-gradient(180deg,rgba(59,224,200,.26),rgba(21,156,137,.22));
+  border-color:var(--acc);color:#0B1018;font-weight:700}
+.fbtn.pri:hover{filter:brightness(1.12)}
+.fbtn[disabled]{opacity:.4;pointer-events:none}
+.finp{width:100%;background:rgba(6,9,14,.7);border:1px solid var(--line);
+  border-radius:10px;color:var(--ink);font-family:var(--ui);font-size:1.05cqw;
+  padding:.66cqw .9cqw;outline:0}
+.finp:focus{border-color:var(--acc)}
+.swatches{display:flex;gap:.42cqw;flex-wrap:wrap}
+.sw2{width:2.1cqw;height:2.1cqw;min-width:22px;min-height:22px;border-radius:8px;
+  cursor:pointer;border:2px solid transparent;transition:transform .12s}
+.sw2:hover{transform:scale(1.1)}
+.sw2.on{border-color:var(--acc);box-shadow:0 0 0 2px rgba(59,224,200,.3)}
+.optrow{display:flex;gap:.4cqw;flex-wrap:wrap}
+.opt{padding:.4cqw .8cqw;border-radius:8px;font-size:.84cqw;cursor:pointer;
+  border:1px solid var(--line);color:var(--ink2);transition:all .13s;
+  text-transform:capitalize}
+.opt:hover{border-color:var(--line2);color:var(--ink)}
+.opt.on{border-color:var(--acc);color:var(--acc);background:rgba(59,224,200,.10)}
+.flabel{font-size:.76cqw;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink3);margin-bottom:.24cqw}
+
+/* the guided first steps, as a small card in the corner */
+.guide{position:absolute;right:1.4cqw;bottom:8.5cqw;width:min(21cqw,320px);
+  padding:.9cqw 1.0cqw;border-radius:13px;display:none;
+  background:linear-gradient(180deg,rgba(20,27,42,.94),rgba(10,15,24,.92));
+  border:1px solid var(--line2);backdrop-filter:blur(12px);
+  box-shadow:0 12px 34px rgba(0,0,0,.5)}
+.guide.on{display:block;animation:tin .3s ease both}
+.guide .st{font-size:.7cqw;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--acc2);margin-bottom:.24cqw}
+.guide h4{font-size:1.0cqw;font-weight:700;margin-bottom:.3cqw}
+.guide p{font-size:.86cqw;line-height:1.5;color:var(--ink2)}
+.guide .pg{height:.3cqw;min-height:4px;border-radius:99px;margin-top:.55cqw;
+  background:rgba(255,255,255,.08);overflow:hidden}
+.guide .pg>i{display:block;height:100%;
+  background:linear-gradient(90deg,var(--acc2),var(--acc));transition:width .4s}
+
+@container app (max-width: 700px){
+  #front .pane{width:74cqw;padding:6cqw 5cqw}
+  .fbody{max-width:64cqw;font-size:13px}
+  .guide{width:44cqw;bottom:16cqw;font-size:12px}
+}
 
 /* ---- worlds ---- */
 .wcard{display:flex;gap:1.0cqw;align-items:center;padding:.85cqw 1.0cqw;
@@ -435,6 +514,50 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .plate.boss .hb{width:9cqw}
 .plate.boss .nm{color:#FFC46A}
 
+/* ---- touch ----
+   Only present on a coarse pointer. Left thumb steers, right thumb
+   looks, and the action cluster sits under the right thumb rather
+   than in a corner it cannot reach. */
+.touch{position:absolute;inset:0;pointer-events:none;display:none}
+.touch.on{display:block}
+.tstick{position:absolute;width:26cqh;height:26cqh;border-radius:50%;
+  border:2px solid rgba(232,239,250,.18);pointer-events:none;
+  opacity:0;transition:opacity .18s}
+.tstick.on{opacity:1}
+.tstick>i{position:absolute;left:50%;top:50%;width:38%;height:38%;
+  margin:-19% 0 0 -19%;border-radius:50%;
+  background:rgba(232,239,250,.24);border:1px solid rgba(232,239,250,.42)}
+.tbtn{position:absolute;border-radius:50%;pointer-events:auto;
+  display:grid;place-items:center;font-family:var(--disp);font-weight:700;
+  letter-spacing:.06em;color:var(--ink);
+  background:linear-gradient(165deg,rgba(38,48,66,.86),rgba(18,25,38,.86));
+  border:1px solid var(--line2);backdrop-filter:blur(8px);
+  box-shadow:0 6px 20px rgba(0,0,0,.45);user-select:none;
+  transition:transform .1s,background .1s}
+.tbtn:active{transform:scale(.92);background:rgba(59,224,200,.22)}
+.tbtn.big{width:13cqh;height:13cqh;font-size:1.5cqh;right:4cqh;bottom:13cqh}
+.tbtn.mid{width:9.5cqh;height:9.5cqh;font-size:1.2cqh}
+.tbtn.jump{right:17.5cqh;bottom:16cqh}
+.tbtn.act{right:5.5cqh;bottom:27cqh}
+.tbtn.menu{width:7cqh;height:7cqh;font-size:1cqh;right:2.5cqh;top:2.5cqh}
+
+/* ---- trading ---- */
+.tradewrap{display:flex;gap:1.1cqw}
+.tradeside{flex:1;min-width:0;border:1px solid var(--line);border-radius:12px;
+  padding:.8cqw;background:rgba(255,255,255,.025)}
+.tradeside h4{font-size:.92cqw;font-weight:600;margin-bottom:.5cqw;
+  display:flex;justify-content:space-between;align-items:center}
+.tradeside h4 .v{color:var(--gold);font-size:.86cqw}
+.tradegrid{display:grid;grid-template-columns:repeat(3,1fr);gap:.42cqw}
+.tradegrid .cell{aspect-ratio:1}
+.tradeside.locked{border-color:rgba(87,208,122,.5);
+  background:rgba(87,208,122,.06)}
+.tradebar{display:flex;gap:.6cqw;align-items:center;margin-top:.9cqw}
+.tradebar .note{flex:1;font-size:.84cqw;color:var(--ink2)}
+.tradetimer{height:.34cqw;border-radius:99px;background:rgba(6,9,14,.7);
+  overflow:hidden;margin-top:.6cqw;border:1px solid var(--line)}
+.tradetimer>i{display:block;height:100%;background:var(--acc);transition:width 1s linear}
+
 /* ---- narrow / touch ---- */
 @container app (max-aspect-ratio: 13/9){
   .idchip .who{min-width:11cqw}
@@ -458,6 +581,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
     <div class="bootbar"><i id="bootfill"></i></div>
     <div class="boottip" id="boottip">Waking the harbour…</div>
   </div>
+
+  <div id="front"><div class="veil"></div><div class="pane" id="frontpane"></div></div>
 
   <div id="rotate"><div class="ph"></div>
     <div style="font-family:var(--disp);letter-spacing:.2em;font-size:18px">TURN YOUR DEVICE</div>
@@ -5757,8 +5882,8 @@ P.rock=function(v){
 P.lamp=function(style){
   return prop('lamp:'+(style||'harbour'),function(b){
     b.mat('panel');
-    b.cylinder(0,0.10,0,0.24,0.20,0.20,10,'#9AA4B2');
-    b.cylinder(0,2.10,0,0.09,0.07,3.90,8,'#FFFFFF');
+    b.cylinder(0,0.10,0,0.24,0.20,0.20,10,'#C6CEDA');
+    b.cylinder(0,2.10,0,0.09,0.07,3.90,8,'#DCE2EA');
     if(style==='harbour'){
       /* a curved arm and a hanging lantern */
       b.push();b.translate(0,4.00,0);
@@ -5809,9 +5934,9 @@ P.bench=function(){
     b.mat('panel');
     for(var s=-1;s<=1;s+=2){
       b.push();b.translate(s*0.80,0.23,0);
-      b.chamfer(0,0,0,0.08,0.46,0.46,'#5E6672',0.02);b.pop();
+      b.chamfer(0,0,0,0.08,0.46,0.46,'#AEB6C2',0.02);b.pop();
       b.push();b.translate(s*0.80,0.72,-0.28);
-      b.chamfer(0,0,0,0.07,0.56,0.08,'#5E6672',0.02);b.pop();
+      b.chamfer(0,0,0,0.07,0.56,0.08,'#AEB6C2',0.02);b.pop();
     }
   },120);
 };
@@ -5824,7 +5949,7 @@ P.crate=function(v){
     b.mat('panel');
     for(var e=-1;e<=1;e+=2){
       b.push();b.translate(0,s/2,e*s/2*1.01);
-      b.chamfer(0,0,0,s*1.02,0.06,0.02,'#8A8F98',0.01,{noBand:true});b.pop();
+      b.chamfer(0,0,0,s*1.02,0.06,0.02,'#C8CED8',0.01,{noBand:true});b.pop();
     }
   },300);
 };
@@ -5845,7 +5970,7 @@ P.barrel=function(){
       b.loft([
         {y:0,   pts:Geo.circle(0.415,12)},
         {y:0.07,pts:Geo.circle(0.415,12)}
-      ],'#6E747E',{openTop:true,openBottom:true});
+      ],'#B4BCC6',{openTop:true,openBottom:true});
       b.pop();
     }
   },200);
@@ -5878,7 +6003,7 @@ P.bollard=function(){
       {y:0.60,pts:Geo.circle(0.19,10)},
       {y:0.72,pts:Geo.circle(0.24,10)},
       {y:0.80,pts:Geo.circle(0.20,10)}
-    ],'#5E6672',{});
+    ],'#BFC7D2',{});
   },200);
 };
 
@@ -5886,11 +6011,11 @@ P.bollard=function(){
 P.piling=function(){
   return prop('piling',function(b){
     b.mat('bark');
-    b.cylinder(0,0,0,0.26,0.22,8.0,8,'#6B5138');
+    b.cylinder(0,0,0,0.26,0.22,8.0,8,'#A88A66');
     b.mat('panel');
     b.push();b.translate(0,3.75,0);
     b.loft([{y:0,pts:Geo.circle(0.28,10)},{y:0.10,pts:Geo.circle(0.28,10)}],
-      '#7A828E',{openTop:true,openBottom:true});
+      '#C0C8D2',{openTop:true,openBottom:true});
     b.pop();
   },200);
 };
@@ -5930,7 +6055,7 @@ P.boat=function(v){
       b.chamfer(0,0,0,1.05,0.46,0.05,'#BFE4F5',0.02,{noBand:true});b.pop();
       b.mat('panel');
       b.push();b.translate(0,2.30,-1.3);
-      b.cylinder(0,0,0,0.06,0.05,0.70,6,'#8E99A8');b.pop();
+      b.cylinder(0,0,0,0.06,0.05,0.70,6,'#CAD2DC');b.pop();
     }else{
       /* or a mast and a furled sail */
       b.mat('bark');
@@ -5965,16 +6090,16 @@ P.missionBoard=function(){
     b.mat('panel');
     for(var s=-1;s<=1;s+=2){
       b.push();b.translate(s*1.5,1.3,0);
-      b.cylinder(0,0,0,0.12,0.10,2.6,8,'#6E7885');b.pop();
+      b.cylinder(0,0,0,0.12,0.10,2.6,8,'#B2BAC6');b.pop();
     }
     b.push();b.translate(0,2.1,0);
-    b.chamfer(0,0,0,3.4,2.0,0.16,'#4E5866',0.06);b.pop();
+    b.chamfer(0,0,0,3.4,2.0,0.16,'#98A2B0',0.06);b.pop();
     b.mat('neon',0.9);
     b.push();b.translate(0,2.1,0.10);
     b.chamfer(0,0,0,3.0,1.66,0.03,'#3BE0C8',0.02,{noBand:true});b.pop();
     b.mat('panel');
     b.push();b.translate(0,3.24,0);
-    b.chamfer(0,0,0,3.7,0.16,0.42,'#8E99A8',0.05);b.pop();
+    b.chamfer(0,0,0,3.7,0.16,0.42,'#CAD2DC',0.05);b.pop();
   },20);
 };
 
@@ -5988,7 +6113,7 @@ P.portal=function(){
       {y:0,   pts:Geo.roundRect(4.4,2.4,0.5,14)},
       {y:0.5, pts:Geo.roundRect(4.0,2.0,0.45,14)},
       {y:0.7, pts:Geo.roundRect(3.7,1.8,0.4,14)}
-    ],'#3E4756',{uvScale:1.2});
+    ],'#98A2B0',{uvScale:1.2});
     b.pop();
     /* the arch, as a ring of tapered blocks */
     var R=2.3;
@@ -5998,7 +6123,7 @@ P.portal=function(){
       b.translate(Math.cos(a)*R,1.05+Math.sin(a)*R,0);
       b.rotate(0,0,a-Math.PI/2);
       b.mat('panel');
-      b.chamfer(0,0,0,0.46,0.40,0.66,i%2?'#6E7A8C':'#5A6576',0.06);
+      b.chamfer(0,0,0,0.46,0.40,0.66,i%2?'#C4CCD8':'#AAB2BE',0.06);
       b.mat('neon',0.95);
       b.push();b.translate(0,-0.22,0.35);
       b.sphere(0,0,0,0.055,6,5,'#5BE8FF');b.pop();
@@ -6039,16 +6164,16 @@ var M=LH.M,Geo=LH.Geo,A={};
 var STYLES={
   harbour:{ wall:'planks', wallCol:['#C8A87E','#B08A5E','#9C7A58','#D4BC96'],
             trim:'planks', trimCol:'#6E5236', roof:'roof', roofCol:['#7E8CA0','#8E7A8A','#6E7E92'],
-            base:'stone', baseCol:'#7A8290' },
+            base:'stone', baseCol:'#C0C8D2' },
   town:{    wall:'brickpale', wallCol:['#C4A98E','#B09678','#D0BCA2','#A88E72'],
             trim:'planks', trimCol:'#5E4A38', roof:'roof', roofCol:['#B4666E','#9A6480','#C4807A'],
-            base:'stone', baseCol:'#8A8F98' },
-  modern:{  wall:'panelw', wallCol:['#8E97A4','#A4ADB8','#78828E','#B4BCC6'],
-            trim:'panel', trimCol:'#4E5866', roof:'panel', roofCol:['#5E6878','#6A7484'],
-            base:'concrete', baseCol:'#6E7682' },
-  industrial:{wall:'panel', wallCol:['#5A626E','#6E7682','#4E5662'],
-            trim:'panel', trimCol:'#3A424E', roof:'panel', roofCol:['#3A424E','#464E5A'],
-            base:'concrete', baseCol:'#5A6068' }
+            base:'stone', baseCol:'#C8CED8' },
+  modern:{  wall:'panelw', wallCol:['#C4CCD6','#DCE2EA','#AEB6C2','#EAEEF4'],
+            trim:'panel', trimCol:'#9AA4B0', roof:'panel', roofCol:['#A8B2C0','#BAC2CE'],
+            base:'concrete', baseCol:'#B0B8C2' },
+  industrial:{wall:'panel', wallCol:['#A2AAB6','#B8C0CA','#8E96A2'],
+            trim:'panel', trimCol:'#7A828E', roof:'panel', roofCol:['#8A929E','#98A0AC'],
+            base:'concrete', baseCol:'#9AA2AC' }
 };
 A.STYLES=Object.keys(STYLES);
 
@@ -6912,6 +7037,9 @@ function fire(name){I.actions[name]=true;}
 
 I.attach=function(el){
   window.addEventListener('keydown',function(e){
+    /* Browsers refuse to start audio without a gesture, so the first
+       real key or click is where the context comes up. */
+    if(LH.Audio)LH.Audio.unlock();
     if(e.repeat)return;
     var b=BIND[e.code];
     if(!b)return;
@@ -6935,6 +7063,7 @@ I.attach=function(el){
      drag-to-look otherwise. Both write into the same look delta. */
   var dragging=false,lastX=0,lastY=0;
   el.addEventListener('mousedown',function(e){
+    if(LH.Audio)LH.Audio.unlock();
     I.lastKind='kb';
     I.pointer.down=true;
     I.pointer.x=e.clientX/window.innerWidth;
@@ -7054,6 +7183,13 @@ I.end=function(){
   I.actions={};
   I.look.x=0;I.look.y=0;
   I.zoom=0;
+};
+/* Touch buttons write into the same action and held maps the keyboard
+   uses, so nothing downstream knows which device it came from. */
+I.touchAction=function(name,down){
+  I.lastKind='touch';
+  if(down){I.actions[name]=true;I.held[name]=true;}
+  else I.held[name]=false;
 };
 I.pressed=function(n){return !!I.actions[n];};
 I.down=function(n){return !!I.held[n];};
@@ -8422,6 +8558,9 @@ Net.save=function(){
     return true;
   }catch(e){return false;}
 };
+Net.hasSave=function(){
+  try{return !!localStorage.getItem('lumen.save');}catch(e){return false;}
+};
 Net.load=function(){
   try{
     var raw=localStorage.getItem('lumen.save');
@@ -8958,7 +9097,37 @@ U.init=function(){
   makePanel('missions','Missions',['Daily','Story','Weekly']);
   makePanel('shop','Store',['Seeds','Blocks','Gear','Style','Bundles']);
   makePanel('worlds','Worlds',['My Worlds','New World']);
+  makePanel('trade','Trade',null);
   makePanel('menu','Menu',null);
+
+  /* touch layer — only shown on a coarse pointer */
+  els.touch=el('div','touch');
+  els.touch.innerHTML=
+    '<div class="tstick" id="utstick"><i></i></div>'+
+    '<div class="tbtn big" id="utprimary">USE</div>'+
+    '<div class="tbtn mid jump" id="utjump">JUMP</div>'+
+    '<div class="tbtn mid act" id="utact">E</div>'+
+    '<div class="tbtn menu" id="utmenu">≡</div>';
+  hud.appendChild(els.touch);
+  els.tstick=els.touch.querySelector('#utstick');
+  var coarse=window.matchMedia&&window.matchMedia('(pointer:coarse)').matches;
+  if(coarse||navigator.maxTouchPoints>0)els.touch.classList.add('on');
+  function hold(id,name){
+    var b=els.touch.querySelector(id);
+    b.addEventListener('touchstart',function(e){
+      e.preventDefault();LH.Input.touchAction(name,true);});
+    b.addEventListener('touchend',function(e){
+      e.preventDefault();LH.Input.touchAction(name,false);});
+    b.addEventListener('mousedown',function(){LH.Input.touchAction(name,true);});
+    b.addEventListener('mouseup',function(){LH.Input.touchAction(name,false);});
+  }
+  hold('#utprimary','primary');
+  hold('#utjump','jump');
+  hold('#utact','interact');
+  els.touch.querySelector('#utmenu').addEventListener('click',function(){
+    U.open('menu');});
+  /* the stick's ring follows the thumb, drawn from Input's own state */
+  U._stickTick=function(){U.touchStick(LH.Input.stick);};
 
   els.travel=el('div');
   els.travel.id='travel';
@@ -9157,6 +9326,7 @@ function render(id){
   if(id==='shop')return renderShop(bd,P.root.dataset.tab);
   if(id==='missions')return renderMissions(bd,P.root.dataset.tab);
   if(id==='worlds')return renderWorlds(bd,P.root.dataset.tab);
+  if(id==='trade')return renderTrade(bd);
   if(id==='map')return renderMap(bd);
   if(id==='menu')return renderMenu(bd);
 }
@@ -9240,6 +9410,14 @@ function detailFor(key,ctx){
       act('Use','pri',function(){
         Net.request('use',{key:key},function(r){
           if(r.ok){U.sync(r.state);U.toast('Used '+it.name,'good');}
+          else U.toast(r.why,'bad');
+        });
+      });
+    }
+    if(it.tradeable&&tradeCache){
+      act('Add to trade','pri',function(){
+        Net.request('tradeOffer',{key:key,n:1},function(r){
+          if(r.ok){tradeCache=r.trade;U.toast('Added to the trade','good');}
           else U.toast(r.why,'bad');
         });
       });
@@ -9467,6 +9645,101 @@ function renderMissions(bd,tab){
 }
 U.refreshMissions=function(){missionCache=null;};
 
+/* ---------------- trade window ----------------
+   Both grids visible, both values totalled, and the lock/confirm
+   sequence spelled out rather than implied — the anti-scam surface
+   matters more than the chrome. */
+var tradeCache=null;
+function renderTrade(bd){
+  Net.request('tradeState',{},function(r){tradeCache=r.trade;});
+  var t=tradeCache;
+  if(!t){
+    bd.appendChild(el('div','empty-note',
+      'Nobody is trading with you. Walk up to someone and press E.'));
+    return;
+  }
+  var wrap=el('div','tradewrap');
+
+  function side(title,offer,value,locked,mine){
+    var box=el('div','tradeside'+(locked?' locked':''));
+    var h=el('h4');
+    h.innerHTML=title+'<span class="v">'+value.toLocaleString()+'</span>';
+    box.appendChild(h);
+    var g=el('div','tradegrid');
+    var keys=Object.keys(offer);
+    for(var i=0;i<9;i++){
+      var k=keys[i];
+      if(!k){
+        var blank=el('div','cell');
+        blank.style.opacity='.35';
+        g.appendChild(blank);
+        continue;
+      }
+      var c=itemCell(k,offer[k],{showCount:true});
+      if(!c)continue;
+      if(mine){
+        c.title='Click to take back';
+        (function(kk){
+          c.addEventListener('click',function(){
+            Net.request('tradeOffer',{key:kk,n:1,remove:true},function(r2){
+              if(r2.ok){tradeCache=r2.trade;render('trade');}
+              else U.toast(r2.why,'bad');
+            });
+          });
+        })(k);
+      }
+      g.appendChild(c);
+    }
+    box.appendChild(g);
+    return box;
+  }
+  wrap.appendChild(side('You offer',t.mine,t.valueMine,t.lockedMe,true));
+  wrap.appendChild(side(t.with+' offers',t.theirs,t.valueTheirs,t.lockedThem,false));
+  bd.appendChild(wrap);
+
+  var tm=el('div','tradetimer');
+  tm.innerHTML='<i style="width:'+Math.round(t.left/120*100)+'%"></i>';
+  bd.appendChild(tm);
+
+  var bar=el('div','tradebar');
+  var note=el('div','note');
+  note.innerHTML=!t.lockedMe
+    ? 'Add items from your backpack, then lock when you are happy.'
+    : (!t.lockedThem
+      ? '<b style="color:var(--gold)">Waiting for '+t.with+' to lock.</b> '+
+        'They may want a better offer.'
+      : '<b style="color:var(--r2)">Both locked.</b> Confirm to swap.');
+  bar.appendChild(note);
+  var lock=el('button','btn'+(t.lockedMe?'':' pri'),t.lockedMe?'Unlock':'Lock offer');
+  lock.addEventListener('click',function(){
+    Net.request('tradeLock',{},function(r2){
+      if(r2.ok){tradeCache=r2.trade;render('trade');LH.Audio&&LH.Audio.play('ui');}
+    });
+  });
+  bar.appendChild(lock);
+  var conf=el('button','btn pri','Confirm');
+  if(!t.lockedMe||!t.lockedThem)conf.setAttribute('disabled','');
+  conf.addEventListener('click',function(){
+    Net.request('tradeConfirm',{},function(r2){
+      if(!r2.ok){U.toast(r2.why,'bad');tradeCache=null;render('trade');return;}
+      U.sync(r2.state);
+      r2.got.forEach(function(g){U.toastItem(g[0],g[1]);});
+      U.toast('Trade complete','good');
+      LH.Audio&&LH.Audio.play('coin');
+      tradeCache=null;U.close();
+    });
+  });
+  bar.appendChild(conf);
+  var cancel=el('button','btn dim','Cancel');
+  cancel.addEventListener('click',function(){
+    Net.request('tradeCancel',{},function(){tradeCache=null;U.close();});
+  });
+  bar.appendChild(cancel);
+  bd.appendChild(bar);
+}
+U.openTrade=function(state){tradeCache=state;U.open('trade');};
+U.refreshTrade=function(){tradeCache=null;};
+
 var newWorld={name:'',theme:'meadow'};
 function renderWorlds(bd,tab){
   var R=LH.Realm;
@@ -9499,6 +9772,8 @@ function renderWorlds(bd,tab){
           if(!r.ok){U.toast(r.why,'bad');return;}
           U.sync(r.state);
           U.toast('“'+r.world.name+'” is yours.','good');
+          LH.Front&&(LH.Front.madeWorld=true);
+          LH.Audio&&LH.Audio.play('levelup');
           newWorld.name='';
           panels.worlds.root.dataset.tab='My Worlds';
           panels.worlds.root.querySelectorAll('.tab').forEach(function(x,i){
@@ -9702,6 +9977,19 @@ U.travelFade=function(on,label){
   els.travel.classList.toggle('on',!!on);
 };
 
+U.touchStick=function(st){
+  if(!els.tstick)return;
+  if(!st||!st.active){els.tstick.classList.remove('on');return;}
+  els.tstick.classList.add('on');
+  var r=els.tstick.getBoundingClientRect();
+  els.tstick.style.left=(st.ox-r.width/2)+'px';
+  els.tstick.style.top=(st.oy-r.height/2)+'px';
+  var knob=els.tstick.firstChild;
+  knob.style.left=(50+(st.x-st.ox)/r.width*100)+'%';
+  knob.style.top=(50+(st.y-st.oy)/r.height*100)+'%';
+};
+U.isTouch=function(){return els.touch&&els.touch.classList.contains('on');};
+
 LH.UI=U;
 })();
 
@@ -9809,7 +10097,7 @@ E.mesh=function(kind){
       b.push();
       b.translate(side*0.5,0.28,-0.34+t*0.7);
       b.rotate(0,0,side*0.7);
-      b.cylinder(0,-0.16,0,0.06,0.03,0.44,6,'#B0B6C0');
+      b.cylinder(0,-0.16,0,0.06,0.03,0.44,6,'#D8DEE6');
       b.pop();
     }
     for(var s=-1;s<=1;s+=2){
@@ -10899,14 +11187,14 @@ function realmGate(){
     {y:0,   pts:Geo.roundRect(4.6,2.6,0.5,14)},
     {y:0.5, pts:Geo.roundRect(4.2,2.2,0.45,14)},
     {y:0.7, pts:Geo.roundRect(3.9,1.9,0.4,14)}
-  ],'#3E4756',{uvScale:1.2});
+  ],'#98A2B0',{uvScale:1.2});
   for(var i=0;i<=16;i++){
     var a=Math.PI*(i/16);
     b.push();
     b.translate(Math.cos(a)*2.3,0.9+Math.sin(a)*2.3,0);
     b.rotate(0,0,a-Math.PI/2);
     b.mat('panel');
-    b.chamfer(0,0,0,0.46,0.40,0.66,i%2?'#6E7A8C':'#5A6576',0.06);
+    b.chamfer(0,0,0,0.46,0.40,0.66,i%2?'#C4CCD8':'#AAB2BE',0.06);
     b.pop();
   }
   b.mat('neon',0.85);
@@ -11066,6 +11354,105 @@ Net.register('saveRealm',function(p,srv){
   return {ok:true};
 });
 
+/* ---------------- trading ----------------
+   Player to player, with the confirmation dance the 2D build had: both
+   sides put items up, both sides lock, both sides confirm, and any
+   change to either offer after a lock breaks both locks. The other
+   party is simulated until there is a server; the validation is not,
+   because it is the part that has to survive one arriving. */
+var trade=null;
+function tradeValue(offer){
+  var v=0;
+  for(var k in offer){
+    var it=D.byKey(k);
+    if(it)v+=it.value*offer[k];
+  }
+  return v;
+}
+
+Net.register('tradeOpen',function(p,srv){
+  if(trade)return {ok:false,why:'You are already trading.'};
+  trade={with:String(p.with||'Trader').slice(0,16),
+    mine:{},theirs:p.theirs||{},
+    lockedMe:false,lockedThem:false,
+    confirmMe:false,confirmThem:false,
+    opened:Date.now()};
+  return {ok:true,trade:tradeState(srv)};
+});
+function tradeState(srv){
+  if(!trade)return null;
+  return {with:trade.with,mine:Object.assign({},trade.mine),
+    theirs:Object.assign({},trade.theirs),
+    lockedMe:trade.lockedMe,lockedThem:trade.lockedThem,
+    confirmMe:trade.confirmMe,confirmThem:trade.confirmThem,
+    valueMine:tradeValue(trade.mine),valueTheirs:tradeValue(trade.theirs),
+    left:Math.max(0,120-Math.floor((Date.now()-trade.opened)/1000))};
+}
+Net.register('tradeOffer',function(p,srv){
+  if(!trade)return {ok:false,why:'Not trading.'};
+  if(trade.lockedMe)return {ok:false,why:'Unlock first.'};
+  var it=D.byKey(p.key);
+  if(!it)return {ok:false,why:'No such item.'};
+  if(!it.tradeable)return {ok:false,why:'That item cannot be traded.'};
+  var n=Math.max(1,p.n|0||1);
+  var held=srv.snapshot().inv[p.key]||0;
+  var already=trade.mine[p.key]||0;
+  if(p.remove){
+    trade.mine[p.key]=Math.max(0,already-n);
+    if(!trade.mine[p.key])delete trade.mine[p.key];
+  }else{
+    if(already+n>held)return {ok:false,why:'You do not have that many.'};
+    if(Object.keys(trade.mine).length>=9&&!trade.mine[p.key])
+      return {ok:false,why:'Nine kinds of item is the limit.'};
+    trade.mine[p.key]=already+n;
+  }
+  /* A locked offer refuses edits outright (above), so the classic
+     swap-after-agreement is impossible. This clears the locks as well,
+     which matters for the other direction: if their side changes, your
+     agreement to the old goods must not carry over. */
+  trade.lockedMe=trade.lockedThem=false;
+  trade.confirmMe=trade.confirmThem=false;
+  return {ok:true,trade:tradeState(srv)};
+});
+Net.register('tradeLock',function(p,srv){
+  if(!trade)return {ok:false,why:'Not trading.'};
+  trade.lockedMe=!trade.lockedMe;
+  if(!trade.lockedMe)trade.confirmMe=trade.confirmThem=false;
+  /* the simulated partner locks a beat later, and only if the deal is
+     not obviously lopsided against them */
+  trade.lockedThem=trade.lockedMe&&
+    tradeValue(trade.mine)>=tradeValue(trade.theirs)*0.62;
+  return {ok:true,trade:tradeState(srv)};
+});
+Net.register('tradeConfirm',function(p,srv){
+  if(!trade)return {ok:false,why:'Not trading.'};
+  if(!trade.lockedMe||!trade.lockedThem)
+    return {ok:false,why:'Both sides have to lock first.'};
+  trade.confirmMe=true;
+  trade.confirmThem=true;
+  /* re-check the goods are still there at the moment of the swap */
+  var inv=srv.snapshot().inv;
+  for(var k in trade.mine){
+    if((inv[k]||0)<trade.mine[k]){
+      trade=null;
+      return {ok:false,why:'The trade fell through — something is missing.'};
+    }
+  }
+  for(var g in trade.mine)srv.take(g,trade.mine[g]);
+  for(var t in trade.theirs)srv.give(t,trade.theirs[t]);
+  var got=Object.keys(trade.theirs).map(function(x){return [x,trade.theirs[x]];});
+  srv.xp(40,'social');
+  trade=null;
+  return {ok:true,got:got,state:srv.snapshot()};
+});
+Net.register('tradeCancel',function(p,srv){
+  trade=null;
+  return {ok:true};
+});
+Net.register('tradeState',function(p,srv){
+  return {ok:true,trade:tradeState(srv)};
+});
+
 Net.register('realmCells',function(p,srv){
   var w=srv.world(p.id);
   if(!w)return {ok:false,why:'No such world.'};
@@ -11099,6 +11486,567 @@ Net.register('canBuildHere',function(p,srv){
 });
 
 LH.RealmNet=true;
+})();
+
+/* ============================================================
+   LH.Audio — everything you hear, synthesised.
+
+   No sound files, for the same reason there are no texture files:
+   the whole game is one document. Effects are short envelopes over
+   oscillators and filtered noise; the score is a slow generative
+   pad that follows the time of day and swaps its scale when you
+   enter your own world.
+
+   Browsers will not start audio without a gesture, so the context
+   is created lazily on the first real input and everything before
+   that is silently dropped rather than queued.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,A={};
+
+var ctx=null, master=null, sfxBus=null, musicBus=null;
+var noiseBuf=null;
+A.enabled=true;
+A.volume=0.75;
+A.musicVolume=0.42;
+
+function ensure(){
+  if(ctx)return ctx;
+  var C=window.AudioContext||window.webkitAudioContext;
+  if(!C)return null;
+  ctx=new C();
+  master=ctx.createGain();
+  master.gain.value=A.volume;
+  master.connect(ctx.destination);
+  sfxBus=ctx.createGain();sfxBus.gain.value=1;sfxBus.connect(master);
+  musicBus=ctx.createGain();musicBus.gain.value=A.musicVolume;
+  musicBus.connect(master);
+  /* One second of noise, reused by everything that needs a transient:
+     footsteps, breaking rock, water. */
+  noiseBuf=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate);
+  var d=noiseBuf.getChannelData(0);
+  for(var i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+  return ctx;
+}
+A.unlock=function(){
+  ensure();
+  if(ctx&&ctx.state==='suspended')ctx.resume();
+  return !!ctx;
+};
+A.ready=function(){return !!ctx;};
+
+function env(node,t0,a,d,peak){
+  node.gain.setValueAtTime(0.0001,t0);
+  node.gain.exponentialRampToValueAtTime(Math.max(0.0002,peak),t0+a);
+  node.gain.exponentialRampToValueAtTime(0.0001,t0+a+d);
+}
+
+function tone(freq,dur,type,peak,slideTo,delay){
+  if(!ctx||!A.enabled)return;
+  var t0=ctx.currentTime+(delay||0);
+  var o=ctx.createOscillator(),g=ctx.createGain();
+  o.type=type||'sine';
+  o.frequency.setValueAtTime(freq,t0);
+  if(slideTo)o.frequency.exponentialRampToValueAtTime(Math.max(20,slideTo),t0+dur);
+  env(g,t0,Math.min(0.02,dur*0.25),dur,peak===undefined?0.22:peak);
+  o.connect(g);g.connect(sfxBus);
+  o.start(t0);o.stop(t0+dur+0.06);
+}
+
+function noise(dur,peak,cut,q,slideCut,delay){
+  if(!ctx||!A.enabled)return;
+  var t0=ctx.currentTime+(delay||0);
+  var src=ctx.createBufferSource();src.buffer=noiseBuf;
+  var f=ctx.createBiquadFilter();
+  f.type='bandpass';
+  f.frequency.setValueAtTime(cut||1200,t0);
+  if(slideCut)f.frequency.exponentialRampToValueAtTime(Math.max(60,slideCut),t0+dur);
+  f.Q.value=q||1.1;
+  var g=ctx.createGain();
+  env(g,t0,0.006,dur,peak===undefined?0.2:peak);
+  src.connect(f);f.connect(g);g.connect(sfxBus);
+  src.start(t0);src.stop(t0+dur+0.05);
+}
+
+/* ---------------- the effect library ----------------
+   Each one is a short recipe. Written as data-ish functions rather
+   than a switch so adding a sound is a line. */
+var SFX={
+  step:function(){noise(0.09,0.10,420+Math.random()*260,1.6,180);},
+  jump:function(){tone(300,0.14,'triangle',0.16,520);},
+  land:function(){noise(0.13,0.20,300,1.2,110);tone(120,0.10,'sine',0.14,70);},
+  place:function(){tone(420,0.09,'square',0.10,560);noise(0.07,0.09,900,2,500);},
+  break:function(){
+    noise(0.22,0.26,900,0.9,220);
+    tone(180,0.12,'triangle',0.10,90);
+  },
+  hit:function(){
+    noise(0.10,0.24,1600,1.4,500);
+    tone(220,0.09,'sawtooth',0.12,140);
+  },
+  hurt:function(){tone(300,0.20,'sawtooth',0.16,120);noise(0.12,0.14,700,1.1,240);},
+  pickup:function(){
+    tone(880,0.07,'sine',0.13);
+    tone(1320,0.09,'sine',0.11,undefined,0.05);
+  },
+  cast:function(){noise(0.26,0.12,2400,0.8,600);},
+  splash:function(){noise(0.30,0.20,900,0.7,240);},
+  bite:function(){tone(660,0.08,'square',0.14);tone(880,0.10,'square',0.12,undefined,0.07);},
+  reel:function(){noise(0.05,0.06,2600,3,2200);},
+  snap:function(){tone(1400,0.10,'sawtooth',0.20,300);noise(0.10,0.16,3000,1.4,700);},
+  catch:function(){
+    /* a small rising arpeggio — the one moment worth a fanfare */
+    [523,659,784,1046].forEach(function(f,i){
+      tone(f,0.20,'triangle',0.16,undefined,i*0.075);
+    });
+    noise(0.30,0.12,700,0.8,200);
+  },
+  levelup:function(){
+    [523,659,784,1046,1318].forEach(function(f,i){
+      tone(f,0.34,'sine',0.18,undefined,i*0.09);
+    });
+  },
+  ui:function(){tone(1200,0.04,'sine',0.07);},
+  open:function(){tone(520,0.09,'sine',0.09,760);},
+  close:function(){tone(760,0.08,'sine',0.08,480);},
+  deny:function(){tone(200,0.14,'square',0.13,150);},
+  coin:function(){
+    tone(1568,0.07,'sine',0.10);
+    tone(2093,0.08,'sine',0.08,undefined,0.045);
+  },
+  travel:function(){
+    tone(180,0.9,'sine',0.14,720);
+    noise(0.9,0.10,400,0.6,3000);
+  }
+};
+
+A.play=function(name){
+  if(!ctx||!A.enabled)return false;
+  var f=SFX[name];
+  if(!f)return false;
+  f();
+  return true;
+};
+A.has=function(name){return !!SFX[name];};
+
+/* Footsteps are rate-limited by distance travelled rather than by a
+   timer, so they stay in step whether you walk or sprint. */
+var stepAccum=0;
+A.footstep=function(distance,surface){
+  stepAccum+=distance;
+  if(stepAccum<1.9)return;
+  stepAccum=0;
+  if(!ctx||!A.enabled)return;
+  /* soft ground is duller and quieter than stone */
+  var soft=(surface==='grass'||surface==='sand'||surface==='dirt');
+  noise(soft?0.11:0.08, soft?0.07:0.11,
+        soft?(300+Math.random()*180):(900+Math.random()*500),
+        soft?1.1:2.0, soft?150:320);
+};
+
+/* ---------------- the score ----------------
+   A slow pad over a scale that follows the time of day, with a
+   sparse melody on top. Generative rather than looped: a loop of any
+   length becomes obvious in a game people leave running. */
+var musicOn=false, nextNote=0, chordIdx=0;
+var SCALES={
+  day:   [0,2,4,7,9],        /* major pentatonic — open, unbothered */
+  dusk:  [0,2,3,7,9],
+  night: [0,2,3,5,7,10],     /* minor — the harbour after dark */
+  realm: [0,2,4,6,7,9,11]    /* lydian — your own world, slightly unreal */
+};
+var ROOT={day:220,dusk:196,night:174.61,realm:233.08};
+var pad=null;
+
+function mood(){
+  if(LH.Realm&&LH.Realm.inRealm())return 'realm';
+  var t=LH.Sky?LH.Sky.time:12;
+  if(t<6.2||t>19.6)return 'night';
+  if(t<7.6||t>18.0)return 'dusk';
+  return 'day';
+}
+
+function startPad(){
+  if(!ctx||pad)return;
+  pad={osc:[],gain:ctx.createGain(),filter:ctx.createBiquadFilter()};
+  pad.gain.gain.value=0.0001;
+  pad.filter.type='lowpass';
+  pad.filter.frequency.value=900;
+  pad.filter.Q.value=0.6;
+  pad.gain.connect(pad.filter);
+  pad.filter.connect(musicBus);
+  /* three detuned voices: the beating between them is the whole
+     character of the pad */
+  for(var i=0;i<3;i++){
+    var o=ctx.createOscillator();
+    o.type='sawtooth';
+    o.detune.value=(i-1)*7;
+    o.connect(pad.gain);
+    o.start();
+    pad.osc.push(o);
+  }
+  pad.gain.gain.linearRampToValueAtTime(0.055,ctx.currentTime+4);
+}
+
+A.music=function(on){
+  musicOn=on!==false;
+  if(musicOn){ensure();startPad();}
+  else if(pad)pad.gain.gain.linearRampToValueAtTime(0.0001,ctx.currentTime+1.5);
+};
+
+A.update=function(dt){
+  if(!ctx||!musicOn||!A.enabled)return;
+  var m=mood();
+  var root=ROOT[m], scale=SCALES[m];
+  var now=ctx.currentTime;
+
+  if(pad){
+    /* the pad walks a slow chord cycle */
+    var deg=scale[chordIdx%scale.length];
+    var f=root*Math.pow(2,deg/12);
+    for(var i=0;i<pad.osc.length;i++){
+      pad.osc[i].frequency.setTargetAtTime(f*(i===2?2:1),now,2.2);
+    }
+    pad.filter.frequency.setTargetAtTime(m==='night'?620:1100,now,3);
+  }
+
+  if(now<nextNote)return;
+  chordIdx++;
+  nextNote=now+(m==='night'?7.5:5.5)+Math.random()*3.5;
+  /* one note, sometimes two, high above the pad */
+  if(Math.random()<0.72){
+    var d1=scale[(Math.random()*scale.length)|0];
+    var oct=Math.random()<0.4?3:2;
+    var g=ctx.createGain();
+    var o=ctx.createOscillator();
+    o.type='triangle';
+    o.frequency.value=root*Math.pow(2,d1/12+oct);
+    env(g,now+0.05,0.6,2.6,0.05);
+    o.connect(g);g.connect(musicBus);
+    o.start(now);o.stop(now+3.6);
+  }
+};
+
+A.setVolume=function(v){
+  A.volume=M.clamp(v,0,1);
+  if(master)master.gain.setTargetAtTime(A.volume,ctx.currentTime,0.05);
+};
+A.setMusicVolume=function(v){
+  A.musicVolume=M.clamp(v,0,1);
+  if(musicBus)musicBus.gain.setTargetAtTime(A.musicVolume,ctx.currentTime,0.05);
+};
+A.mute=function(on){
+  A.enabled=!on;
+  if(master)master.gain.setTargetAtTime(on?0:A.volume,ctx.currentTime,0.05);
+};
+
+LH.Audio=A;
+})();
+
+/* ============================================================
+   LH.Front — the title, character creation, and the first steps.
+
+   Three screens over a live world. The camera orbits the plaza
+   behind them and the character being built is the actual player
+   actor, so character creation is a preview of the thing itself
+   rather than a paper doll that has to be kept in sync.
+
+   The onboarding that follows is a checklist rather than a corridor:
+   it names the next thing worth doing and gets out of the way when
+   you do something else.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,D=LH.Data,Net=LH.Net,Act=LH.Actors,Body=LH.Body,Cos=LH.Cos,Geo=LH.Geo;
+var F={};
+
+var root=null,pane=null,step='title';
+var draft=null;
+F.active=function(){return step!=='done';};
+F.step=function(){return step;};
+
+var SKIN=['#F7DCC2','#F2C9A4','#E3AE83','#C98B62','#9C6242','#75462C','#54321F'];
+var HAIRC=['#1E1B18','#2B2118','#4A3222','#7A5230','#A87740','#D8B978',
+           '#8E3B2E','#2A2E3A','#5C4B8A','#2E6B6B'];
+var EYEC=['#4A7FB5','#4E6B3A','#6B4A2C','#3A3F4A','#5C4B8A','#8A5A3A'];
+var WEAR=['#8C93A0','#3E5C7A','#7A3A48','#3A6A4A','#6A5A3A','#4A3A6A',
+          '#D8D2C4','#26292F'];
+
+function el(t,c,h){var e=document.createElement(t);if(c)e.className=c;
+  if(h!==undefined)e.innerHTML=h;return e;}
+function clear(e){while(e.firstChild)e.removeChild(e.firstChild);}
+
+F.init=function(){
+  root=document.getElementById('front');
+  pane=document.getElementById('frontpane');
+  root.classList.add('on');
+  document.getElementById('hud').classList.add('hidden');
+  render();
+  return F;
+};
+
+function go(next){
+  step=next;
+  if(step==='done'){
+    root.classList.remove('on');
+    document.getElementById('hud').classList.remove('hidden');
+    LH.Audio&&LH.Audio.play('open');
+    startGuide();
+    return;
+  }
+  render();
+}
+
+/* ---------------- screens ---------------- */
+function render(){
+  clear(pane);
+  if(step==='title')return renderTitle();
+  if(step==='create')return renderCreate();
+  if(step==='ready')return renderReady();
+}
+
+function renderTitle(){
+  pane.appendChild(el('div','fbrand','Lumen Harbor'));
+  pane.appendChild(el('div','fsub','A World Of Your Own'));
+  pane.appendChild(el('div','fbody',
+    'An island, a rod, a pick, and somewhere of your own to build. '+
+    'Fish the harbour, work the quarry, clear the woods, trade what '+
+    'you find — and put up whatever you like on land that stays yours.'));
+  var row=el('div','frow');
+  var play=el('button','fbtn pri','Begin');
+  play.addEventListener('click',function(){
+    LH.Audio&&LH.Audio.unlock();
+    LH.Audio&&LH.Audio.music(true);
+    LH.Audio&&LH.Audio.play('ui');
+    go('create');
+  });
+  row.appendChild(play);
+  /* Only offer to continue if there is genuinely something saved. */
+  if(F.hasSave){
+    var cont=el('button','fbtn','Continue');
+    cont.addEventListener('click',function(){
+      LH.Audio&&LH.Audio.unlock();
+      LH.Audio&&LH.Audio.music(true);
+      F.resumed=true;
+      go('done');
+    });
+    row.appendChild(cont);
+  }
+  pane.appendChild(row);
+  pane.appendChild(el('div','fbody',
+    '<span style="color:var(--ink3);font-size:.86cqw">'+
+    'Everything here — every surface, every character, every sound — is '+
+    'generated when the page loads. Nothing is downloaded.</span>'));
+}
+
+function swatchRow(label,colours,current,onPick){
+  var wrap=el('div');
+  wrap.appendChild(el('div','flabel',label));
+  var row=el('div','swatches');
+  colours.forEach(function(c){
+    var b=el('div','sw2'+(c===current?' on':''));
+    b.style.background=c;
+    b.addEventListener('click',function(){onPick(c);});
+    row.appendChild(b);
+  });
+  wrap.appendChild(row);
+  return wrap;
+}
+function optRow(label,opts,current,onPick){
+  var wrap=el('div');
+  wrap.appendChild(el('div','flabel',label));
+  var row=el('div','optrow');
+  opts.forEach(function(o){
+    var b=el('div','opt'+(o===current?' on':''),o);
+    b.addEventListener('click',function(){onPick(o);});
+    row.appendChild(b);
+  });
+  wrap.appendChild(row);
+  return wrap;
+}
+
+function renderCreate(){
+  var p=LH.Game&&LH.Game.player;
+  if(!p)return;
+  if(!draft)draft=p.kit;
+
+  pane.appendChild(el('div','fstep','Step one of two'));
+  pane.appendChild(el('div','fbrand','Who Are You'));
+  pane.appendChild(el('div','fbody',
+    'You arrive with the clothes you are standing in. Everything after '+
+    'this is something you find, earn or buy.'));
+
+  var nameWrap=el('div');
+  nameWrap.appendChild(el('div','flabel','Name'));
+  var inp=el('input','finp');
+  inp.placeholder='Your name';
+  inp.maxLength=16;
+  inp.value=draft.name||'';
+  inp.addEventListener('input',function(){draft.name=inp.value;});
+  inp.addEventListener('keydown',function(e){e.stopPropagation();});
+  nameWrap.appendChild(inp);
+  pane.appendChild(nameWrap);
+
+  function repaint(){
+    /* The actor is the preview, so a change is visible immediately in
+       the world rather than on a separate doll. */
+    render();
+  }
+  pane.appendChild(swatchRow('Skin',SKIN,draft.skin,function(c){
+    draft.skin=c;repaint();}));
+  pane.appendChild(optRow('Hair',Body.HAIR,draft.hair.style,function(o){
+    draft.hair.style=o;repaint();}));
+  pane.appendChild(swatchRow('Hair colour',HAIRC,draft.hair.color,function(c){
+    draft.hair.color=c;repaint();}));
+  pane.appendChild(swatchRow('Eyes',EYEC,draft.eye,function(c){
+    draft.eye=c;repaint();}));
+  pane.appendChild(optRow('Build',['slim','base','bulk'],draft.build,function(o){
+    draft.build=o;repaint();}));
+  pane.appendChild(optRow('Top',['tee','jacket','hoodie'],draft.shirt.style,
+    function(o){draft.shirt.style=o;repaint();}));
+  pane.appendChild(swatchRow('Clothes',WEAR,draft.shirt.color,function(c){
+    draft.shirt.color=c;
+    draft.pants.color=Geo.shade(c,-52);
+    repaint();}));
+
+  var row=el('div','frow');
+  var rand=el('button','fbtn','Surprise me');
+  rand.addEventListener('click',function(){
+    function pick(a){return a[(Math.random()*a.length)|0];}
+    draft.skin=pick(SKIN);
+    draft.hair.style=pick(Body.HAIR);
+    draft.hair.color=pick(HAIRC);
+    draft.eye=pick(EYEC);
+    draft.build=pick(['slim','base','bulk']);
+    draft.shirt.style=pick(['tee','jacket','hoodie']);
+    draft.shirt.color=pick(WEAR);
+    draft.pants.color=Geo.shade(draft.shirt.color,-52);
+    draft.shirt.sleeve=Math.random()<0.5?'long':'short';
+    LH.Audio&&LH.Audio.play('ui');
+    repaint();
+  });
+  row.appendChild(rand);
+  var next=el('button','fbtn pri','Continue');
+  next.addEventListener('click',function(){
+    var nm=(draft.name||'').trim();
+    if(!nm){LH.UI.toast('Pick a name first.','bad');inp.focus();return;}
+    Net.request('setName',{name:nm},function(r){
+      if(!r.ok){LH.UI.toast(r.why,'bad');return;}
+      LH.UI.sync(r.state);
+      LH.Audio&&LH.Audio.play('ui');
+      go('ready');
+    });
+  });
+  row.appendChild(next);
+  pane.appendChild(row);
+}
+
+function renderReady(){
+  pane.appendChild(el('div','fstep','Step two of two'));
+  pane.appendChild(el('div','fbrand','Lumen Harbor'));
+  pane.appendChild(el('div','fbody',
+    'You are arriving at the plaza. The harbour is north, the quarry '+
+    'south, the market east. Find the Harbourmaster on the jetty when '+
+    'you want to know what to do first.'));
+  var keys=el('div','fbody');
+  keys.innerHTML=
+    '<div style="display:grid;grid-template-columns:auto 1fr;gap:.3cqw 1cqw;'+
+    'font-size:.9cqw"><b>WASD</b><span>move</span>'+
+    '<b>Space</b><span>jump</span>'+
+    '<b>Shift</b><span>run</span>'+
+    '<b>Mouse</b><span>look — drag or right-drag</span>'+
+    '<b>Left click</b><span>build, break, swing</span>'+
+    '<b>E</b><span>interact</span>'+
+    '<b>Tab</b><span>backpack</span>'+
+    '<b>1–0</b><span>hotbar</span>'+
+    '<b>Esc</b><span>menu</span></div>';
+  pane.appendChild(keys);
+  var row=el('div','frow');
+  var b=el('button','fbtn pri','Enter the harbour');
+  b.addEventListener('click',function(){
+    LH.Audio&&LH.Audio.play('travel');
+    go('done');
+  });
+  row.appendChild(b);
+  var back=el('button','fbtn','Back');
+  back.addEventListener('click',function(){go('create');});
+  row.appendChild(back);
+  pane.appendChild(row);
+}
+
+/* ---------------- the guided first steps ----------------
+   A checklist, not a corridor. Each step names the next thing worth
+   doing and completes when you do it — including if you do it by
+   accident, which is the whole point. */
+var STEPS=[
+  {id:'move',   title:'Find your feet',
+   text:'Walk with <b>WASD</b> and look around by dragging the mouse.',
+   test:function(s){return F.walked>14;}},
+  {id:'talk',   title:'Meet the Harbourmaster',
+   text:'She is on the jetty, north of the plaza. Press <b>E</b> to talk.',
+   test:function(s){return Object.keys(s.met).length>0;}},
+  {id:'fish',   title:'Cast a line',
+   text:'Stand at the water\\u2019s edge and press <b>E</b>. Hold to cast, '+
+        'strike on the bite, then hold to reel — and let go when it runs.',
+   test:function(s){return s.stats.caught>0;}},
+  {id:'mine',   title:'Work the quarry',
+   text:'The face is south, past the woods. Press <b>E</b> to mine it.',
+   test:function(s){return s.stats.broken>0;}},
+  {id:'plot',   title:'Claim some land',
+   text:'The plots are west. Standing on one, press <b>E</b> to claim it — '+
+        'the first is free.',
+   test:function(s){return s.plots.length>0;}},
+  {id:'build',  title:'Put something up',
+   text:'Pick a block from the hotbar and left-click to place it.',
+   test:function(s){return s.stats.placed>0;}},
+  {id:'world',  title:'Make a world of your own',
+   text:'The gateway is in the middle of the plaza. Press <b>E</b> at it.',
+   test:function(s){return F.madeWorld;}}
+];
+F.walked=0;
+F.madeWorld=false;
+
+var card=null,idx=0,guideOn=false;
+function startGuide(){
+  if(F.resumed){guideOn=false;return;}
+  card=document.createElement('div');
+  card.className='guide';
+  document.getElementById('hud').appendChild(card);
+  guideOn=true;
+  idx=0;
+  paintGuide();
+}
+function paintGuide(){
+  if(!card)return;
+  if(idx>=STEPS.length){
+    card.classList.remove('on');
+    guideOn=false;
+    LH.UI.say('','That is everything. The island is yours to get on with.','sys');
+    return;
+  }
+  var s=STEPS[idx];
+  card.innerHTML=
+    '<div class="st">First steps · '+(idx+1)+' of '+STEPS.length+'</div>'+
+    '<h4>'+s.title+'</h4><p>'+s.text+'</p>'+
+    '<div class="pg"><i style="width:'+Math.round(idx/STEPS.length*100)+'%"></i></div>';
+  card.classList.add('on');
+}
+F.tick=function(state){
+  if(!guideOn||!card||idx>=STEPS.length)return;
+  if(STEPS[idx].test(state)){
+    idx++;
+    LH.Audio&&LH.Audio.play('pickup');
+    paintGuide();
+  }
+};
+F.skipGuide=function(){
+  if(card)card.classList.remove('on');
+  guideOn=false;
+};
+F.guiding=function(){return guideOn;};
+
+LH.Front=F;
 })();
 
 /* ============================================================
@@ -11229,12 +12177,14 @@ var M=LH.M,GL=LH.GL,R=LH.Render,App=LH.App,Cam=LH.Cam,Geo=LH.Geo;
 var T=LH.Terrain,W=LH.World,P=LH.Props,Act=LH.Actors,I=LH.Input,Pl=LH.Player,Sky=LH.Sky;
 var V=LH.Voxels,D=LH.Data,Net=LH.Net,UI=LH.UI,Icon=LH.Icon;
 var En=LH.Enemies,Fish=LH.Fishing,Quests=LH.Quests,Realm=LH.Realm;
+var Aud=LH.Audio,Front=LH.Front;
 var G={};
 
 G.player=null;
 G.crowd=[];
 G.ready=false;
 G.aim={hit:false,x:0,y:0,z:0,mode:'none',target:null};
+G.entered=false;
 
 /* ---------------- boot ---------------- */
 App.stage('Painting surfaces',function(){
@@ -11351,19 +12301,30 @@ App.stage('Waking the harbour',function(){
   var qpad=T.pad('quarry');
   En.spawn('guardian',qpad.x,qpad.z+14,{leash:30});
 
-  /* Any saved progress replaces the starting state, and rebuilding the
-     voxel chunks it restored has to happen before the first draw. */
-  if(Net.load()){
-    UI.sync(Net.snapshot());
-    for(var g=0;g<64;g++)V.update(8);
-  }
+  /* Saved progress is offered on the title screen rather than loaded
+     over the top of a character you are about to make. */
+  Front.hasSave=Net.hasSave();
   G.refreshKit();
   G.ready=true;
+});
+App.stage('Opening the harbour',function(){
+  Front.init();
 });
 
 /* The character's appearance is a projection of the server's equipped
    map. Nothing writes to the kit directly, so a rejected equip cannot
    leave you visibly wearing something you do not own. */
+G.loadSave=function(){
+  if(!Net.load())return false;
+  UI.sync(Net.snapshot());
+  for(var g=0;g<80;g++)V.update(8);
+  G.refreshKit();
+  var p=G.player;
+  p.pos[0]=W.spawn[0];p.pos[2]=W.spawn[2];
+  p.pos[1]=W.groundAt(W.spawn[0],W.spawn[2]);
+  return true;
+};
+
 G.refreshKit=function(){
   if(!G.player)return;
   var eq=Net.snapshot().equipped;
@@ -11424,7 +12385,7 @@ function actPrimary(){
     p.anim.play('build');
     Net.request('place',{x:a.place.x,y:a.place.y,z:a.place.z,
       key:held.key,rot:0,pos:p.pos},function(r){
-      if(r.ok){UI.sync(r.state);LH.Audio&&LH.Audio.play('place');}
+      if(r.ok){UI.sync(r.state);Aud&&Aud.play('place');}
       else UI.toast(r.why,'bad');
     });
     return;
@@ -11435,7 +12396,7 @@ function actPrimary(){
       if(r.ok){
         UI.sync(r.state);
         for(var i=0;i<r.drops.length;i++)UI.toastItem(r.drops[i][0],r.drops[i][1]);
-        LH.Audio&&LH.Audio.play('break');
+        Aud&&Aud.play('break');
       }else UI.toast(r.why,'bad');
     });
     return;
@@ -11451,8 +12412,13 @@ G.interact=function(pt){
   var p=G.player;
   switch(pt.kind){
     case 'npc':
-      /* pressing again while the card is up closes it */
-      if(G.talking===pt.data.npc){G.talking=null;UI.dialogue(null);break;}
+      /* pressing again while the card is up opens the trade window —
+         the second press is the one that means business */
+      if(G.talking===pt.data.npc){
+        G.talking=null;UI.dialogue(null);
+        G.offerTrade(Quests.NPCS[pt.data.npc].name);
+        break;
+      }
       Net.request('talk',{id:pt.data.npc},function(r){
         if(!r.ok){UI.toast(r.why,'bad');return;}
         UI.sync(r.state);
@@ -11475,8 +12441,8 @@ G.interact=function(pt){
     case 'mine':
       p.anim.play('mine');
       Net.request('mine',{node:'ore'},function(r){
-        if(r.ok){UI.sync(r.state);UI.toastItem(r.got,r.n);
-          if(r.levelled)UI.toast('Level up!','good');}
+        if(r.ok){UI.sync(r.state);UI.toastItem(r.got,r.n);Aud&&Aud.play('break');
+          if(r.levelled){UI.toast('Level up!','good');Aud&&Aud.play('levelup');}}
         else UI.toast(r.why,'bad');
       });
       break;
@@ -11487,6 +12453,25 @@ G.interact=function(pt){
   }
 };
 G.onHeldChanged=function(){G.refreshKit();};
+
+/* A resident's counter-offer. Simulated — they propose something from
+   their own stock at roughly the value of what you have shown them —
+   but every check on the swap itself is real. */
+G.offerTrade=function(who){
+  var pool=['ingot_cu','ingot_fe','rope','cloth','bait_shrimp','plank_m',
+            'coal','copper','iron','crystal','food_stew','lantern'];
+  var theirs={};
+  var n=1+((Math.random()*3)|0);
+  for(var i=0;i<n;i++){
+    var k=pool[(Math.random()*pool.length)|0];
+    theirs[k]=(theirs[k]||0)+1+((Math.random()*4)|0);
+  }
+  Net.request('tradeOpen',{with:who,theirs:theirs},function(r){
+    if(!r.ok){UI.toast(r.why,'bad');return;}
+    UI.openTrade(r.trade);
+    Aud&&Aud.play('open');
+  });
+};
 
 /* ---------------- travel ----------------
    Regenerating the surface takes about a fifth of a second, which is
@@ -11521,6 +12506,7 @@ G.travelTo=function(w){
   if(!srvWorld){UI.toast('That world is not yours.','bad');return;}
   /* the cells come from the server's own row, not from the listing */
   Net.request('saveRealm',{id:w.id,cells:undefined});
+  Aud&&Aud.play('travel');
   travel('Entering '+w.name,function(){
     Realm.enter({id:w.id,name:w.name,theme:w.theme,seed:w.seed,
       radius:w.radius,relief:w.relief,cells:G._realmCells(w.id)});
@@ -11539,6 +12525,7 @@ G._realmCells=function(id){
 };
 G.travelHome=function(){
   if(!Realm.inRealm())return;
+  Aud&&Aud.play('travel');
   travel('Returning to Lumen Harbor',function(){Realm.leave();});
 };
 
@@ -11548,20 +12535,20 @@ G.travelHome=function(){
 Fish.on(function(ev,data){
   var p=G.player;
   if(ev==='stage'){
-    if(data==='cast')p.anim.play('fishCast',true);
+    if(data==='cast'){p.anim.play('fishCast',true);Aud&&Aud.play('cast');}
     else if(data==='wait'||data==='sink')p.anim.play('fishWait');
-    else if(data==='strike')p.anim.play('fishReel',true);
+    else if(data==='strike'){p.anim.play('fishReel',true);Aud&&Aud.play('bite');}
     else if(data==='reel')p.anim.play('fishReel');
     return;
   }
   if(ev==='reject'){UI.toast(data,'bad');p.anim.play('idle');return;}
   if(ev==='miss'){UI.toast('It got away.','bad');p.anim.play('idle');return;}
-  if(ev==='snap'){UI.toast('The line snapped!','bad');
+  if(ev==='snap'){UI.toast('The line snapped!','bad');Aud&&Aud.play('snap');
     Cam.shake(0.12,0.2);p.anim.play('idle');return;}
   if(ev==='caught'){
     UI.sync(data.state);
     UI.showCatch(data);
-    LH.Audio&&LH.Audio.play('catch');
+    Aud&&Aud.play('catch');
     p.anim.play('celebrate',true);
     setTimeout(function(){if(p.anim.state==='celebrate')p.anim.play('idle');},1500);
   }
@@ -11595,7 +12582,7 @@ function swing(){
       UI.toast(e.S.name+' defeated','good');
       if(r.loot)for(var i=0;i<r.loot.length;i++)UI.toastItem(r.loot[i][0],r.loot[i][1]);
     }
-    LH.Audio&&LH.Audio.play('hit');
+    Aud&&Aud.play('hit');
   });
 }
 
@@ -11705,6 +12692,53 @@ App.onUpdate(function(dt,time){
 
   Sky.update(dt);
   UI.setClock(Sky.time,Sky.weather);
+  if(Aud)Aud.update(dt);
+
+  /* --- the front end owns everything until it is finished --- */
+  if(Front.active()){
+    /* A slow orbit of the plaza behind the panel, with the character
+       being edited standing in it — so creation previews the real
+       thing rather than a doll that has to be kept in sync. */
+    var fpad=T.pad('plaza');
+    var ang=time*0.055;
+    Cam.manual=true;
+    M.set3(Cam.target,fpad.x+7,fpad.y+1.05,fpad.z-2);
+    M.set3(Cam.eye,fpad.x+7+Math.sin(ang)*5.4,fpad.y+2.3,
+      fpad.z-2+Math.cos(ang)*5.4);
+    G.player.pos[0]=fpad.x+7;G.player.pos[2]=fpad.z-2;
+    G.player.pos[1]=W.groundAt(G.player.pos[0],G.player.pos[2]);
+    /* The camera sits in direction `ang` from the target, and facing 0
+       points at +Z — so facing must equal `ang` for the character to
+       look back at it. Adding pi shows their back, which is not what
+       anyone wants from a character creator. */
+    G.player.facing=ang;
+    G.player.anim.play('idle');
+    G.player.update(dt);
+    updateCrowd(dt);
+    updateNpcs(dt);
+    Cam.update(dt,G.player.pos,null);
+    R.updateLight(G.player.pos,44);
+    T.extractFrustum(R.vp);
+    W.cullProps(Cam.target[0],Cam.target[2],1.3);
+    I.end();
+    return;
+  }
+  if(!G.entered){
+    /* Hand the camera back once, on the frame the front end closes.
+       Keying this off Cam.manual would fire again every time anything
+       else takes manual control — a cinematic, a screenshot — and
+       replay the arrival. */
+    G.entered=true;
+    Cam.manual=false;
+    Cam.yaw=G.player.facing+Math.PI;
+    Cam.pitch=0.22;Cam.wantDist=6.2;Cam.dist=6.2;
+    M.copy3(Cam.focus,G.player.pos);
+    if(Front.resumed)G.loadSave();
+    else UI.say('','Welcome to Lumen Harbor. Press <b>E</b> to interact, '+
+      '<b>Tab</b> for your backpack, <b>Esc</b> for the menu.','sys');
+    UI.say('','Other people here are simulated — there is no server '+
+      'behind them yet.','sys');
+  }
 
   /* --- panel and hotbar input --- */
   for(var n=0;n<10;n++){
@@ -11783,6 +12817,15 @@ App.onUpdate(function(dt,time){
   En.update(dt,G.player.pos,onEnemyHit);
   updatePlates();
   if(!Realm.inRealm()){updateNpcs(dt);trackDistrict();chatter(dt);}
+
+  /* footsteps are driven by distance so they stay in step at any speed */
+  var moved=Math.hypot(Pl.vel[0],Pl.vel[2])*dt;
+  if(Pl.grounded&&moved>0.001){
+    Front.walked+=moved;
+    if(Aud)Aud.footstep(moved,surfaceName());
+  }
+  Front.tick(UI.state()||Net.snapshot());
+  if(UI.isTouch())UI.touchStick(I.stick);
 
   /* walking away ends a conversation */
   if(G.talking){
@@ -11890,6 +12933,13 @@ function chatter(dt){
   UI.say(c[0],c[1]);
 }
 
+/* The material under the player's feet, by name, for footstep audio. */
+function surfaceName(){
+  var m=Pl.surfaceMat();
+  for(var k in LH.Tex.NAME)if(LH.Tex.NAME[k]===m)return k;
+  return 'stone';
+}
+
 function camSolid(x,y,z){
   if(y<T.heightAt(x,z)+0.35)return true;
   if(V.solid(Math.floor(x),Math.floor(y),Math.floor(z)))return true;
@@ -11963,12 +13013,7 @@ App.onDraw(function(dt,time){
 /* ---------------- go ---------------- */
 if(LH.App.start()){
   LH.Input.attach(document.getElementById('gl'));
-  LH.App.runBoot(function(){
-    LH.UI.say('','Welcome to Lumen Harbor. Press <b>E</b> to interact, '+
-      '<b>Tab</b> for your backpack, <b>Esc</b> for the menu.','sys');
-    LH.UI.say('','Other people here are simulated — there is no server '+
-      'behind them yet.','sys');
-  });
+  LH.App.runBoot();
 }
 LH.Game=G;
 })();
