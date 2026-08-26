@@ -378,11 +378,13 @@ LH.M=M;
 var M=LH.M;
 var GL={};
 
-/* Interleaved vertex: pos(3) nrm(3) uv(2) col(3) mat(2).
-   `mat` is (textureArrayLayer, emissive) per vertex, which is what
-   lets one mesh — a whole building, a terrain chunk — mix brick,
-   glass and neon and still draw in a single call. */
-var VSTRIDE=13, VBYTES=VSTRIDE*4;
+/* Interleaved vertex: pos(3) nrm(3) uv(2) col(3) mat(4).
+   `mat` is (layer, emissive, layer2, blend). Two layers and a weight,
+   not one layer: a texture-array index cannot be interpolated across
+   a triangle, because the values in between address unrelated
+   materials. Sampling both and mixing is the only way a sand-to-grass
+   boundary comes out as a boundary rather than a rainbow. */
+var VSTRIDE=15, VBYTES=VSTRIDE*4;
 /* per-instance: mat4(16) + tint(4) */
 var ISTRIDE=20, IBYTES=ISTRIDE*4;
 GL.VSTRIDE=VSTRIDE;GL.ISTRIDE=ISTRIDE;
@@ -492,7 +494,7 @@ GL.mesh=function(data,idx,maxInstances){
   gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,VBYTES,12);
   gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,2,gl.FLOAT,false,VBYTES,24);
   gl.enableVertexAttribArray(3);gl.vertexAttribPointer(3,3,gl.FLOAT,false,VBYTES,32);
-  gl.enableVertexAttribArray(4);gl.vertexAttribPointer(4,2,gl.FLOAT,false,VBYTES,44);
+  gl.enableVertexAttribArray(4);gl.vertexAttribPointer(4,4,gl.FLOAT,false,VBYTES,44);
 
   var ebo=gl.createBuffer();
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ebo);
@@ -787,23 +789,36 @@ function Builder(){
      modelling session works. */
   this.layer=0;
   this.emis=0;
+  this.layer2=0;   /* secondary material */
+  this.blend=0;    /* 0 = all primary, 1 = all secondary */
 }
 Geo.Builder=Builder;
 Geo.build=function(){return new Builder();};
 
 Builder.prototype.push=function(){
-  this.stack.push({m:new Float32Array(this.m),l:this.layer,e:this.emis});return this;
+  this.stack.push({m:new Float32Array(this.m),l:this.layer,e:this.emis,
+    l2:this.layer2,bl:this.blend});return this;
 };
 Builder.prototype.pop=function(){
   var f=this.stack.pop();
-  if(f){this.m.set(f.m);this.layer=f.l;this.emis=f.e;}
+  if(f){this.m.set(f.m);this.layer=f.l;this.emis=f.e;
+    this.layer2=f.l2;this.blend=f.bl;}
   this._nmDirty=true;return this;
 };
 /* Pick a material by name from LH.Tex. Emissive is 0..1 and is added
    straight to the lit result, so neon reads at night. */
 Builder.prototype.mat=function(name,emis){
   this.layer=(typeof name==='number')?name:LH.Tex.layer(name);
-  this.emis=emis||0;return this;
+  this.emis=emis||0;
+  /* A single material means both slots agree and the blend is off. */
+  this.layer2=this.layer;this.blend=0;
+  return this;
+};
+/* Blend toward a second material. Used by the terrain for every
+   surface boundary and by anything that wants a gradient. */
+Builder.prototype.mat2=function(name,blend){
+  this.layer2=(typeof name==='number')?name:LH.Tex.layer(name);
+  this.blend=blend||0;return this;
 };
 var _tmpM=M.m4(),_tmpM2=M.m4(),_t=M.v3(),_s=M.v3(1,1,1);
 Builder.prototype.translate=function(x,y,z){
@@ -837,7 +852,8 @@ Builder.prototype.vert=function(x,y,z,nx,ny,nz,u,vv,c){
   var ty=nm[1]*nx+nm[4]*ny+nm[7]*nz;
   var tz=nm[2]*nx+nm[5]*ny+nm[8]*nz;
   var l=Math.sqrt(tx*tx+ty*ty+tz*tz)||1;
-  this.v.push(px,py,pz,tx/l,ty/l,tz/l,u,vv,c[0],c[1],c[2],this.layer,this.emis);
+  this.v.push(px,py,pz,tx/l,ty/l,tz/l,u,vv,c[0],c[1],c[2],
+    this.layer,this.emis,this.layer2,this.blend);
   return this.n++;
 };
 Builder.prototype.tri=function(a,b,c){this.i.push(a,b,c);return this;};
@@ -1175,11 +1191,14 @@ Builder.prototype.loft=function(sections,c,o){
     if(up)this.quad(A,D,C2,B);else this.quad(A,B,C2,D);
   }
   /* caps, unless the loft joins something else */
-  /* `openTop` always means the last section and `openBottom` the first,
-     whichever way the stack runs. The cap's normal and winding follow
-     the same direction flag. */
+  /* `openTop` means the geometrically higher cap and `openBottom` the
+     lower one, regardless of which end of the list they land on. Tying
+     them to list order instead makes a descending loft cap the wrong
+     end, which shows up as a large flat surface facing the wrong way. */
   var ny=up?1:-1;
-  if(!o.openTop){
+  var openFar=up?o.openTop:o.openBottom;
+  var openNear=up?o.openBottom:o.openTop;
+  if(!openFar){
     var top=sections[rings-1],tsc=top.scale===undefined?1:top.scale;
     var tcol=top.col?col3(top.col):col;
     var tc=this.vert(0,top.y,0,0,ny,0,.5,.5,tcol),t0=this.n;
@@ -1189,7 +1208,7 @@ Builder.prototype.loft=function(sections,c,o){
       if(up)this.tri(tc,t0+(i+1)%n,t0+i);else this.tri(tc,t0+i,t0+(i+1)%n);
     }
   }
-  if(!o.openBottom){
+  if(!openNear){
     var bo=sections[0],bsc=bo.scale===undefined?1:bo.scale;
     var bcol=bo.col?col3(bo.col):col;
     var bc=this.vert(0,bo.y,0,0,-ny,0,.5,.5,bcol),b0=this.n;
@@ -1228,6 +1247,41 @@ Builder.prototype.limb=function(len,r0,r1,c,o){
   return this;
 };
 
+/* A flat disc, and a flat ring. Both exist because a capped loft is
+   the wrong shape for anything hollow: a fountain basin built as a
+   capped cylinder is a solid lid over the water. */
+Builder.prototype.disc=function(x,y,z,r,seg,c,down){
+  seg=seg||16;
+  var col=col3(c),ny=down?-1:1;
+  var ctr=this.vert(x,y,z,0,ny,0,.5,.5,col),i0=this.n;
+  for(var i=0;i<seg;i++){
+    var a=i/seg*TAU;
+    this.vert(x+Math.cos(a)*r,y,z+Math.sin(a)*r,0,ny,0,
+      Math.cos(a)*.5+.5,Math.sin(a)*.5+.5,col);
+  }
+  for(var k=0;k<seg;k++){
+    var k2=(k+1)%seg;
+    if(down)this.tri(ctr,i0+k,i0+k2);
+    else this.tri(ctr,i0+k2,i0+k);
+  }
+  return this;
+};
+Builder.prototype.annulus=function(x,y,z,r0,r1,seg,c,down){
+  seg=seg||16;
+  var col=col3(c),ny=down?-1:1,base=this.n;
+  for(var i=0;i<seg;i++){
+    var a=i/seg*TAU,ca=Math.cos(a),sa=Math.sin(a);
+    this.vert(x+ca*r0,y,z+sa*r0,0,ny,0,ca*.5+.5,sa*.5+.5,col);
+    this.vert(x+ca*r1,y,z+sa*r1,0,ny,0,ca*.5+.5,sa*.5+.5,col);
+  }
+  for(var k=0;k<seg;k++){
+    var a0=base+k*2, b0=base+((k+1)%seg)*2;
+    if(down)this.quad(a0,a0+1,b0+1,b0);
+    else this.quad(a0,b0,b0+1,a0+1);
+  }
+  return this;
+};
+
 /* A quad billboarded in the XY plane — leaves, banners, fish fins. */
 Builder.prototype.card=function(x,y,z,w,h,c,dbl){
   var col=col3(c);
@@ -1249,13 +1303,15 @@ Builder.prototype.card=function(x,y,z,w,h,c,dbl){
 /* Merge another builder's output in under the current transform.
    Lets a prop be composed from named sub-builders. */
 Builder.prototype.append=function(other){
-  var base=this.n,ov=other.v,sl=this.layer,se=this.emis;
-  for(var i=0;i<ov.length;i+=13){
+  var base=this.n,ov=other.v,sl=this.layer,se=this.emis,
+      sl2=this.layer2,sb=this.blend;
+  for(var i=0;i<ov.length;i+=15){
     this.layer=ov[i+11];this.emis=ov[i+12];
+    this.layer2=ov[i+13];this.blend=ov[i+14];
     this.vert(ov[i],ov[i+1],ov[i+2],ov[i+3],ov[i+4],ov[i+5],
       ov[i+6],ov[i+7],[ov[i+8],ov[i+9],ov[i+10]]);
   }
-  this.layer=sl;this.emis=se;
+  this.layer=sl;this.emis=se;this.layer2=sl2;this.blend=sb;
   for(var j=0;j<other.i.length;j++)this.i.push(base+other.i[j]);
   return this;
 };
@@ -1264,13 +1320,13 @@ Builder.prototype.append=function(other){
    prop builder without rebuilding it. */
 Builder.prototype.tintAll=function(c){
   var col=col3(c);
-  for(var i=0;i<this.v.length;i+=13){this.v[i+8]=col[0];this.v[i+9]=col[1];this.v[i+10]=col[2];}
+  for(var i=0;i<this.v.length;i+=15){this.v[i+8]=col[0];this.v[i+9]=col[1];this.v[i+10]=col[2];}
   return this;
 };
 
 Builder.prototype.bounds=function(){
   var mn=[1e9,1e9,1e9],mx=[-1e9,-1e9,-1e9];
-  for(var i=0;i<this.v.length;i+=13){
+  for(var i=0;i<this.v.length;i+=15){
     for(var k=0;k<3;k++){
       var val=this.v[i+k];
       if(val<mn[k])mn[k]=val;
@@ -1514,7 +1570,7 @@ R.panel=function(lo,hi,cells,seed,rivets){
 };
 
 R.tilefloor=function(a,b,grout,cells){
-  a=a||'#28323F';b=b||'#3E4C5E';grout=grout||'#1A222C';cells=cells||4;
+  a=a||'#6A7686';b=b||'#828E9E';grout=grout||'#4A5462';cells=cells||4;
   return function(u,v){
     var cx=Math.floor(u*cells),cy=Math.floor(v*cells);
     var fu=u*cells-cx,fv=v*cells-cy;
@@ -1594,7 +1650,9 @@ R.crystal=function(tint,seed){
 };
 
 R.glass=function(tint){
-  tint=tint||'#8FD4F0';
+  /* Same reasoning as the emissive material: neutral texture, tinted
+     at the call site. */
+  tint=tint||'#CFDCE6';
   return function(u,v){
     var base=rgb(tint);
     /* faint pane distortion and a diagonal reflection band */
@@ -1617,7 +1675,7 @@ R.water=function(){
 };
 
 R.roof=function(lo,hi,rows){
-  lo=lo||'#3A2A3C';hi=hi||'#6A4A5E';rows=rows||10;
+  lo=lo||'#544459';hi=hi||'#8A6A7E';rows=rows||10;
   return function(u,v){
     var row=Math.floor(v*rows),fv=v*rows-row;
     var off=(row%2)?0.5:0;
@@ -1634,14 +1692,23 @@ R.roof=function(lo,hi,rows){
   };
 };
 
+/* A dressed stone path rather than asphalt. Tarmac reads as a black
+   scar cut across a green island, and every road on the map is
+   visible from every hill. */
 R.road=function(){
   return function(u,v){
-    var base=mixv(rgb('#23262C'),rgb('#3A3E46'),tileFbm(u,v,8,227,5));
+    var base=mixv(rgb('#8A8375'),rgb('#B4AC9C'),tileFbm(u,v,7,227,5));
+    /* irregular setts: a cellular split with a paler joint */
+    var cells=9;
+    var gx=Math.floor(u*cells),gy=Math.floor(v*cells);
+    var jitter=M.hash2(gx,gy,231);
+    base=litv(base,(jitter-0.5)*26);
+    var fu=u*cells-gx,fv=v*cells-gy;
+    var e=0.07+jitter*0.03;
+    if(fu<e||fv<e)base=mixv(base,rgb('#6E685C'),0.55);
     var agg=M.hash2(u*SZ|0,v*SZ|0,229);
-    if(agg>0.96)base=litv(base,34);
-    if(agg<0.05)base=litv(base,-20);
-    var crack=1-Math.abs(tileFbm(u,v,5,233,3)*2-1);
-    if(crack>0.93)base=litv(base,-24);
+    if(agg>0.965)base=litv(base,26);
+    if(agg<0.05)base=litv(base,-16);
     return base;
   };
 };
@@ -1665,8 +1732,12 @@ R.gold=function(lo,hi){
   };
 };
 
+/* Neutral by default. An emissive material that bakes its own hue
+   multiplies against whatever tint the caller passes, so a warm lamp
+   drawn on a teal texture comes out mint green. Keep the texture
+   near-white and let the tint carry the colour. */
 R.emissive=function(tint){
-  tint=tint||'#3BE0C8';
+  tint=tint||'#F4F8FF';
   return function(u,v){
     var c=rgb(tint);
     var pulse=tileFbm(u,v,10,269,2);
@@ -1694,8 +1765,9 @@ var LAYERS=[
   ['panel',   R.panel('#333B48','#69768A',4,113,true)],
   ['panelw',  R.panel('#5E6672','#9AA4B2',3,311,false)],
   ['concrete',R.concrete()],
-  ['tile',    R.tilefloor()],
-  ['tilepale',R.tilefloor('#5E6A78','#7C8896','#3E4652',4)],
+  ['tile',    R.tilefloor('#6A7686','#828E9E','#4A5462',7)],
+  ['tilepale',R.tilefloor('#9AA4B0','#B0B9C4','#6E7884',4)],
+  ['tiledark',R.tilefloor('#2E3846','#42505F','#1E2630',4)],
   ['roof',    R.roof()],
   ['road',    R.road()],
   ['foliage', R.foliage()],
@@ -1706,7 +1778,7 @@ var LAYERS=[
   ['crystal', R.crystal()],
   ['gold',    R.gold()],
   ['water',   R.water()],
-  ['neon',    R.emissive('#3BE0C8')],
+  ['neon',    R.emissive('#F4F8FF')],
   ['neonw',   R.emissive('#FFFFFF')]
 ];
 
@@ -1835,7 +1907,7 @@ layout(location=0) in vec3 aPos;
 layout(location=1) in vec3 aNrm;
 layout(location=2) in vec2 aUV;
 layout(location=3) in vec3 aCol;
-layout(location=4) in vec2 aMat;      // x = texture layer, y = emissive
+layout(location=4) in vec4 aMat;      // layer, emissive, layer2, blend
 layout(location=5) in mat4 aModel;    // consumes 5,6,7,8
 layout(location=9) in vec4 aTint;     // rgb tint, a = extra emissive
 
@@ -1849,6 +1921,8 @@ out vec3 vNrm;
 out vec2 vUV;
 out vec3 vCol;
 out float vLayer;
+out float vLayer2;
+out float vBlend;
 out float vEmis;
 
 void main(){
@@ -1863,6 +1937,8 @@ void main(){
   vec4 tint = (uInstanced==1) ? aTint : uTint;
   vCol = aCol*tint.rgb;
   vLayer = aMat.x;
+  vLayer2 = aMat.z;
+  vBlend = aMat.w;
   vEmis = aMat.y + tint.a;
   gl_Position = uVP*wp;
 }
@@ -1877,18 +1953,30 @@ uniform sampler2DArray uAtlas;
 uniform float uSpec;
 uniform float uTime;
 uniform float uAlpha;
+// Lit windows and neon should not blow out at noon. One global scale,
+// driven by the time of day, keeps them readable in daylight and lets
+// them carry the night.
+uniform float uEmisScale;
 
 in vec3 vWorld;
 in vec3 vNrm;
 in vec2 vUV;
 in vec3 vCol;
 in float vLayer;
+in float vLayer2;
+in float vBlend;
 in float vEmis;
 
 layout(location=0) out vec4 oCol;
 
 void main(){
-  vec4 tex = texture(uAtlas, vec3(vUV, vLayer));
+  // Round the layer indices: they are interpolated across the triangle
+  // and a fractional array index is undefined, not a blend.
+  vec4 tex = texture(uAtlas, vec3(vUV, floor(vLayer+0.5)));
+  if(vBlend>0.002){
+    vec4 tex2 = texture(uAtlas, vec3(vUV, floor(vLayer2+0.5)));
+    tex = mix(tex, tex2, clamp(vBlend,0.0,1.0));
+  }
   vec3 albedo = tex.rgb*vCol;
   float alpha = tex.a*uAlpha;
   if(alpha<0.02) discard;
@@ -1914,7 +2002,7 @@ void main(){
   float rim = pow(1.0-saturate(dot(n,v)),3.0);
   col += uSkyCol*rim*0.16;
 
-  col += albedo*vEmis*3.0;
+  col += albedo*vEmis*3.0*uEmisScale;
 
   col = applyFog(col,vWorld,uEye);
   oCol = vec4(col*uExposure, alpha);
@@ -2105,7 +2193,9 @@ void main(){
   col=mix(col,vec3(0.92,0.97,1.0),foam*fw*0.75);
 
   col=applyFog(col,vWorld,uEye);
-  float alpha=mix(0.80,0.97,saturate(depth*1.4+fres));
+  // Near-opaque away from the shore. Any real transparency out here
+  // shows the edge of the terrain mesh as a square outline on the sea.
+  float alpha=mix(0.88,1.0,saturate(depth*1.4+fres));
   oCol=vec4(col*uExposure,alpha);
 }
 `;
@@ -2200,7 +2290,8 @@ R.scene={
   stars:0,
   bloom:0.85,
   bloomThresh:1.05,
-  vignette:0.55
+  vignette:0.55,
+  emisScale:1.0
 };
 
 R.vp=M.m4();R.view=M.m4();R.proj=M.m4();R.invVP=M.m4();
@@ -2328,6 +2419,7 @@ R.beginOpaque=function(){
   GL.u1i(p,'uShadow',1);
   GL.u1f(p,'uSpec',0.25);
   GL.u1f(p,'uAlpha',1);
+  GL.u1f(p,'uEmisScale',R.scene.emisScale);
   GL.u4f(p,'uTint',1,1,1,0);
   GL.u1i(p,'uInstanced',0);
   return p;
@@ -2561,6 +2653,8 @@ Cam.shoulder=0.55;             /* lateral offset — over-the-shoulder framing *
 Cam.sensitivity=1.0;
 Cam.invertY=false;
 Cam.firstPerson=false;
+Cam.collide=true;
+Cam.manual=false;
 
 Cam.view=M.m4();
 Cam.proj=M.m4();
@@ -2588,6 +2682,15 @@ var _want=M.v3(),_dir=M.v3(),_right=M.v3(),_up=M.v3(0,1,0),_tmp=M.v3();
    stops short of the first blocked sample, which is cheaper and steadier
    than a true swept sphere and is indistinguishable in play. */
 Cam.update=function(dt,followPos,solid){
+  /* Manual mode: eye and target are whatever the caller set. Used by
+     cinematics and by the screenshot harness, which needs to frame a
+     shot rather than orbit whoever happens to be standing there. */
+  if(Cam.manual){
+    M.lookAt(Cam.view,Cam.eye,Cam.target,_up);
+    M.perspective(Cam.proj,Cam.fov,LH.App.aspect||1.777,Cam.near,Cam.far);
+    LH.Render.setCamera(Cam.view,Cam.proj,Cam.eye);
+    return;
+  }
   M.lerp3(Cam.focus,Cam.focus,followPos,1-Math.pow(0.0008,dt));
   M.set3(Cam.target,Cam.focus[0],Cam.focus[1]+Cam.height,Cam.focus[2]);
 
@@ -2599,7 +2702,10 @@ Cam.update=function(dt,followPos,solid){
   Cam.dist=M.damp(Cam.dist,Cam.wantDist,0.22,dt);
 
   var d=Cam.dist;
-  if(solid){
+  /* Collision can be switched off for cinematics and for framing
+     screenshots, where the boom pulling in is a nuisance rather than
+     a feature. */
+  if(solid&&Cam.collide!==false){
     /* march out from the head; the first blocked sample caps the boom */
     var steps=14,hit=d;
     for(var i=1;i<=steps;i++){
@@ -4667,94 +4773,2345 @@ A.touched=function(){return touched;};
 LH.Actors=A;
 })();
 
-/* ---- TEMPORARY CHARACTER TEST — replaced by LH.World ---- */
+
+/* ============================================================
+   LH.Terrain — the island.
+
+   A heightmap sampled from deterministic noise, with district "pads"
+   stamped into it: a pad flattens a disc of ground to a fixed height
+   with a smooth falloff and forces its own surface material. That is
+   what lets a plaza be genuinely flat and walkable while the land
+   around it stays organic, without hand-authoring a mesh.
+
+   The surface is cut into 32 m chunks so the renderer can cull it,
+   and the same heightmap answers every ground query in the game —
+   collision, prop placement, water depth, camera clearance.
+   ============================================================ */
 (function(){
 'use strict';
-var M=LH.M,GL=LH.GL,R=LH.Render,App=LH.App,Cam=LH.Cam,Geo=LH.Geo,Act=LH.Actors;
-var ground=null,cast=[];
+var M=LH.M,GL=LH.GL,Geo=LH.Geo,T={};
 
-App.stage('Painting surfaces',function(){LH.Tex.buildAll();});
-App.stage('Raising the ground',function(){
-  var b=Geo.build();
-  b.mat('tile');
-  b.plane(0,0,0,40,40,'#FFFFFF',8,10);
-  ground=b.upload();
-});
-App.stage('Casting the players',function(){
-  var demos=[
-    {st:'idle',     hair:'swept', hat:'none',   shirt:'jacket', wings:'none'},
-    {st:'locomote', hair:'long',  hat:'none',   shirt:'tee',    wings:'none'},
-    {st:'mine',     hair:'crop',  hat:'cap',    shirt:'hoodie', wings:'none'},
-    {st:'fishWait', hair:'bun',   hat:'brim',   shirt:'tee',    wings:'none'},
-    {st:'attack',   hair:'spiked',hat:'visor',  shirt:'jacket', wings:'mech'},
-    {st:'celebrate',hair:'braids',hat:'crown',  shirt:'jacket', wings:'angelic'}
+var SIZE=352;              /* metres across, centred on the origin */
+var HALF=SIZE/2;
+var CHUNK=32;              /* metres per chunk */
+var RES=1;                 /* metres per heightmap sample */
+var N=SIZE/RES+1;          /* samples per side */
+var SEA=0;                 /* water plane height */
+
+T.SIZE=SIZE;T.HALF=HALF;T.CHUNK=CHUNK;T.SEA=SEA;
+
+var heights=null, mats=null, chunks=[];
+
+/* ---------------- district pads ----------------
+   Ordered: later pads win where they overlap, so a jetty can cut into
+   the beach it sits on. */
+/* Spread across a shoreline at roughly 135 m. The districts have to
+   occupy a modest fraction of the island: an earlier layout on a
+   smaller island left the place about 85% paving, which reads as a
+   car park rather than an island with a town on it. There is now
+   wilderness between every pair of districts.
+
+   The soft rings are generous because a pad meeting steep ground over
+   a short distance reads as a stepped cliff at the heightmap's 1 m
+   resolution. */
+var PADS=[
+  /* name          x     z     r    y     soft  material   */
+  ['plaza',        0,   10,    26,  7.0,  32,  'tile'     ],
+  ['market',      72,   26,    24, 10.0,  30,  'tilepale' ],
+  ['missions',   -62,   44,    20, 15.0,  28,  'concrete' ],
+  ['harbour',     -4,  -84,    30,  1.1,  26,  'deck'     ],
+  ['jetty',       30, -106,    12,  1.1,   9,  'deck'     ],
+  ['garage',      86,  -34,    18,  5.0,  26,  'road'     ],
+  ['plots',      -86,  -20,    28,  6.5,  28,  'grass'    ],
+  ['quarry',      46,   92,    22, 24.0,  32,  'gravel'   ],
+  ['arena',      -40,   96,    20, 27.0,  30,  'concrete' ]
+];
+T.PADS=PADS;
+var PAD={};
+for(var pi=0;pi<PADS.length;pi++){
+  PAD[PADS[pi][0]]={x:PADS[pi][1],z:PADS[pi][2],r:PADS[pi][3],y:PADS[pi][4]};
+}
+T.pad=function(n){return PAD[n];};
+
+/* ---------------- the height function ----------------
+   Deterministic: the island must come back identical on every load,
+   so nothing here may touch Math.random(). */
+function baseHeight(x,z){
+  var d=Math.hypot(x,z)/HALF;
+
+  /* Island falloff. The shore is pushed outward by low-frequency noise
+     so the coastline is ragged rather than a circle. Full land inside
+     0.68 of the half-width, fading to sea by 0.92 — which puts the
+     waterline at roughly 86 m and leaves room for all nine districts. */
+  var coast=M.fbm(x*0.008,z*0.008,17,3)*0.20-0.10;
+  var land=M.clamp(1-(d+coast-0.68)/0.24,0,1);
+  land=M.smooth(land);
+
+  /* Rolling ground, plus ridged noise for the southern highland. The
+     highland is kept modest: a 30 m ridge next to a 6 m district pad
+     makes a transition no amount of smoothing can hide. */
+  var roll=M.fbm(x*0.0092,z*0.0092,3,5)*14.0;
+  var ridge=M.ridge(x*0.0075,z*0.0075,29,4);
+  var highland=M.clamp((z-40)/100,0,1);
+  var hills=ridge*ridge*30*highland;
+
+  var h=-9+land*(9.0+roll+hills);
+
+  /* The bay: a crescent scooped out of the north shore, so the harbour
+     has sheltered water and the town has a waterfront to face. */
+  var bx=x-(-4), bz=z-(-104);
+  var bd=Math.hypot(bx*0.85,bz)/66;
+  var bay=M.clamp(1-bd,0,1);
+  h-=M.smooth(bay)*13.0;
+
+  /* A river channel running from the highland down into the bay,
+     which is where the freshwater fishing spots live. */
+  var rx=x-(-112+Math.sin(z*0.014)*22);
+  var river=M.clamp(1-Math.abs(rx)/16,0,1);
+  river*=M.clamp((z+46)/70,0,1)*M.clamp((130-z)/90,0,1);
+  h-=M.smooth(river)*7.5;
+
+  return h;
+}
+
+/* Stamp the pads. Returns {y, mat, flat} where flat is how strongly
+   this sample is inside a pad — props use it to avoid planting a tree
+   in the middle of the marketplace. */
+/* Roads. A town is legible because its parts are connected; nine
+   discs of paving on a green island read as a diagram. Each path
+   levels the ground along its length and paints a surface, using the
+   same machinery as the pads. */
+var PATHS=[
+  ['plaza','market',   7],
+  ['plaza','harbour',  9],
+  ['plaza','missions', 6],
+  ['plaza','quarry',   6],
+  ['market','garage',  6],
+  ['missions','plots', 5],
+  ['missions','arena', 5],
+  ['plots','harbour',  5],
+  ['quarry','arena',   5]
+];
+T.PATHS=PATHS;
+
+/* Squared distance from a point to a segment, and the height the road
+   should sit at there — roads ramp between their endpoints rather
+   than staying level, so they climb hills instead of cutting through. */
+var _seg={d:0,y:0};
+function segDist(px,pz,ax,az,ay,bx,bz,by){
+  var dx=bx-ax,dz=bz-az;
+  var len2=dx*dx+dz*dz;
+  var t=len2>0?M.clamp(((px-ax)*dx+(pz-az)*dz)/len2,0,1):0;
+  var cx=ax+dx*t,cz=az+dz*t;
+  _seg.d=Math.hypot(px-cx,pz-cz);
+  _seg.y=ay+(by-ay)*t;
+  return _seg;
+}
+
+var _res={y:0,mat:-1,matW:0,flat:0};
+function stamped(x,z){
+  var h=baseHeight(x,z);
+  var mat=-1,matW=0,flat=0;
+  for(var i=0;i<PADS.length;i++){
+    var P=PADS[i];
+    /* Perturb the radius with angle so the district is not a perfect
+       circle. A disc of paving is the clearest tell that a town was
+       generated rather than built. */
+    var ang=Math.atan2(z-P[2],x-P[1]);
+    var wob=1+ (M.noise2(Math.cos(ang)*2.4+P[1]*0.05,
+                         Math.sin(ang)*2.4+P[2]*0.05,7)-0.5)*0.42;
+    var d=Math.hypot(x-P[1],z-P[2])/wob;
+    var r=P[3],soft=P[5];
+    if(d>r+soft)continue;
+    /* 1 inside the disc, easing to 0 across the soft ring */
+    var w=d<=r?1:M.smooth(M.clamp(1-(d-r)/soft,0,1));
+    if(w<=0)continue;
+    h=M.lerp(h,P[4],w);
+    /* The surface has to stop far short of where the levelling does.
+       The soft ring is deliberately wide — a pad meeting steep ground
+       abruptly reads as a stepped cliff — but painting across all of
+       it makes every district three times its real size, and nine of
+       them merge into one grey mass covering the island. Paving is
+       confined to roughly the pad radius plus a quarter of the ring. */
+    var sw=M.smooth(M.clamp((w-0.68)/0.24,0,1));
+    if(sw>matW){matW=sw;mat=LH.Tex.layer(P[6]);}
+    if(w>flat)flat=w;
+  }
+  /* Roads last: they cut across whatever they cross. */
+  var roadL=LH.Tex.layer('road');
+  for(var q=0;q<PATHS.length;q++){
+    var A=PAD[PATHS[q][0]],B=PAD[PATHS[q][1]];
+    if(!A||!B)continue;
+    var half=PATHS[q][2]/2;
+    var sd=segDist(x,z,A.x,A.z,A.y,B.x,B.z,B.y);
+    var shoulder=5;
+    if(sd.d>half+shoulder)continue;
+    /* a slight camber, and shoulders that ease into the ground */
+    var w2=M.smooth(M.clamp(1-(sd.d-half)/shoulder,0,1));
+    if(w2<=0)continue;
+    h=M.lerp(h,sd.y-0.12,w2*0.92);
+    var sw2=M.smooth(M.clamp((w2-0.55)/0.30,0,1));
+    if(sw2>matW){matW=sw2;mat=roadL;}
+    if(w2>flat)flat=w2;
+  }
+  _res.y=h;_res.mat=mat;_res.matW=matW;_res.flat=flat;
+  return _res;
+}
+
+/* Surface material where no pad claims it, returned as a blended pair.
+   Slope matters more than height — a steep face is rock whatever
+   altitude it sits at — so the slope transition takes the two blend
+   slots when it is active, and the height bands take them otherwise.
+   A vertex is almost never mid-transition in both at once. */
+var BANDS=[
+  {upTo: 1.1, mat:'sand' },
+  {upTo: 3.0, mat:'sand' },
+  {upTo:30.0, mat:'grass'},
+  {upTo:44.0, mat:'stone'},
+  {upTo:1e9,  mat:'snow' }
+];
+var _sm={a:0,b:0,w:0};
+function naturalMat(y,slope){
+  var rockW=M.smooth(M.clamp((slope-0.40)/0.30,0,1));
+
+  /* which height band, and how far into the boundary above it */
+  var i=0;
+  while(i<BANDS.length-1&&y>BANDS[i].upTo)i++;
+  var a=LH.Tex.layer(BANDS[i].mat);
+  var b=a,w=0;
+  if(i<BANDS.length-1){
+    var edge=BANDS[i].upTo, zone=(i===0)?0.9:2.6;
+    var t=M.clamp((y-(edge-zone))/zone,0,1);
+    if(t>0){b=LH.Tex.layer(BANDS[i+1].mat);w=M.smooth(t);}
+  }
+  /* Below the waterline everything is wet sand regardless of band. */
+  if(y<0.2){a=LH.Tex.layer('sand');b=a;w=0;}
+
+  if(rockW>0.015){
+    /* the dominant band material carries into the rock transition */
+    var band=(w>0.5)?b:a;
+    _sm.a=band;_sm.b=LH.Tex.layer('cliff');_sm.w=rockW;
+  }else{
+    _sm.a=a;_sm.b=b;_sm.w=w;
+  }
+  return _sm;
+}
+
+/* ---------------- build ---------------- */
+var matsB=null, matsW=null;
+T.generate=function(){
+  heights=new Float32Array(N*N);
+  mats=new Int16Array(N*N);
+  matsB=new Int16Array(N*N);
+  matsW=new Float32Array(N*N);
+  var padMat=new Int16Array(N*N), padW=new Float32Array(N*N);
+  var i,j;
+  for(j=0;j<N;j++)for(i=0;i<N;i++){
+    var x=-HALF+i*RES,z=-HALF+j*RES;
+    var r=stamped(x,z);
+    heights[j*N+i]=r.y;
+    padMat[j*N+i]=r.mat;
+    padW[j*N+i]=r.matW;
+  }
+  /* Second pass for the surface: slope needs neighbours, so it cannot
+     be done in the same loop as the heights. */
+  for(j=0;j<N;j++)for(i=0;i<N;i++){
+    var k=j*N+i;
+    var hL=heights[j*N+Math.max(0,i-1)],hR=heights[j*N+Math.min(N-1,i+1)];
+    var hD=heights[Math.max(0,j-1)*N+i],hU=heights[Math.min(N-1,j+1)*N+i];
+    var slope=Math.hypot(hR-hL,hU-hD)/(2*RES);
+    var nat=naturalMat(heights[k],slope);
+    if(padW[k]>0.002&&padMat[k]>=0){
+      /* Inside a district: the paving is the primary and the natural
+         ground is what it fades into at the edge. */
+      mats[k]=padMat[k];
+      matsB[k]=(nat.w>0.5)?nat.b:nat.a;
+      matsW[k]=1-padW[k];
+    }else{
+      mats[k]=nat.a;matsB[k]=nat.b;matsW[k]=nat.w;
+    }
+  }
+  T.heights=heights;T.mats=mats;T.matsB=matsB;T.matsW=matsW;T.N=N;
+};
+
+/* Bilinear height lookup. Every ground query in the game lands here,
+   so it avoids allocation and clamps rather than branching on bounds. */
+T.heightAt=function(x,z){
+  if(!heights)return 0;
+  var fx=(x+HALF)/RES, fz=(z+HALF)/RES;
+  if(fx<0)fx=0;if(fz<0)fz=0;
+  if(fx>N-1.001)fx=N-1.001;if(fz>N-1.001)fz=N-1.001;
+  var i=fx|0, j=fz|0, tx=fx-i, tz=fz-j;
+  var h00=heights[j*N+i], h10=heights[j*N+i+1];
+  var h01=heights[(j+1)*N+i], h11=heights[(j+1)*N+i+1];
+  return (h00*(1-tx)+h10*tx)*(1-tz)+(h01*(1-tx)+h11*tx)*tz;
+};
+
+T.normalAt=function(out,x,z){
+  var e=0.6;
+  var hL=T.heightAt(x-e,z),hR=T.heightAt(x+e,z);
+  var hD=T.heightAt(x,z-e),hU=T.heightAt(x,z+e);
+  M.set3(out,-(hR-hL)/(2*e),1,-(hU-hD)/(2*e));
+  return M.norm3(out,out);
+};
+T.slopeAt=function(x,z){
+  var e=0.8;
+  var hL=T.heightAt(x-e,z),hR=T.heightAt(x+e,z);
+  var hD=T.heightAt(x,z-e),hU=T.heightAt(x,z+e);
+  return Math.hypot(hR-hL,hU-hD)/(2*e);
+};
+T.flatAt=function(x,z){return stamped(x,z).flat;};
+T.inBounds=function(x,z){return x>-HALF&&x<HALF&&z>-HALF&&z<HALF;};
+
+/* ---------------- meshing ---------------- */
+T.buildChunks=function(){
+  chunks.length=0;
+  var per=CHUNK/RES;
+  var cn=SIZE/CHUNK;
+  for(var cz=0;cz<cn;cz++)for(var cx=0;cx<cn;cx++){
+    var ox=-HALF+cx*CHUNK, oz=-HALF+cz*CHUNK;
+    var b=Geo.build();
+    var base=b.n;
+    var minY=1e9,maxY=-1e9;
+    var gi,gj;
+    for(gj=0;gj<=per;gj++)for(gi=0;gi<=per;gi++){
+      var si=cx*per+gi, sj=cz*per+gj;
+      if(si>N-1)si=N-1;if(sj>N-1)sj=N-1;
+      var k=sj*N+si;
+      var h=heights[k];
+      if(h<minY)minY=h;if(h>maxY)maxY=h;
+      var hL=heights[sj*N+Math.max(0,si-1)],hR=heights[sj*N+Math.min(N-1,si+1)];
+      var hD=heights[Math.max(0,sj-1)*N+si],hU=heights[Math.min(N-1,sj+1)*N+si];
+      var nx=-(hR-hL)/(2*RES),nz=-(hU-hD)/(2*RES);
+      var nl=Math.hypot(nx,1,nz);
+      b.layer=mats[k];
+      b.layer2=matsB[k];
+      b.blend=matsW[k];
+      b.emis=0;
+      /* UVs run in world units so neighbouring chunks tile seamlessly
+         and the texture does not swim when a chunk is rebuilt. */
+      var wx=ox+gi*RES, wz=oz+gj*RES;
+      b.vert(wx,h,wz,nx/nl,1/nl,nz/nl,wx*0.14,wz*0.14,[1,1,1]);
+    }
+    var stride=per+1;
+    for(gj=0;gj<per;gj++)for(gi=0;gi<per;gi++){
+      var a=base+gj*stride+gi, bb=a+1, c=a+stride, d=c+1;
+      b.quad(a,c,d,bb);
+    }
+    var mesh=b.upload();
+    mesh.cx=ox+CHUNK/2;mesh.cz=oz+CHUNK/2;
+    mesh.cy=(minY+maxY)/2;
+    mesh.rad=Math.hypot(CHUNK*0.72,(maxY-minY)/2+0.5);
+    chunks.push(mesh);
+  }
+  T.chunks=chunks;
+};
+
+/* Sphere-vs-frustum in world space. Cheap, conservative, and it is the
+   difference between drawing 49 terrain chunks and drawing 12. */
+var _planes=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
+T.extractFrustum=function(vp){
+  var m=vp;
+  function set(p,a,b,c,d){
+    var l=Math.hypot(a,b,c)||1;
+    p[0]=a/l;p[1]=b/l;p[2]=c/l;p[3]=d/l;
+  }
+  set(_planes[0],m[3]+m[0],m[7]+m[4],m[11]+m[8],m[15]+m[12]);   /* left  */
+  set(_planes[1],m[3]-m[0],m[7]-m[4],m[11]-m[8],m[15]-m[12]);   /* right */
+  set(_planes[2],m[3]+m[1],m[7]+m[5],m[11]+m[9],m[15]+m[13]);   /* bottom*/
+  set(_planes[3],m[3]-m[1],m[7]-m[5],m[11]-m[9],m[15]-m[13]);   /* top   */
+  set(_planes[4],m[3]+m[2],m[7]+m[6],m[11]+m[10],m[15]+m[14]);  /* near  */
+  set(_planes[5],m[3]-m[2],m[7]-m[6],m[11]-m[10],m[15]-m[14]);  /* far   */
+};
+T.sphereVisible=function(x,y,z,r){
+  for(var i=0;i<6;i++){
+    var p=_planes[i];
+    if(p[0]*x+p[1]*y+p[2]*z+p[3]<-r)return false;
+  }
+  return true;
+};
+
+T.drawChunks=function(cull){
+  var n=0;
+  for(var i=0;i<chunks.length;i++){
+    var c=chunks[i];
+    if(cull&&!T.sphereVisible(c.cx,c.cy,c.cz,c.rad))continue;
+    GL.draw(c);n++;
+  }
+  return n;
+};
+/* The shadow pass wants a different set: everything near the sun's
+   focus, visible to the camera or not, or objects behind you stop
+   casting into the shot. */
+T.drawChunksNear=function(fx,fz,radius){
+  for(var i=0;i<chunks.length;i++){
+    var c=chunks[i];
+    if(Math.hypot(c.cx-fx,c.cz-fz)>radius+c.rad)continue;
+    GL.draw(c);
+  }
+};
+
+LH.Terrain=T;
+})();
+
+/* ============================================================
+   LH.Props — everything that stands on the terrain.
+
+   Two kinds of thing live here. Small repeated objects — trees,
+   lamps, crates, benches — are single meshes drawn instanced, so a
+   forest of two hundred trees is one draw call. Architecture is
+   generated per building and merged into one static mesh per
+   district, because no two buildings should be the same and there is
+   no point instancing something that appears once.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,GL=LH.GL,Geo=LH.Geo,P={};
+var cache={};
+
+function prop(key,fn,maxInst){
+  var hit=cache[key];if(hit)return hit;
+  var b=Geo.build();fn(b);
+  var mesh=b.upload(maxInst||256);
+  mesh.key=key;cache[key]=mesh;return mesh;
+}
+P.prop=prop;
+P.cache=cache;
+
+/* ---------------- vegetation ---------------- */
+/* A trunk that leans and forks. Straight cylinders read as telegraph
+   poles; the lean is most of what sells a tree at distance. */
+function trunk(b,h,r0,r1,lean,seed){
+  var rng=M.rng(seed||7);
+  var secs=[],steps=6;
+  var lx=0,lz=0;
+  for(var i=0;i<=steps;i++){
+    var t=i/steps;
+    lx+=(rng()-0.5)*lean*h*0.16;
+    lz+=(rng()-0.5)*lean*h*0.16;
+    var pts=Geo.circle(M.lerp(r0,r1,t*t),8);
+    for(var j=0;j<pts.length;j++){pts[j][0]+=lx;pts[j][1]+=lz;}
+    secs.push({y:t*h,pts:pts});
+  }
+  b.loft(secs,'#FFFFFF',{openTop:true,uvScale:2});
+  return [lx,lz];
+}
+
+P.TREES=['broadleaf','pine','palm','blossom','dead'];
+P.CULL={tree:190,bush:95,tuft:52,rock:150,dflt:150};
+P.tree=function(kind,variant){
+  variant=variant||0;
+  return prop('tree:'+kind+':'+variant,function(b){
+    var rng=M.rng(101+variant*37);
+    var scale=0.86+rng()*0.34;
+    if(kind==='pine'){
+      b.mat('bark');
+      var h=8.5*scale;
+      trunk(b,h,0.30*scale,0.10*scale,0.10,11+variant);
+      b.mat('foliage');
+      /* stacked skirts, each smaller and rotated, so the silhouette
+         is ragged rather than a smooth cone */
+      for(var i=0;i<6;i++){
+        var t=i/5;
+        var y=h*(0.26+t*0.66);
+        var r=(2.5-t*1.9)*scale;
+        b.push();b.translate((rng()-0.5)*0.2,y,(rng()-0.5)*0.2);
+        b.rotate(0,rng()*6.28,0);
+        b.loft([
+          {y:0,pts:Geo.circle(r,9)},
+          {y:r*0.95,pts:Geo.circle(r*0.12,9)}
+        ],i%2?'#FFFFFF':'#D8D8D8',{openBottom:false});
+        b.pop();
+      }
+    }else if(kind==='palm'){
+      b.mat('bark');
+      var ph=7.5*scale;
+      var tip=trunk(b,ph,0.24*scale,0.16*scale,0.42,13+variant);
+      b.mat('foliage');
+      var n=8;
+      for(var f=0;f<n;f++){
+        var a=f/n*M.TAU+rng()*0.4;
+        b.push();
+        b.translate(tip[0],ph,tip[1]);
+        b.rotate(0,a,0);
+        b.rotate(-0.55-rng()*0.4,0,0);
+        /* a frond: long, drooping, tapered */
+        for(var s=0;s<4;s++){
+          var st=s/3;
+          b.push();
+          b.translate(0,-st*st*1.1,st*3.2);
+          b.rotate(st*0.5,0,0);
+          b.card(0,0,0,(1.5-st*0.9)*scale,(2.0-st*0.6)*scale,
+            s%2?'#FFFFFF':'#CFCFCF');
+          b.pop();
+        }
+        b.pop();
+      }
+      /* coconuts */
+      b.mat('bark');
+      for(var c=0;c<3;c++){
+        var ca=c/3*M.TAU;
+        b.push();b.translate(tip[0]+Math.cos(ca)*0.30,ph-0.28,tip[1]+Math.sin(ca)*0.30);
+        b.sphere(0,0,0,0.20*scale,7,6,'#B8B8B8');b.pop();
+      }
+    }else if(kind==='dead'){
+      b.mat('bark');
+      var dh=6.0*scale;
+      var dt=trunk(b,dh,0.30*scale,0.09*scale,0.30,17+variant);
+      for(var br=0;br<5;br++){
+        var ba=rng()*M.TAU,bt=0.4+rng()*0.5;
+        b.push();
+        b.translate(dt[0]*bt,dh*bt,dt[1]*bt);
+        b.rotate(0,ba,0);b.rotate(-0.9-rng()*0.5,0,0);
+        b.cylinder(0,0.8,0,0.10*scale,0.02*scale,1.7*scale,6,'#FFFFFF');
+        b.pop();
+      }
+    }else{
+      /* broadleaf and blossom share a shape; only the canopy material
+         differs, which is the whole point of a material index */
+      b.mat('bark');
+      var bh=7.0*scale;
+      var bt2=trunk(b,bh*0.62,0.34*scale,0.18*scale,0.22,19+variant);
+      b.mat(kind==='blossom'?'foliagep':'foliage');
+      /* Canopy from overlapping squashed spheres at varied heights.
+         One big sphere reads as a lollipop; five read as a tree. */
+      var blobs=[[0,1.00,0,2.5],[1.5,0.72,0.5,1.9],[-1.3,0.80,-0.7,2.0],
+                 [0.5,0.60,-1.5,1.7],[-0.6,0.62,1.5,1.8]];
+      for(var k=0;k<blobs.length;k++){
+        var B=blobs[k];
+        b.push();
+        b.translate(bt2[0]+B[0]*scale*(0.8+rng()*0.4),
+                    bh*0.62+B[1]*scale*1.5,
+                    bt2[1]+B[2]*scale*(0.8+rng()*0.4));
+        b.sphere(0,0,0,B[3]*scale*(0.85+rng()*0.3),8,6,
+          k%2?'#FFFFFF':'#DADADA',{squash:0.78});
+        b.pop();
+      }
+    }
+  },900);
+};
+
+P.bush=function(v){
+  return prop('bush:'+v,function(b){
+    b.mat('foliage');
+    var rng=M.rng(211+v*13);
+    for(var i=0;i<4;i++){
+      b.push();
+      b.translate((rng()-0.5)*0.9,0.28+rng()*0.34,(rng()-0.5)*0.9);
+      b.sphere(0,0,0,0.42+rng()*0.30,9,7,i%2?'#FFFFFF':'#D0D0D0',{squash:0.80});
+      b.pop();
+    }
+  },1400);
+};
+
+P.grassTuft=function(v){
+  return prop('tuft:'+v,function(b){
+    b.mat('foliage');
+    var rng=M.rng(307+v*7);
+    for(var i=0;i<7;i++){
+      var a=rng()*M.TAU,r=rng()*0.28;
+      b.push();
+      b.translate(Math.cos(a)*r,0,Math.sin(a)*r);
+      b.rotate((rng()-0.5)*0.5,rng()*3.14,(rng()-0.5)*0.5);
+      b.card(0,0.24+rng()*0.16,0,0.08,0.48+rng()*0.30,'#FFFFFF');
+      b.pop();
+    }
+  },2600);
+};
+
+P.rock=function(v){
+  return prop('rock:'+v,function(b){
+    b.mat('cliff');
+    var rng=M.rng(409+v*23);
+    /* A sphere pushed around by noise, then flattened. Reads as stone
+       because the facets are irregular, not because of the texture. */
+    var n=9,rings=6,secs=[];
+    for(var j=0;j<=rings;j++){
+      var t=j/rings;
+      var pts=[];
+      for(var i=0;i<n;i++){
+        var a=i/n*M.TAU;
+        var rr=(0.55+Math.sin(t*Math.PI)*0.62)*(0.72+rng()*0.56);
+        pts.push([Math.cos(a)*rr,Math.sin(a)*rr]);
+      }
+      secs.push({y:t*1.15,pts:pts});
+    }
+    b.loft(secs,'#FFFFFF',{uvScale:1.4});
+  },1200);
+};
+
+/* ---------------- street furniture ---------------- */
+P.lamp=function(style){
+  return prop('lamp:'+(style||'harbour'),function(b){
+    b.mat('panel');
+    b.cylinder(0,0.10,0,0.24,0.20,0.20,10,'#9AA4B2');
+    b.cylinder(0,2.10,0,0.09,0.07,3.90,8,'#FFFFFF');
+    if(style==='harbour'){
+      /* a curved arm and a hanging lantern */
+      b.push();b.translate(0,4.00,0);
+      for(var i=0;i<5;i++){
+        var t=i/4;
+        b.push();
+        b.translate(Math.sin(t*1.2)*0.85,Math.cos(t*1.2)*0.30,0);
+        b.sphere(0,0,0,0.075,6,5,'#FFFFFF');
+        b.pop();
+      }
+      b.pop();
+      b.push();b.translate(0.80,3.86,0);
+      b.mat('panel');
+      b.loft([
+        {y:-0.34,pts:Geo.roundRect(0.30,0.30,0.06,10)},
+        {y:-0.28,pts:Geo.roundRect(0.36,0.36,0.07,10)},
+        {y: 0.10,pts:Geo.roundRect(0.30,0.30,0.06,10)},
+        {y: 0.20,pts:Geo.roundRect(0.10,0.10,0.03,10)}
+      ],'#C4CDDA',{});
+      b.mat('neon',1.0);
+      b.sphere(0,-0.10,0,0.15,10,8,'#FFE0A8',{squash:1.1});
+      b.pop();
+    }else{
+      b.push();b.translate(0,4.10,0);
+      b.mat('neon',1.0);
+      b.chamfer(0,0,0,0.34,0.50,0.34,'#BFE9FF',0.08);
+      b.mat('panel');
+      b.push();b.translate(0,0.34,0);
+      b.chamfer(0,0,0,0.42,0.10,0.42,'#8E99A8',0.03);b.pop();
+      b.pop();
+    }
+  },200);
+};
+
+P.bench=function(){
+  return prop('bench',function(b){
+    /* slats, not a slab: the gaps are what make it read as a bench
+       rather than a block of wood at seat height */
+    b.mat('planks');
+    for(var i=0;i<3;i++){
+      b.push();b.translate(0,0.46,-0.18+i*0.18);
+      b.chamfer(0,0,0,1.90,0.07,0.15,'#B08A5E',0.02);b.pop();
+    }
+    for(var k=0;k<3;k++){
+      b.push();b.translate(0,0.74+k*0.17,-0.26);b.rotate(-0.20,0,0);
+      b.chamfer(0,0,0,1.90,0.07,0.14,'#A8825A',0.02);b.pop();
+    }
+    b.mat('panel');
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.80,0.23,0);
+      b.chamfer(0,0,0,0.08,0.46,0.46,'#5E6672',0.02);b.pop();
+      b.push();b.translate(s*0.80,0.72,-0.28);
+      b.chamfer(0,0,0,0.07,0.56,0.08,'#5E6672',0.02);b.pop();
+    }
+  },120);
+};
+
+P.crate=function(v){
+  return prop('crate:'+v,function(b){
+    b.mat('planks');
+    var s=0.72+ (v%3)*0.14;
+    b.chamfer(0,s/2,0,s,s,s,'#C9A87C',0.035,{uvScale:1.4});
+    b.mat('panel');
+    for(var e=-1;e<=1;e+=2){
+      b.push();b.translate(0,s/2,e*s/2*1.01);
+      b.chamfer(0,0,0,s*1.02,0.06,0.02,'#8A8F98',0.01,{noBand:true});b.pop();
+    }
+  },300);
+};
+
+P.barrel=function(){
+  return prop('barrel',function(b){
+    b.mat('planks');
+    b.loft([
+      {y:0.00,pts:Geo.circle(0.32,12)},
+      {y:0.22,pts:Geo.circle(0.40,12)},
+      {y:0.55,pts:Geo.circle(0.42,12)},
+      {y:0.88,pts:Geo.circle(0.40,12)},
+      {y:1.10,pts:Geo.circle(0.32,12)}
+    ],'#A87A4E',{uvScale:2});
+    b.mat('panel');
+    for(var i=0;i<2;i++){
+      b.push();b.translate(0,0.28+i*0.54,0);
+      b.loft([
+        {y:0,   pts:Geo.circle(0.415,12)},
+        {y:0.07,pts:Geo.circle(0.415,12)}
+      ],'#6E747E',{openTop:true,openBottom:true});
+      b.pop();
+    }
+  },200);
+};
+
+P.planter=function(){
+  return prop('planter',function(b){
+    b.mat('concrete');
+    b.loft([
+      {y:0.00,pts:Geo.roundRect(1.10,1.10,0.14,12)},
+      {y:0.52,pts:Geo.roundRect(1.26,1.26,0.16,12)},
+      {y:0.62,pts:Geo.roundRect(1.30,1.30,0.16,12)}
+    ],'#8E97A2',{uvScale:1.2});
+    b.mat('foliage');
+    var rng=M.rng(521);
+    for(var i=0;i<5;i++){
+      b.push();
+      b.translate((rng()-0.5)*0.7,0.72+rng()*0.22,(rng()-0.5)*0.7);
+      b.sphere(0,0,0,0.30+rng()*0.16,8,6,'#FFFFFF',{squash:0.8});
+      b.pop();
+    }
+  },160);
+};
+
+P.bollard=function(){
+  return prop('bollard',function(b){
+    b.mat('panel');
+    b.loft([
+      {y:0.00,pts:Geo.circle(0.22,10)},
+      {y:0.60,pts:Geo.circle(0.19,10)},
+      {y:0.72,pts:Geo.circle(0.24,10)},
+      {y:0.80,pts:Geo.circle(0.20,10)}
+    ],'#5E6672',{});
+  },200);
+};
+
+/* ---------------- harbour ---------------- */
+P.piling=function(){
+  return prop('piling',function(b){
+    b.mat('bark');
+    b.cylinder(0,0,0,0.26,0.22,8.0,8,'#6B5138');
+    b.mat('panel');
+    b.push();b.translate(0,3.75,0);
+    b.loft([{y:0,pts:Geo.circle(0.28,10)},{y:0.10,pts:Geo.circle(0.28,10)}],
+      '#7A828E',{openTop:true,openBottom:true});
+    b.pop();
+  },200);
+};
+
+P.boat=function(v){
+  return prop('boat:'+v,function(b){
+    b.mat('deck');
+    /* A hull lofted from a keel line to a gunwale: pointed at the bow,
+       square at the stern. */
+    var L=5.6,Wd=1.9;
+    var secs=[];
+    for(var i=0;i<=6;i++){
+      var t=i/6;
+      var w=Wd*(0.30+Math.sin(t*Math.PI)*0.92);
+      var d=1.05*(0.42+Math.sin(t*Math.PI)*0.70);
+      secs.push({y:t*1.05,pts:(function(){
+        var pts=Geo.roundRect(w,L,0.34,16);
+        /* sharpen the bow */
+        for(var j=0;j<pts.length;j++){
+          if(pts[j][1]>L*0.28)pts[j][0]*=0.30;
+          else if(pts[j][1]>L*0.10)pts[j][0]*=0.72;
+        }
+        return pts;
+      })()});
+    }
+    b.loft(secs,'#C9B08A',{uvScale:1.6,openTop:true});
+    b.mat('planks');
+    b.push();b.translate(0,0.90,-0.4);
+    b.chamfer(0,0,0,1.5,0.10,2.4,'#9C7C58',0.04);b.pop();
+    if(v%2===0){
+      /* a small wheelhouse */
+      b.mat('planks');
+      b.push();b.translate(0,1.45,-1.3);
+      b.chamfer(0,0,0,1.3,1.0,1.5,'#B49070',0.06);b.pop();
+      b.mat('glass');
+      b.push();b.translate(0,1.60,-0.56);
+      b.chamfer(0,0,0,1.05,0.46,0.05,'#BFE4F5',0.02,{noBand:true});b.pop();
+      b.mat('panel');
+      b.push();b.translate(0,2.30,-1.3);
+      b.cylinder(0,0,0,0.06,0.05,0.70,6,'#8E99A8');b.pop();
+    }else{
+      /* or a mast and a furled sail */
+      b.mat('bark');
+      b.push();b.translate(0,2.6,0.2);
+      b.cylinder(0,0,0,0.09,0.06,3.4,8,'#7A5C40');b.pop();
+      b.mat('fabric');
+      b.push();b.translate(0,2.2,0.2);
+      b.loft([
+        {y:-1.0,pts:Geo.circle(0.22,8,1,2.6)},
+        {y: 0.9,pts:Geo.circle(0.14,8,1,2.0)}
+      ],'#E8E2D4',{});
+      b.pop();
+    }
+  },60);
+};
+
+/* ---------------- signage and interaction points ---------------- */
+P.signpost=function(){
+  return prop('signpost',function(b){
+    b.mat('planks');
+    b.cylinder(0,1.2,0,0.10,0.09,2.4,8,'#8A6A48');
+    b.push();b.translate(0,2.05,0.04);
+    b.chamfer(0,0,0,1.5,0.62,0.09,'#C0A078',0.03);b.pop();
+    b.mat('neon',0.7);
+    b.push();b.translate(0,2.05,0.10);
+    b.chamfer(0,0,0,1.30,0.42,0.02,'#5BE8D0',0.01,{noBand:true});b.pop();
+  },120);
+};
+
+P.missionBoard=function(){
+  return prop('missionBoard',function(b){
+    b.mat('panel');
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*1.5,1.3,0);
+      b.cylinder(0,0,0,0.12,0.10,2.6,8,'#6E7885');b.pop();
+    }
+    b.push();b.translate(0,2.1,0);
+    b.chamfer(0,0,0,3.4,2.0,0.16,'#4E5866',0.06);b.pop();
+    b.mat('neon',0.9);
+    b.push();b.translate(0,2.1,0.10);
+    b.chamfer(0,0,0,3.0,1.66,0.03,'#3BE0C8',0.02,{noBand:true});b.pop();
+    b.mat('panel');
+    b.push();b.translate(0,3.24,0);
+    b.chamfer(0,0,0,3.7,0.16,0.42,'#8E99A8',0.05);b.pop();
+  },20);
+};
+
+/* The gateway to a player's own world. Deliberately the most
+   dramatic object in the plaza: it is the promise the game is making. */
+P.portal=function(){
+  return prop('portal',function(b){
+    b.mat('panel');
+    b.push();b.translate(0,0.35,0);
+    b.loft([
+      {y:0,   pts:Geo.roundRect(4.4,2.4,0.5,14)},
+      {y:0.5, pts:Geo.roundRect(4.0,2.0,0.45,14)},
+      {y:0.7, pts:Geo.roundRect(3.7,1.8,0.4,14)}
+    ],'#3E4756',{uvScale:1.2});
+    b.pop();
+    /* the arch, as a ring of tapered blocks */
+    var R=2.3;
+    for(var i=0;i<=18;i++){
+      var a=Math.PI*(i/18);
+      b.push();
+      b.translate(Math.cos(a)*R,1.05+Math.sin(a)*R,0);
+      b.rotate(0,0,a-Math.PI/2);
+      b.mat('panel');
+      b.chamfer(0,0,0,0.46,0.40,0.66,i%2?'#6E7A8C':'#5A6576',0.06);
+      b.mat('neon',0.95);
+      b.push();b.translate(0,-0.22,0.35);
+      b.sphere(0,0,0,0.055,6,5,'#5BE8FF');b.pop();
+      b.pop();
+    }
+    /* the surface */
+    b.mat('neon',0.85);
+    b.push();b.translate(0,1.05,0);
+    b.loft([
+      {y:-1.0,pts:Geo.circle(1.85,18,1,0.10)},
+      {y: 0.0,pts:Geo.circle(2.02,18,1,0.10)},
+      {y: 1.9,pts:Geo.circle(1.20,18,1,0.10)}
+    ],'#2FBFE0',{openTop:true,openBottom:true});
+    b.pop();
+  },8);
+};
+
+LH.Props=P;
+})();
+
+/* ============================================================
+   LH.Arch — buildings.
+
+   Generated per building from a seed and a style, then merged into
+   one static mesh per district. Instancing would be wrong here: the
+   whole point is that no two buildings on the waterfront are the
+   same, and a street of identical copies is the fastest way to make
+   a generated town look generated.
+
+   Every building is the same four decisions — a footprint, a number
+   of storeys, a roof, and a frontage — with the style choosing the
+   materials and the details.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,Geo=LH.Geo,A={};
+
+var STYLES={
+  harbour:{ wall:'planks', wallCol:['#C8A87E','#B08A5E','#9C7A58','#D4BC96'],
+            trim:'planks', trimCol:'#6E5236', roof:'roof', roofCol:['#7E8CA0','#8E7A8A','#6E7E92'],
+            base:'stone', baseCol:'#7A8290' },
+  town:{    wall:'brickpale', wallCol:['#C4A98E','#B09678','#D0BCA2','#A88E72'],
+            trim:'planks', trimCol:'#5E4A38', roof:'roof', roofCol:['#B4666E','#9A6480','#C4807A'],
+            base:'stone', baseCol:'#8A8F98' },
+  modern:{  wall:'panelw', wallCol:['#8E97A4','#A4ADB8','#78828E','#B4BCC6'],
+            trim:'panel', trimCol:'#4E5866', roof:'panel', roofCol:['#5E6878','#6A7484'],
+            base:'concrete', baseCol:'#6E7682' },
+  industrial:{wall:'panel', wallCol:['#5A626E','#6E7682','#4E5662'],
+            trim:'panel', trimCol:'#3A424E', roof:'panel', roofCol:['#3A424E','#464E5A'],
+            base:'concrete', baseCol:'#5A6068' }
+};
+A.STYLES=Object.keys(STYLES);
+
+/* A window: recessed frame, glass, and a sill. The recess is what
+   makes a facade read as built rather than printed on. */
+function window_(b,st,w,h,lit){
+  b.mat(st.trim);
+  b.chamfer(0,0,0.06,w+0.16,h+0.16,0.14,st.trimCol,0.03);
+  b.mat('glass');
+  b.chamfer(0,0,0.13,w,h,0.04,'#9EB6C8',0.01,{noBand:true});
+  if(lit){
+    b.mat('neon',0.42);
+    b.chamfer(0,0,0.15,w-0.04,h-0.04,0.02,'#FFD3A0',0.01,{noBand:true});
+  }
+  b.mat(st.trim);
+  b.push();b.translate(0,-h/2-0.10,0.14);
+  b.chamfer(0,0,0,w+0.30,0.09,0.22,st.trimCol,0.03);b.pop();
+}
+
+function door(b,st,w,h){
+  b.mat(st.trim);
+  b.chamfer(0,h/2,0.06,w+0.20,h+0.14,0.16,st.trimCol,0.04);
+  b.mat('planks');
+  b.chamfer(0,h/2,0.14,w,h,0.06,'#6E4E32',0.02);
+  b.mat('gold');
+  b.push();b.translate(w*0.32,h*0.48,0.19);
+  b.sphere(0,0,0,0.055,8,6,'#D8B45E');b.pop();
+}
+
+/* Pitched, hipped or flat, plus an overhanging eave. The eave casts
+   the shadow line that gives a building its weight. */
+function roof(b,st,w,d,y,kind,col){
+  b.mat(st.roof);
+  if(kind==='flat'){
+    b.push();b.translate(0,y+0.12,0);
+    b.chamfer(0,0,0,w+0.5,0.24,d+0.5,col,0.06);b.pop();
+    /* parapet */
+    b.mat(st.trim);
+    var t=0.16;
+    var sides=[[0,(d+0.5)/2],[0,-(d+0.5)/2],[(w+0.5)/2,0],[-(w+0.5)/2,0]];
+    for(var i=0;i<4;i++){
+      var S=sides[i],horiz=i<2;
+      b.push();b.translate(S[0],y+0.46,S[1]);
+      b.chamfer(0,0,0,horiz?w+0.5:t,0.44,horiz?t:d+0.5,st.trimCol,0.04);
+      b.pop();
+    }
+    return y+0.68;
+  }
+  var ph=kind==='steep'?d*0.52:d*0.34;
+  /* two slopes as thin boxes, rotated to meet at the ridge */
+  var slope=Math.atan2(ph,d/2);
+  var len=Math.hypot(ph,d/2);
+  for(var s=-1;s<=1;s+=2){
+    b.push();
+    b.translate(0,y+ph/2,s*d/4);
+    b.rotate(-s*slope,0,0);
+    b.chamfer(0,0,0,w+0.7,0.16,len*2*0.52,col,0.05,{uvScale:0.8});
+    b.pop();
+  }
+  /* gable ends fill the triangles the slopes leave open */
+  b.mat(st.wall);
+  for(var g=-1;g<=1;g+=2){
+    b.push();b.translate(g*w/2,y,0);b.rotate(0,Math.PI/2,0);
+    b.extrude([[-d/2,0],[d/2,0],[0,ph]],0.14,col);
+    b.pop();
+  }
+  b.mat(st.roof);
+  b.push();b.translate(0,y+ph+0.04,0);
+  b.chamfer(0,0,0,w+0.8,0.14,0.30,col,0.04);b.pop();
+  return y+ph;
+}
+
+/* The main entry point. Returns useful anchors — the door position and
+   the roof height — so the world can hang a sign or an NPC on it. */
+A.building=function(b,o){
+  var rng=M.rng(o.seed||1);
+  var st=STYLES[o.style]||STYLES.town;
+  var w=o.w||8, d=o.d||7, storeys=o.storeys||2;
+  var sh=o.storeyH||3.1;
+  var wallCol=st.wallCol[(rng()*st.wallCol.length)|0];
+  var roofCol=st.roofCol[(rng()*st.roofCol.length)|0];
+  var y0=o.y||0;
+
+  b.push();
+  b.translate(o.x||0,y0,o.z||0);
+  b.rotate(0,o.rot||0,0);
+
+  /* plinth — buildings that meet the ground with no base look pasted on */
+  b.mat(st.base);
+  b.push();b.translate(0,0.22,0);
+  b.chamfer(0,0,0,w+0.44,0.44+ (o.sink||0),d+0.44,st.baseCol,0.08);
+  b.pop();
+
+  for(var s=0;s<storeys;s++){
+    var yc=0.44+s*sh+sh/2;
+    b.mat(st.wall);
+    b.push();b.translate(0,yc,0);
+    b.chamfer(0,0,0,w,sh,d,wallCol,0.10,{uvScale:0.55});
+    b.pop();
+    /* a string course between storeys */
+    if(s<storeys-1){
+      b.mat(st.trim);
+      b.push();b.translate(0,0.44+(s+1)*sh,0);
+      b.chamfer(0,0,0,w+0.26,0.18,d+0.26,st.trimCol,0.04);b.pop();
+    }
+    /* openings on the front and back faces */
+    var nW=Math.max(1,Math.round(w/2.6));
+    for(var i=0;i<nW;i++){
+      var wx=(i-(nW-1)/2)*(w/nW);
+      for(var face=0;face<2;face++){
+        var fz=face?-d/2:d/2;
+        if(s===0&&face===0&&Math.abs(wx)<w/nW*0.6&&o.doorway!==false){
+          b.push();b.translate(wx,0.44+s*sh,fz);
+          if(face)b.rotate(0,Math.PI,0);
+          door(b,st,1.30,2.30);
+          b.pop();
+          continue;
+        }
+        b.push();
+        b.translate(wx,yc+0.10,fz);
+        if(face)b.rotate(0,Math.PI,0);
+        window_(b,st,1.10,1.45,rng()<0.55);
+        b.pop();
+      }
+    }
+    /* and on the sides, fewer */
+    var nS=Math.max(1,Math.round(d/3.4));
+    for(var j=0;j<nS;j++){
+      var wz=(j-(nS-1)/2)*(d/nS);
+      for(var side=-1;side<=1;side+=2){
+        b.push();
+        b.translate(side*w/2,yc+0.10,wz);
+        b.rotate(0,side*Math.PI/2,0);
+        window_(b,st,0.90,1.30,rng()<0.4);
+        b.pop();
+      }
+    }
+  }
+
+  var top=0.44+storeys*sh;
+  var kind=o.roof||(rng()<0.28?'flat':(rng()<0.4?'steep':'pitch'));
+  var rTop=roof(b,st,w,d,top,kind,roofCol);
+
+  /* Frontage: an awning and a hanging sign turn a box into a shop. */
+  if(o.shop){
+    b.mat('fabric');
+    b.push();b.translate(0,0.44+2.62,d/2+0.62);b.rotate(0.34,0,0);
+    b.chamfer(0,0,0,w*0.86,0.08,1.40,o.awning||'#B4485E',0.03,{uvScale:2});
+    b.pop();
+    b.mat('planks');
+    b.push();b.translate(0,0.44+2.98,d/2+0.10);
+    b.chamfer(0,0,0,w*0.88,0.14,0.24,st.trimCol,0.03);b.pop();
+    b.mat('neon',0.9);
+    b.push();b.translate(0,0.44+3.42,d/2+0.16);
+    b.chamfer(0,0,0,w*0.62,0.44,0.06,o.signCol||'#3BE0C8',0.02,{noBand:true});
+    b.pop();
+  }
+  /* Chimneys, vents, aerials — the roofline is the part of a building
+     you actually see across a town, and a bare one reads as a model. */
+  if(kind!=='flat'&&rng()<0.7){
+    b.mat(st.base);
+    b.push();b.translate((rng()-0.5)*w*0.5,rTop+0.5,(rng()-0.5)*d*0.3);
+    b.chamfer(0,0,0,0.62,1.30,0.62,st.baseCol,0.05);b.pop();
+  }
+  if(kind==='flat'){
+    b.mat('panel');
+    for(var v=0;v<2+((rng()*3)|0);v++){
+      b.push();
+      b.translate((rng()-0.5)*w*0.7,rTop+0.30,(rng()-0.5)*d*0.7);
+      b.cylinder(0,0,0,0.24,0.24,0.55,8,'#6E7682');
+      b.push();b.translate(0,0.34,0);
+      b.chamfer(0,0,0,0.62,0.10,0.62,'#5A626E',0.03);b.pop();
+      b.pop();
+    }
+  }
+  b.pop();
+  return {top:rTop+y0,front:d/2};
+};
+
+/* A market stall: a frame, a striped canopy and a counter of goods. */
+A.stall=function(b,o){
+  var rng=M.rng(o.seed||3);
+  b.push();
+  b.translate(o.x||0,o.y||0,o.z||0);
+  b.rotate(0,o.rot||0,0);
+  b.mat('planks');
+  for(var i=0;i<4;i++){
+    var sx=(i<2?-1:1)*1.5, sz=(i%2?-1:1)*1.1;
+    b.push();b.translate(sx,1.1,sz);
+    b.cylinder(0,0,0,0.09,0.08,2.2,7,'#8A6A48');b.pop();
+  }
+  b.push();b.translate(0,0.92,0);
+  b.chamfer(0,0,0,3.2,0.12,2.0,'#B08A5E',0.03);b.pop();
+  b.push();b.translate(0,0.46,-1.0);
+  b.chamfer(0,0,0,3.2,0.92,0.10,'#9C7A58',0.03);b.pop();
+  /* canopy: alternating stripes as separate slabs */
+  b.mat('fabric');
+  var c1=o.col||'#C4485E';
+  for(var s=0;s<6;s++){
+    b.push();
+    b.translate(-1.5+s*0.6+0.3,2.30+ (s%2?0.02:0),0);
+    b.rotate(0,0,0);
+    b.chamfer(0,0,0,0.58,0.09,2.6,s%2?c1:'#EFE6D6',0.02,{uvScale:2});
+    b.pop();
+  }
+  b.mat('planks');
+  b.push();b.translate(0,2.44,0);
+  b.chamfer(0,0,0,3.5,0.10,0.16,'#6E5236',0.02);b.pop();
+  /* goods on the counter */
+  b.mat('crystal',0.25);
+  for(var g=0;g<5;g++){
+    b.push();
+    b.translate(-1.2+g*0.6,1.10,rng()*0.5-0.2);
+    b.sphere(0,0,0,0.13+rng()*0.06,8,6,
+      ['#5BE8D0','#F5A03C','#B269FF','#57D07A','#489BFF'][g]);
+    b.pop();
+  }
+  b.pop();
+};
+
+LH.Arch=A;
+})();
+
+/* ============================================================
+   LH.World — Lumen Harbor.
+
+   Assembles the island: terrain, water, nine districts, the
+   architecture in each, the vegetation between them, and the
+   collision volumes that stop you walking through a wall.
+
+   Districts are data. Adding one means adding a pad in LH.Terrain
+   and a dresser here — not touching the renderer, the controller or
+   the camera.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,GL=LH.GL,Geo=LH.Geo,T=LH.Terrain,P=LH.Props,Arch=LH.Arch;
+var W={};
+
+W.statics=[];        /* merged architecture meshes */
+W.instanced=[];      /* prop meshes with a static instance buffer */
+W.boxes=[];          /* axis-aligned collision volumes */
+W.points=[];         /* named interaction points */
+W.water=null;
+
+/* ---------------- collision ----------------
+   Buildings are boxes. A capsule-vs-box push-out is enough for a
+   sandbox and costs nothing next to a real physics engine — and the
+   list is small because only architecture registers, not props. */
+function box(x,y,z,w,h,d,rot,tag){
+  W.boxes.push({x:x,y:y,z:z,hw:w/2,hh:h/2,hd:d/2,
+    c:Math.cos(-rot||0),s:Math.sin(-rot||0),tag:tag||''});
+}
+W.box=box;
+
+/* Transform a world point into a box's local space, so a rotated
+   building still collides correctly. */
+function toLocal(B,x,z,out){
+  var dx=x-B.x,dz=z-B.z;
+  out[0]=dx*B.c-dz*B.s;
+  out[1]=dx*B.s+dz*B.c;
+  return out;
+}
+var _lp=[0,0];
+W.solidAt=function(x,y,z){
+  for(var i=0;i<W.boxes.length;i++){
+    var B=W.boxes[i];
+    if(y<B.y-B.hh||y>B.y+B.hh)continue;
+    toLocal(B,x,z,_lp);
+    if(Math.abs(_lp[0])<B.hw&&Math.abs(_lp[1])<B.hd)return true;
+  }
+  return false;
+};
+
+/* Push a circle of radius r out of every box it overlaps. Iterated
+   twice so a corner between two buildings resolves instead of
+   oscillating. */
+W.resolve=function(pos,r,footY){
+  for(var pass=0;pass<2;pass++){
+    for(var i=0;i<W.boxes.length;i++){
+      var B=W.boxes[i];
+      if(footY+1.6<B.y-B.hh||footY>B.y+B.hh)continue;
+      toLocal(B,pos[0],pos[2],_lp);
+      var lx=_lp[0],lz=_lp[1];
+      var cx=M.clamp(lx,-B.hw,B.hw), cz=M.clamp(lz,-B.hd,B.hd);
+      var dx=lx-cx, dz=lz-cz;
+      var d2=dx*dx+dz*dz;
+      if(d2>r*r)continue;
+      var nx,nz,pen;
+      if(d2>1e-8){
+        var d=Math.sqrt(d2);nx=dx/d;nz=dz/d;pen=r-d;
+      }else{
+        /* centre is inside the box — push out of the nearest face */
+        var px=B.hw-Math.abs(lx), pz=B.hd-Math.abs(lz);
+        if(px<pz){nx=lx<0?-1:1;nz=0;pen=px+r;}
+        else{nx=0;nz=lz<0?-1:1;pen=pz+r;}
+      }
+      /* back to world space */
+      var wx=nx*B.c+nz*B.s, wz=-nx*B.s+nz*B.c;
+      pos[0]+=wx*pen;pos[2]+=wz*pen;
+    }
+  }
+  return pos;
+};
+
+W.groundAt=function(x,z){
+  var h=T.heightAt(x,z);
+  /* Standing on a roof or a jetty deck is a box query, not a
+     heightmap one. Take the highest surface under the sample. */
+  for(var i=0;i<W.boxes.length;i++){
+    var B=W.boxes[i];
+    if(!B.walkable)continue;
+    toLocal(B,x,z,_lp);
+    if(Math.abs(_lp[0])<B.hw&&Math.abs(_lp[1])<B.hd){
+      var top=B.y+B.hh;
+      if(top>h)h=top;
+    }
+  }
+  return h;
+};
+
+/* ---------------- interaction points ---------------- */
+function point(id,kind,x,z,opt){
+  opt=opt||{};
+  var y=opt.y!==undefined?opt.y:T.heightAt(x,z);
+  var p={id:id,kind:kind,x:x,y:y,z:z,
+    r:opt.r||2.6,label:opt.label||id,prompt:opt.prompt||'Interact',
+    data:opt.data||null};
+  W.points.push(p);
+  return p;
+}
+W.point=point;
+W.nearestPoint=function(x,z,maxD){
+  var best=null,bd=maxD||3.2;
+  for(var i=0;i<W.points.length;i++){
+    var p=W.points[i];
+    var d=Math.hypot(p.x-x,p.z-z);
+    if(d<Math.min(bd,p.r)){bd=d;best=p;}
+  }
+  return best;
+};
+
+/* ---------------- instanced prop placement ---------------- */
+var pending={};
+function place(mesh,x,y,z,rot,scale,tint,emis){
+  var list=pending[mesh.key];
+  if(!list){
+    var kind=String(mesh.key).split(':')[0];
+    list=pending[mesh.key]={mesh:mesh,items:[],
+      cull:LH.Props.CULL[kind]||LH.Props.CULL.dflt};
+  }
+  list.items.push([x,y,z,rot||0,scale||1,tint||'#FFFFFF',emis||0]);
+}
+W.place=place;
+
+var _t=M.v3(),_s=M.v3(),_m=M.m4();
+var groups=[];
+function commitProps(){
+  W.instanced.length=0;
+  groups.length=0;
+  for(var k in pending){
+    var L=pending[k];
+    /* Precompute the transform for every placement once. Rebuilding a
+       matrix per prop per frame would cost more than the draw. */
+    var items=L.items,packed=new Float32Array(items.length*GL.ISTRIDE);
+    for(var i=0;i<items.length;i++){
+      var it=items[i];
+      M.set3(_t,it[0],it[1],it[2]);
+      M.set3(_s,it[4],it[4],it[4]);
+      M.fromTRS(_m,_t,0,it[3],0,_s);
+      var o=i*GL.ISTRIDE;
+      for(var q=0;q<16;q++)packed[o+q]=_m[q];
+      var c=Geo.col3(it[5]);
+      packed[o+16]=c[0];packed[o+17]=c[1];packed[o+18]=c[2];packed[o+19]=it[6];
+    }
+    var xs=new Float32Array(items.length),zs=new Float32Array(items.length);
+    for(var j=0;j<items.length;j++){xs[j]=items[j][0];zs[j]=items[j][2];}
+    groups.push({mesh:L.mesh,packed:packed,xs:xs,zs:zs,
+      count:items.length,cull:L.cull});
+    W.instanced.push(L.mesh);
+  }
+  pending={};
+  W.groups=groups;
+}
+
+/* Refill the instance buffers with what is near enough to matter. The
+   island carries about five thousand props; drawing all of them every
+   frame is four million triangles for a view that can see a fraction
+   of them. Rebuilding the buffers costs a fraction of a millisecond. */
+W.cullProps=function(cx,cz,scale){
+  scale=scale||1;
+  for(var g=0;g<groups.length;g++){
+    var G2=groups[g],mesh=G2.mesh,d=mesh.idata,src=G2.packed;
+    var cull=G2.cull*scale, cull2=cull*cull;
+    var n=0,max=mesh.maxInstances;
+    for(var i=0;i<G2.count&&n<max;i++){
+      var dx=G2.xs[i]-cx, dz=G2.zs[i]-cz;
+      if(dx*dx+dz*dz>cull2)continue;
+      var so=i*GL.ISTRIDE, dof=n*GL.ISTRIDE;
+      for(var q=0;q<GL.ISTRIDE;q++)d[dof+q]=src[so+q];
+      n++;
+    }
+    mesh.instances=n;
+    GL.updateInstances(mesh,n);
+  }
+};
+
+/* ---------------- district dressers ---------------- */
+function ringScatter(b,cx,cz,r0,r1,count,seed,fn){
+  var rng=M.rng(seed);
+  for(var i=0;i<count;i++){
+    var a=rng()*M.TAU, rr=r0+rng()*(r1-r0);
+    fn(cx+Math.cos(a)*rr, cz+Math.sin(a)*rr, rng, a);
+  }
+}
+
+function dressPlaza(b){
+  var pad=T.pad('plaza'), cx=pad.x, cz=pad.z, y=pad.y;
+
+  /* The portal. Everything in the plaza is arranged to face it,
+     because it is the thing the game is actually about. */
+  var portal=P.portal();
+  place(portal,cx,y,cz-9,0,1.15,'#FFFFFF',0);
+  box(cx,y+2.2,cz-9,5.2,4.4,2.0,0,'portal');
+  point('portal','portal',cx,cz-6.4,{y:y,r:4.0,
+    label:'World Gateway',prompt:'Enter your world'});
+
+  /* A fountain at the centre: a basin, a plume and a lit rim. */
+  var f=Geo.build();
+  f.mat('stone');
+  f.push();f.translate(cx,y,cz);
+  /* A hollow basin: outer wall, inner wall, a rim ring joining them at
+     the top, a floor, and the water surface above it. Built as a
+     capped loft it comes out as a solid black lid — the cap covers the
+     whole basin, which is exactly what a fountain must not have. */
+  var SEG=22;
+  f.loft([
+    {y:0.00,pts:Geo.circle(2.50,SEG)},
+    {y:0.62,pts:Geo.circle(2.66,SEG)},
+    {y:0.80,pts:Geo.circle(2.60,SEG)}
+  ],'#96A0AC',{uvScale:1.4,openTop:true,openBottom:true});
+  f.loft([
+    {y:0.26,pts:Geo.circle(2.34,SEG)},
+    {y:0.80,pts:Geo.circle(2.40,SEG)}
+  ],'#828A96',{openTop:true,openBottom:true});
+  f.annulus(0,0.80,0,2.40,2.60,SEG,'#A6AEBA');
+  f.disc(0,0.26,0,2.36,SEG,'#6E7682');
+  f.mat('water',0.05);
+  f.disc(0,0.60,0,2.36,SEG,'#5FC4D8');
+  f.mat('stone');
+  f.loft([
+    {y:0.42,pts:Geo.circle(0.62,14)},
+    {y:1.35,pts:Geo.circle(0.34,14)},
+    {y:1.52,pts:Geo.circle(0.86,14)},
+    {y:1.66,pts:Geo.circle(0.70,14)}
+  ],'#A2AAB6',{});
+  f.mat('crystal',0.60);
+  f.sphere(0,2.02,0,0.40,14,10,'#5BE8FF');
+  f.pop();
+  W.statics.push(f.upload());
+  box(cx,y+0.42,cz,5.4,0.84,5.4,0,'fountain');
+  W.boxes[W.boxes.length-1].walkable=false;
+
+  /* Ring of benches, planters and lamps facing in. */
+  /* Three concentric rings of furniture. A square this size with a
+     bare middle reads as a car park, and the rings also give the eye
+     something to measure the space against. */
+  ringScatter(b,cx,cz,6.2,6.2,8,29,function(x,z,rng,a){
+    place(P.bollard(),x,T.heightAt(x,z),z,a,1,'#8E97A4');
+  });
+  ringScatter(b,cx,cz,10.5,10.5,8,31,function(x,z,rng,a){
+    place(P.bench(),x,T.heightAt(x,z),z,a+Math.PI/2,1,'#FFFFFF');
+  });
+  ringScatter(b,cx,cz,13.5,13.5,10,37,function(x,z,rng,a){
+    place(P.lamp('plaza'),x,T.heightAt(x,z),z,a,1,'#FFFFFF');
+  });
+  ringScatter(b,cx,cz,16.5,16.5,10,41,function(x,z,rng,a){
+    place(P.planter(),x,T.heightAt(x,z),z,a,1,'#FFFFFF');
+  });
+  ringScatter(b,cx,cz,19.5,19.5,12,43,function(x,z,rng,a){
+    place(P.tree('blossom',(rng()*4)|0),x,T.heightAt(x,z)-0.2,z,a,
+      0.72+rng()*0.20,'#FFFFFF');
+  });
+  /* four kiosks facing the fountain, to break up the open floor */
+  for(var q=0;q<4;q++){
+    var qa=q/4*M.TAU+0.78;
+    var qx=cx+Math.cos(qa)*15.5, qz=cz+Math.sin(qa)*15.5;
+    Arch.stall(b,{x:qx,y:T.heightAt(qx,qz),z:qz,rot:-qa+Math.PI/2,
+      seed:150+q*9,col:['#C4485E','#3E7BE0','#38A86A','#F5A03C'][q]});
+    box(qx,T.heightAt(qx,qz)+1.0,qz,3.4,2.0,2.4,-qa+Math.PI/2,'stall');
+  }
+
+  /* Civic frontage along the south edge. */
+  /* A frontage that wraps most of the way round, so the square has
+     walls rather than one distant terrace. */
+  var shops=[
+    {x:-21,z:12,rot:-1.10,style:'town',  w:11,d:9, st:2,shop:1,aw:'#3E7BE0',sc:'#5BE8FF'},
+    {x:-18,z:19,rot:-0.62,style:'harbour',w:10,d:8,st:2,shop:0},
+    {x:-8, z:23,rot:-0.24,style:'town',  w:13,d:10,st:3,shop:1,aw:'#B4485E',sc:'#F5A03C'},
+    {x: 6, z:23,rot: 0.20,style:'modern',w:12,d:9, st:3,shop:1,aw:'#38A86A',sc:'#57D07A'},
+    {x: 18,z:17,rot: 0.72,style:'town',  w:10,d:8, st:2,shop:0},
+    {x: 23,z: 6,rot: 1.24,style:'modern',w:11,d:9, st:2,shop:1,aw:'#8A5AC4',sc:'#B269FF'},
+    {x: 18,z:-6,rot: 1.92,style:'harbour',w:10,d:8,st:2,shop:0},
+    {x:-20,z:-2,rot:-1.62,style:'town',  w:10,d:9, st:2,shop:1,aw:'#F5A03C',sc:'#F5C451'}
   ];
-  var COL=['#C4485E','#3E7BE0','#38A86A','#B269FF','#F5A03C','#3BE0C8'];
-  for(var i=0;i<demos.length;i++){
-    var d=demos[i];
-    var a=Act.Actor({x:(i-2.5)*1.9,y:0,z:0,seed:i*7+3,facing:0});
-    a.kit.hair.style=d.hair;
-    a.kit.hat.style=d.hat;a.kit.hat.color=COL[i];
-    a.kit.shirt.style=d.shirt;a.kit.shirt.color=COL[i];
-    a.kit.shirt.sleeve=i%2?'long':'short';
-    a.kit.pants.color=Geo.shade(COL[i],-55);
-    a.kit.wings.style=d.wings;a.kit.wings.color=COL[i];
-    if(i===5){a.kit.cape.style='royal';a.kit.cape.color='#8E2440';a.kit.aura.style='ring';}
-    if(i===2){a.kit.tool.style='pickaxe';a.kit.tool.color='#C8CEDA';}
-    if(i===3){a.kit.tool.style='rod';a.kit.tool.color='#D8C49A';}
-    if(i===4){a.kit.tool.style='sword';a.kit.tool.color='#DCE4F0';a.kit.pet.style='drone';}
-    if(i===1){a.kit.pet.style='cat';a.kit.pet.color='#E08A45';}
-    a.anim.play(d.st,true);
-    a.anim.params.speed=0.5;
-    cast.push(a);
+  for(var i=0;i<shops.length;i++){
+    var S=shops[i];
+    var bx=cx+S.x,bz=cz+S.z;
+    var by=T.heightAt(bx,bz)-0.3;
+    Arch.building(b,{x:bx,y:by,z:bz,rot:S.rot,style:S.style,
+      w:S.w,d:S.d,storeys:S.st,seed:71+i*13,shop:S.shop,
+      awning:S.aw,signCol:S.sc,sink:1.2});
+    box(bx,by+S.st*3.1/2+0.4,bz,S.w,S.st*3.1+1.2,S.d,S.rot,'building');
   }
+}
+
+function dressMarket(b){
+  var pad=T.pad('market'),cx=pad.x,cz=pad.z,y=pad.y;
+  var cols=['#C4485E','#3E7BE0','#38A86A','#F5A03C','#B269FF','#3BE0C8'];
+  /* two rows of stalls with an aisle between them */
+  for(var r=0;r<2;r++)for(var i=0;i<4;i++){
+    var sx=cx-11+i*7.4, sz=cz-6+r*12;
+    Arch.stall(b,{x:sx,y:T.heightAt(sx,sz),z:sz,
+      rot:r?Math.PI:0,seed:97+r*7+i,col:cols[(r*4+i)%cols.length]});
+    box(sx,T.heightAt(sx,sz)+1.0,sz,3.4,2.0,2.4,0,'stall');
+    place(P.crate((i+r)%3),sx+2.2,T.heightAt(sx+2.2,sz+1.4),sz+1.4,r*0.7,1,'#FFFFFF');
+  }
+  point('market','shop',cx,cz,{y:y,r:9,label:'Lumen Market',prompt:'Browse the market'});
+  /* a merchant's hall closing the north end */
+  var hx=cx,hz=cz+18;
+  Arch.building(b,{x:hx,y:T.heightAt(hx,hz)-0.3,z:hz,rot:Math.PI,style:'town',
+    w:18,d:11,storeys:2,seed:311,shop:1,awning:'#8A5AC4',signCol:'#B269FF',sink:1.2});
+  box(hx,T.heightAt(hx,hz)+3.2,hz,18,7.4,11,0,'building');
+  ringScatter(b,cx,cz,15,19,7,53,function(x,z,rng,a){
+    place(P.lamp('plaza'),x,T.heightAt(x,z),z,a,1,'#FFFFFF');
+  });
+}
+
+function dressHarbour(b){
+  var pad=T.pad('harbour'),cx=pad.x,cz=pad.z,y=pad.y;
+
+  /* The deck: a plank platform out over the water, plus its pilings.
+     Registered walkable so the player stands on it rather than on the
+     seabed underneath. */
+  var deck=Geo.build();
+  deck.mat('deck');
+  var dw=44,dd=16;
+  deck.push();deck.translate(cx,y,cz-6);
+  deck.chamfer(0,0,0,dw,0.5,dd,'#B49274',0.08,{uvScale:0.6});
+  deck.pop();
+  W.statics.push(deck.upload());
+  box(cx,y-0.25,cz-6,dw,0.5,dd,0,'deck');
+  W.boxes[W.boxes.length-1].walkable=true;
+
+  for(var i=0;i<14;i++){
+    var px=cx-dw/2+2+ (i%7)*(dw-4)/6;
+    var pz=cz-6+(i<7?-1:1)*(dd/2-1);
+    place(P.piling(),px,y-4.4,pz,0,1,'#FFFFFF');
+  }
+  /* a finger jetty running further out */
+  var jetty=Geo.build();
+  jetty.mat('deck');
+  jetty.push();jetty.translate(cx+18,y,cz-24);
+  jetty.chamfer(0,0,0,7,0.5,26,'#AC8A6C',0.06,{uvScale:0.6});
+  jetty.pop();
+  W.statics.push(jetty.upload());
+  box(cx+18,y-0.25,cz-24,7,0.5,26,0,'deck');
+  W.boxes[W.boxes.length-1].walkable=true;
+  for(var j=0;j<8;j++){
+    place(P.piling(),cx+18+(j%2?3:-3),y-4.4,cz-34+((j/2)|0)*8,0,1,'#FFFFFF');
+  }
+
+  /* boats moored along the jetty */
+  for(var bt=0;bt<5;bt++){
+    var bx=cx+18+(bt%2?6.0:-6.0);
+    var bz=cz-34+((bt/2)|0)*9;
+    place(P.boat(bt),bx,T.SEA-0.55,bz,(bt%2?0.10:-0.10)+Math.PI/2,1,'#FFFFFF');
+  }
+
+  /* fishing shacks facing the water */
+  var shacks=[[-18,4,-0.30],[-6,6,0],[8,5,0.24]];
+  for(var s=0;s<shacks.length;s++){
+    var sx=cx+shacks[s][0], sz=cz+shacks[s][1];
+    Arch.building(b,{x:sx,y:y-0.3,z:sz,rot:shacks[s][2],style:'harbour',
+      w:8,d:7,storeys:1,seed:401+s*11,shop:s===1,
+      awning:'#2E8FA8',signCol:'#5BE8FF',sink:1.0});
+    box(sx,y+1.9,sz,8,4.6,7,shacks[s][2],'building');
+  }
+  point('fishing','fish',cx+18,cz-30,{y:y,r:12,
+    label:'Harbour Water',prompt:'Cast a line'});
+  point('fishmonger','shop',cx-6,cz+3,{y:y,r:3.2,
+    label:'Fishmonger',prompt:'Sell your catch'});
+
+  for(var l=0;l<8;l++){
+    place(P.lamp('harbour'),cx-24+l*7,y,cz-15,l%2?Math.PI:0,1,'#FFFFFF');
+  }
+  for(var bl=0;bl<10;bl++){
+    place(P.bollard(),cx-22+bl*5,y,cz+3.4,0,1,'#FFFFFF');
+  }
+  for(var cr=0;cr<9;cr++){
+    var rx=cx-20+cr*5.2, rz=cz+1.2+(cr%2)*1.4;
+    place(P.crate(cr%3),rx,y,rz,cr*0.7,1,'#FFFFFF');
+    if(cr%3===0)place(P.barrel(),rx+1.6,y,rz-1.0,0,1,'#FFFFFF');
+  }
+}
+
+function dressMissions(b){
+  var pad=T.pad('missions'),cx=pad.x,cz=pad.z,y=pad.y;
+  place(P.missionBoard(),cx,y,cz-4,0,1,'#FFFFFF');
+  box(cx,y+1.6,cz-4,3.8,3.2,0.6,0,'board');
+  point('missions','missions',cx,cz-1.6,{y:y,r:3.6,
+    label:'Mission Board',prompt:'Read the board'});
+  Arch.building(b,{x:cx-9,y:y-0.3,z:cz+8,rot:0.5,style:'industrial',
+    w:12,d:10,storeys:2,seed:503,sink:1.2});
+  box(cx-9,y+3.2,cz+8,12,7.4,10,0.5,'building');
+  Arch.building(b,{x:cx+10,y:y-0.3,z:cz+6,rot:-0.35,style:'modern',
+    w:10,d:9,storeys:3,seed:509,sink:1.2});
+  box(cx+10,y+4.8,cz+6,10,10.5,9,-0.35,'building');
+  for(var i=0;i<6;i++){
+    var a=i/6*M.TAU;
+    place(P.lamp('plaza'),cx+Math.cos(a)*13,T.heightAt(cx+Math.cos(a)*13,cz+Math.sin(a)*13),
+      cz+Math.sin(a)*13,a,1,'#FFFFFF');
+  }
+  place(P.signpost(),cx+6,y,cz-8,-0.5,1,'#FFFFFF');
+}
+
+function dressGarage(b){
+  var pad=T.pad('garage'),cx=pad.x,cz=pad.z,y=pad.y;
+  Arch.building(b,{x:cx,y:y-0.3,z:cz+7,rot:Math.PI,style:'industrial',
+    w:16,d:11,storeys:1,storeyH:4.6,roof:'flat',seed:601,shop:1,
+    awning:'#4A5462',signCol:'#F5A03C',sink:1.2});
+  box(cx,y+2.5,cz+7,16,5.6,11,0,'building');
+  point('garage','vehicles',cx,cz+1,{y:y,r:5,
+    label:'Harbour Garage',prompt:'View vehicles'});
+  for(var i=0;i<6;i++){
+    place(P.bollard(),cx-9+i*3.6,y,cz-6,0,1,'#F5A03C');
+  }
+  for(var j=0;j<4;j++){
+    place(P.crate(j%3),cx-11+j*2.0,y,cz+13,j*0.5,1,'#FFFFFF');
+  }
+  place(P.lamp('plaza'),cx-10,y,cz+2,0,1,'#FFFFFF');
+  place(P.lamp('plaza'),cx+10,y,cz+2,0,1,'#FFFFFF');
+}
+
+function dressPlots(b){
+  var pad=T.pad('plots'),cx=pad.x,cz=pad.z,y=pad.y;
+  /* Six marked plots the player can build on. A low kerb and a lit
+     marker post: enough to say "this is yours" without walling it in. */
+  var kerb=Geo.build();
+  for(var i=0;i<6;i++){
+    var px=cx-16+(i%3)*16, pz=cz-9+((i/3)|0)*18;
+    kerb.mat('concrete');
+    var w=13,d=13,t=0.5;
+    var sides=[[0,d/2],[0,-d/2],[w/2,0],[-w/2,0]];
+    for(var s=0;s<4;s++){
+      var S=sides[s],horiz=s<2;
+      kerb.push();
+      kerb.translate(px+S[0],T.heightAt(px+S[0],pz+S[1])+0.12,pz+S[1]);
+      kerb.chamfer(0,0,0,horiz?w:t,0.24,horiz?t:d,'#7E868F',0.05);
+      kerb.pop();
+    }
+    place(P.signpost(),px-w/2+0.6,T.heightAt(px-w/2+0.6,pz-d/2+0.6),pz-d/2+0.6,
+      0.8,0.85,'#FFFFFF');
+    point('plot'+i,'plot',px,pz,{y:T.heightAt(px,pz),r:6,
+      label:'Building Plot '+(i+1),prompt:'Claim this plot',data:{plot:i}});
+  }
+  W.statics.push(kerb.upload());
+}
+
+function dressQuarry(b){
+  var pad=T.pad('quarry'),cx=pad.x,cz=pad.z,y=pad.y;
+  /* The mining face: boulders piled against the cliff, and a mouth
+     into the rock. */
+  ringScatter(b,cx,cz,4,20,42,701,function(x,z,rng){
+    place(P.rock((rng()*4)|0),x,T.heightAt(x,z)-0.3,z,rng()*6.28,
+      0.8+rng()*2.4,'#FFFFFF');
+  });
+  var mouth=Geo.build();
+  mouth.mat('cliff');
+  mouth.push();mouth.translate(cx,y,cz+20);
+  /* an arch of rock over a dark opening */
+  for(var i=0;i<=14;i++){
+    var a=Math.PI*(i/14);
+    mouth.push();
+    mouth.translate(Math.cos(a)*4.4,Math.sin(a)*4.4,0);
+    mouth.rotate(0,0,a);
+    mouth.chamfer(0,0,0,2.2,1.8,4.0,i%2?'#7E7466':'#6A6255',0.2);
+    mouth.pop();
+  }
+  mouth.mat('blank');
+  mouth.push();mouth.translate(0,2.0,-1.6);
+  mouth.chamfer(0,0,0,7.4,4.4,0.6,'#0A0C10',0.1,{noBand:true});
+  mouth.pop();
+  mouth.pop();
+  W.statics.push(mouth.upload());
+  point('mine','mine',cx,cz+16,{y:y,r:6,
+    label:'Quarry Face',prompt:'Mine here'});
+  for(var c=0;c<6;c++)
+    place(P.crate(c%3),cx-6+c*2.4,T.heightAt(cx-6+c*2.4,cz-6),cz-6,c*0.6,1,'#FFFFFF');
+  place(P.lamp('plaza'),cx-8,y,cz+8,0,1,'#FFFFFF');
+  place(P.lamp('plaza'),cx+8,y,cz+8,0,1,'#FFFFFF');
+}
+
+function dressArena(b){
+  var pad=T.pad('arena'),cx=pad.x,cz=pad.z,y=pad.y;
+  var ring=Geo.build();
+  ring.mat('concrete');
+  /* tiered seating as concentric rings */
+  for(var t=0;t<4;t++){
+    ring.push();ring.translate(cx,y+t*0.9,cz);
+    ring.loft([
+      {y:0,  pts:Geo.circle(15+t*2.2,26)},
+      {y:0.9,pts:Geo.circle(15+t*2.2,26)}
+    ],t%2?'#7A828E':'#6E7682',{openTop:true,openBottom:true});
+    ring.pop();
+  }
+  W.statics.push(ring.upload());
+  for(var i=0;i<8;i++){
+    var a=i/8*M.TAU;
+    place(P.lamp('plaza'),cx+Math.cos(a)*22,T.heightAt(cx+Math.cos(a)*22,cz+Math.sin(a)*22),
+      cz+Math.sin(a)*22,a,1.2,'#FFFFFF');
+  }
+  point('arena','arena',cx,cz,{y:y,r:10,label:'The Arena',prompt:'Enter the arena'});
+}
+
+/* ---------------- wilderness ---------------- */
+function scatterNature(){
+  var rng=M.rng(1234);
+  var tries=34000;
+  for(var i=0;i<tries;i++){
+    var x=(rng()-0.5)*T.SIZE*0.96;
+    var z=(rng()-0.5)*T.SIZE*0.96;
+    var h=T.heightAt(x,z);
+    if(h<0.6||h>46)continue;                 /* not in the sea or on ice */
+    if(T.flatAt(x,z)>0.42)continue;          /* not on a district pad    */
+    var slope=T.slopeAt(x,z);
+    if(slope>0.95)continue;                  /* not on a bare cliff face */
+
+    var r=rng();
+    /* Bands: palms along the beach, broadleaf on the low ground,
+       pine on the highland, blossom in a grove to the west. */
+    if(h<2.0){
+      if(r<0.12)place(P.tree('palm',(rng()*4)|0),x,h-0.2,z,rng()*6.28,
+        0.9+rng()*0.4,'#FFFFFF');
+      else if(r<0.34)place(P.grassTuft((rng()*3)|0),x,h,z,rng()*6.28,
+        0.8+rng()*0.6,'#C8C08A');
+      else if(r<0.40)place(P.rock((rng()*4)|0),x,h-0.3,z,rng()*6.28,
+        0.4+rng()*0.7,'#C0B49C');
+    }else if(h>26){
+      if(r<0.34)place(P.tree('pine',(rng()*4)|0),x,h-0.2,z,rng()*6.28,
+        0.85+rng()*0.5,'#FFFFFF');
+      else if(r<0.42)place(P.rock((rng()*4)|0),x,h-0.4,z,rng()*6.28,
+        0.7+rng()*1.5,'#FFFFFF');
+      else if(r<0.60)place(P.bush((rng()*3)|0),x,h,z,rng()*6.28,
+        0.8+rng()*0.5,'#7E9464');
+    }else{
+      var west=x<-30&&z>-20&&z<50;
+      if(r<0.20)place(P.tree(west?'blossom':'broadleaf',(rng()*4)|0),
+        x,h-0.2,z,rng()*6.28,0.85+rng()*0.55,'#FFFFFF');
+      else if(r<0.26)place(P.tree('pine',(rng()*4)|0),x,h-0.2,z,rng()*6.28,
+        0.8+rng()*0.4,'#FFFFFF');
+      else if(r<0.30)place(P.tree('dead',(rng()*4)|0),x,h-0.2,z,rng()*6.28,
+        0.8+rng()*0.4,'#9A9080');
+      else if(r<0.52)place(P.bush((rng()*3)|0),x,h,z,rng()*6.28,
+        0.75+rng()*0.6,'#FFFFFF');
+      else if(r<0.86)place(P.grassTuft((rng()*3)|0),x,h,z,rng()*6.28,
+        0.7+rng()*0.7,'#FFFFFF');
+      else place(P.rock((rng()*4)|0),x,h-0.3,z,rng()*6.28,
+        0.35+rng()*0.8,'#FFFFFF');
+    }
+  }
+}
+
+/* ---------------- water ---------------- */
+function buildWater(){
+  var b=Geo.build();
+  b.mat('water');
+  /* Big enough to reach the horizon from anywhere on the island. A
+     plane merely larger than the terrain ends in a visible straight
+     edge with grey nothing beyond it. Subdivision stays modest — the
+     swell only needs somewhere to displace near the shore. */
+  b.plane(0,T.SEA,0,4200,4200,'#FFFFFF',72,180);
+  W.water=b.upload();
+}
+
+/* ---------------- build ---------------- */
+W.build=function(){
+  var b=Geo.build();     /* one merged builder for all architecture */
+  dressPlaza(b);
+  dressMarket(b);
+  dressHarbour(b);
+  dressMissions(b);
+  dressGarage(b);
+  dressPlots(b);
+  dressQuarry(b);
+  dressArena(b);
+  W.statics.push(b.upload());
+  scatterNature();
+  commitProps();
+  buildWater();
+
+  W.spawn=M.v3(T.pad('plaza').x,T.pad('plaza').y,T.pad('plaza').z+12);
+};
+
+/* ---------------- draw ---------------- */
+W.drawStatics=function(){
+  for(var i=0;i<W.statics.length;i++)GL.draw(W.statics[i]);
+};
+W.drawProps=function(prog){
+  GL.u1i(prog,'uInstanced',1);
+  for(var i=0;i<W.instanced.length;i++){
+    var m=W.instanced[i];
+    if(m.instances)GL.drawInstanced(m,m.instances);
+  }
+  GL.u1i(prog,'uInstanced',0);
+};
+
+LH.World=W;
+})();
+
+/* ============================================================
+   LH.Input — one abstraction over keyboard, mouse, touch and pad.
+
+   Nothing downstream asks "is this a phone". The controller reads
+   move.x/move.y, look.x/look.y and a set of named actions, and the
+   device layer is responsible for filling them. That is the only way
+   the same gameplay code survives four input methods.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,I={};
+
+I.move={x:0,y:0};      /* -1..1, camera-relative */
+I.look={x:0,y:0};      /* delta this frame, in pixels */
+I.zoom=0;
+I.run=false;
+I.actions={};          /* edge-triggered, cleared each frame */
+I.held={};             /* level-triggered */
+I.pointer={x:0.5,y:0.5,down:false};
+I.lastKind='kb';       /* kb | touch | pad */
+
+var keys={};
+var BIND={
+  KeyW:'fwd',KeyS:'back',KeyA:'left',KeyD:'right',
+  ArrowUp:'fwd',ArrowDown:'back',ArrowLeft:'left',ArrowRight:'right',
+  Space:'jump',ShiftLeft:'run',ShiftRight:'run',
+  KeyE:'interact',KeyF:'interact',
+  KeyQ:'tool',KeyR:'reload',KeyC:'crouch',
+  Tab:'inventory',KeyI:'inventory',KeyM:'map',KeyJ:'missions',
+  KeyP:'profile',KeyT:'chat',KeyB:'build',KeyG:'worlds',
+  Escape:'menu',KeyV:'emote',KeyH:'help'
+};
+I.BIND=BIND;
+
+function fire(name){I.actions[name]=true;}
+
+I.attach=function(el){
+  window.addEventListener('keydown',function(e){
+    if(e.repeat)return;
+    var b=BIND[e.code];
+    if(!b)return;
+    /* Never swallow the browser's own shortcuts while a text field is
+       focused — chat has to be able to contain the letter W. */
+    if(document.activeElement&&/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName))return;
+    keys[b]=true;I.held[b]=true;fire(b);
+    I.lastKind='kb';
+    if(b!=='menu')e.preventDefault();
+  });
+  window.addEventListener('keyup',function(e){
+    var b=BIND[e.code];if(!b)return;
+    keys[b]=false;I.held[b]=false;
+  });
+  window.addEventListener('blur',function(){
+    for(var k in keys)keys[k]=false;
+    for(var h in I.held)I.held[h]=false;
+  });
+
+  /* Mouse look is pointer-lock when the player asks for it, and
+     drag-to-look otherwise. Both write into the same look delta. */
+  var dragging=false,lastX=0,lastY=0;
+  el.addEventListener('mousedown',function(e){
+    I.lastKind='kb';
+    I.pointer.down=true;
+    I.pointer.x=e.clientX/window.innerWidth;
+    I.pointer.y=e.clientY/window.innerHeight;
+    if(e.button===2||I.locked){dragging=true;lastX=e.clientX;lastY=e.clientY;}
+    else fire('primary');
+    if(e.button===2)e.preventDefault();
+  });
+  window.addEventListener('mouseup',function(e){
+    I.pointer.down=false;dragging=false;
+    if(e.button===2)fire('secondaryUp');
+  });
+  window.addEventListener('mousemove',function(e){
+    I.pointer.x=e.clientX/window.innerWidth;
+    I.pointer.y=e.clientY/window.innerHeight;
+    if(I.locked){I.look.x+=e.movementX||0;I.look.y+=e.movementY||0;return;}
+    if(dragging){I.look.x+=e.clientX-lastX;I.look.y+=e.clientY-lastY;
+      lastX=e.clientX;lastY=e.clientY;}
+  });
+  el.addEventListener('contextmenu',function(e){e.preventDefault();});
+  el.addEventListener('wheel',function(e){
+    I.zoom+=Math.sign(e.deltaY)*0.9;e.preventDefault();
+  },{passive:false});
+  document.addEventListener('pointerlockchange',function(){
+    I.locked=document.pointerLockElement===el;
+  });
+  I.requestLock=function(){el.requestPointerLock&&el.requestPointerLock();};
+  I.releaseLock=function(){document.exitPointerLock&&document.exitPointerLock();};
+
+  /* Touch: left half is a virtual stick, right half is look. Both are
+     tracked by pointer id so two thumbs never interfere. */
+  var stickId=null,stickOX=0,stickOY=0;
+  var lookId=null,lookX=0,lookY=0;
+  I.stick={active:false,ox:0,oy:0,x:0,y:0};
+  el.addEventListener('touchstart',function(e){
+    I.lastKind='touch';
+    for(var i=0;i<e.changedTouches.length;i++){
+      var t=e.changedTouches[i];
+      if(t.clientX<window.innerWidth*0.42&&stickId===null){
+        stickId=t.identifier;stickOX=t.clientX;stickOY=t.clientY;
+        I.stick.active=true;I.stick.ox=stickOX;I.stick.oy=stickOY;
+        I.stick.x=stickOX;I.stick.y=stickOY;
+      }else if(lookId===null){
+        lookId=t.identifier;lookX=t.clientX;lookY=t.clientY;
+      }
+    }
+    e.preventDefault();
+  },{passive:false});
+  el.addEventListener('touchmove',function(e){
+    for(var i=0;i<e.changedTouches.length;i++){
+      var t=e.changedTouches[i];
+      if(t.identifier===stickId){
+        var dx=t.clientX-stickOX,dy=t.clientY-stickOY;
+        var R=Math.min(90,window.innerHeight*0.16);
+        var d=Math.hypot(dx,dy);
+        if(d>R){dx*=R/d;dy*=R/d;}
+        I.move.x=dx/R;I.move.y=-dy/R;
+        I.run=d>R*0.82;
+        I.stick.x=stickOX+dx;I.stick.y=stickOY+dy;
+      }else if(t.identifier===lookId){
+        I.look.x+=t.clientX-lookX;I.look.y+=t.clientY-lookY;
+        lookX=t.clientX;lookY=t.clientY;
+      }
+    }
+    e.preventDefault();
+  },{passive:false});
+  function endTouch(e){
+    for(var i=0;i<e.changedTouches.length;i++){
+      var t=e.changedTouches[i];
+      if(t.identifier===stickId){
+        stickId=null;I.move.x=0;I.move.y=0;I.run=false;I.stick.active=false;
+      }else if(t.identifier===lookId)lookId=null;
+    }
+  }
+  el.addEventListener('touchend',endTouch);
+  el.addEventListener('touchcancel',endTouch);
+};
+
+/* Gamepad is polled, not evented, so it is read at the top of the
+   frame alongside everything else. */
+function pollPad(){
+  if(!navigator.getGamepads)return;
+  var pads=navigator.getGamepads();
+  for(var i=0;i<pads.length;i++){
+    var p=pads[i];
+    if(!p||!p.connected)continue;
+    var dead=0.18;
+    function ax(n){var v=p.axes[n]||0;return Math.abs(v)<dead?0:v;}
+    if(ax(0)||ax(1)){I.move.x=ax(0);I.move.y=-ax(1);I.lastKind='pad';}
+    if(ax(2)||ax(3)){I.look.x+=ax(2)*14;I.look.y+=ax(3)*14;I.lastKind='pad';}
+    var btn=function(n){return p.buttons[n]&&p.buttons[n].pressed;};
+    if(btn(0)&&!I._padA)fire('jump');I._padA=btn(0);
+    if(btn(2)&&!I._padX)fire('interact');I._padX=btn(2);
+    if(btn(7)&&!I._padRT)fire('primary');I._padRT=btn(7);
+    if(btn(6)&&!I._padLT)fire('secondary');I._padLT=btn(6);
+    if(btn(3)&&!I._padY)fire('inventory');I._padY=btn(3);
+    if(btn(9)&&!I._padStart)fire('menu');I._padStart=btn(9);
+    I.run=btn(10)||btn(1);
+    break;
+  }
+}
+
+/* Called once at the top of each frame, before anything reads input. */
+I.begin=function(){
+  pollPad();
+  if(I.lastKind==='kb'){
+    var mx=(keys.right?1:0)-(keys.left?1:0);
+    var my=(keys.fwd?1:0)-(keys.back?1:0);
+    var l=Math.hypot(mx,my);
+    if(l>1){mx/=l;my/=l;}
+    I.move.x=mx;I.move.y=my;
+    I.run=!!keys.run;
+  }
+};
+/* And once at the bottom, so an action fires for exactly one frame. */
+I.end=function(){
+  I.actions={};
+  I.look.x=0;I.look.y=0;
+  I.zoom=0;
+};
+I.pressed=function(n){return !!I.actions[n];};
+I.down=function(n){return !!I.held[n];};
+
+LH.Input=I;
+})();
+
+/* ============================================================
+   LH.Player — the controller.
+
+   A capsule that walks, runs, jumps, swims and climbs slopes,
+   resolved against the terrain heightmap and the world's collision
+   boxes. Movement is camera-relative; the character turns toward
+   where it is going rather than where the camera points, except
+   while aiming.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,Cam=LH.Cam,W=LH.World,T=LH.Terrain,I=LH.Input;
+var Pl={};
+
+Pl.actor=null;
+Pl.vel=M.v3();
+Pl.grounded=true;
+Pl.inWater=false;
+Pl.swimming=false;
+Pl.radius=0.36;
+Pl.height=1.82;
+Pl.eyeH=1.62;
+
+var WALK=4.2, RUN=7.6, SWIM=2.8;
+var ACCEL=26, AIRACCEL=6, FRICTION=13;
+var GRAVITY=-24, JUMP=8.0;
+var MAX_STEP=0.62;      /* how tall a ledge you walk up rather than into */
+
+Pl.init=function(actor){
+  Pl.actor=actor;
+  return Pl;
+};
+
+var _f=M.v3(),_r=M.v3(),_want=M.v3(),_tmp=M.v3();
+
+Pl.update=function(dt){
+  var a=Pl.actor;
+  if(!a)return;
+
+  /* ---- camera-relative desired direction ---- */
+  Cam.forward(_f);Cam.rightVec(_r);
+  M.set3(_want,
+    _r[0]*I.move.x+_f[0]*I.move.y,0,
+    _r[2]*I.move.x+_f[2]*I.move.y);
+  var wl=M.len3(_want);
+  if(wl>1){M.scale3(_want,_want,1/wl);wl=1;}
+
+  var seaY=T.SEA;
+  var feet=a.pos[1];
+  Pl.inWater=feet<seaY-0.15;
+  Pl.swimming=feet<seaY-1.05;
+
+  var top=Pl.swimming?SWIM:((I.run?RUN:WALK));
+  var targetX=_want[0]*top*wl, targetZ=_want[2]*top*wl;
+
+  var acc=Pl.grounded?ACCEL:AIRACCEL;
+  if(Pl.swimming)acc=10;
+  Pl.vel[0]+=(targetX-Pl.vel[0])*Math.min(1,acc*dt);
+  Pl.vel[2]+=(targetZ-Pl.vel[2])*Math.min(1,acc*dt);
+  if(wl<0.01&&Pl.grounded){
+    var f=Math.min(1,FRICTION*dt);
+    Pl.vel[0]-=Pl.vel[0]*f;Pl.vel[2]-=Pl.vel[2]*f;
+  }
+
+  /* ---- vertical ---- */
+  if(Pl.swimming){
+    /* buoyancy pulls you to the surface unless you hold jump to climb
+       out or crouch to dive */
+    var depth=(seaY-0.9)-feet;
+    var buoy=M.clamp(depth*6,-3,4.5);
+    if(I.down('jump'))buoy+=4.0;
+    if(I.down('crouch'))buoy-=6.0;
+    Pl.vel[1]+=(buoy-Pl.vel[1])*Math.min(1,7*dt);
+  }else{
+    Pl.vel[1]+=GRAVITY*dt;
+    if(I.pressed('jump')&&Pl.grounded){
+      Pl.vel[1]=JUMP;Pl.grounded=false;
+      a.anim.play('jump');
+      LH.Audio&&LH.Audio.play('jump');
+    }
+  }
+
+  /* ---- integrate, then resolve ---- */
+  a.pos[0]+=Pl.vel[0]*dt;
+  a.pos[2]+=Pl.vel[2]*dt;
+  a.pos[1]+=Pl.vel[1]*dt;
+
+  /* keep inside the island's bounds */
+  var lim=T.HALF-2;
+  a.pos[0]=M.clamp(a.pos[0],-lim,lim);
+  a.pos[2]=M.clamp(a.pos[2],-lim,lim);
+
+  W.resolve(a.pos,Pl.radius,a.pos[1]);
+
+  var ground=W.groundAt(a.pos[0],a.pos[2]);
+  if(a.pos[1]<=ground+0.001){
+    /* Landing. The impact animation only fires from a real fall, not
+       from walking down a kerb. */
+    if(!Pl.grounded&&Pl.vel[1]<-6.5){
+      a.anim.play('land');
+      Cam.shake(M.clamp(-Pl.vel[1]*0.014,0,0.22),0.22);
+      LH.Audio&&LH.Audio.play('land');
+    }
+    a.pos[1]=ground;
+    if(Pl.vel[1]<0)Pl.vel[1]=0;
+    Pl.grounded=true;
+  }else{
+    /* Step up: if the ground just ahead is only a little higher, lift
+       onto it rather than colliding with it. Without this every kerb
+       in the harbour is a wall. */
+    if(Pl.grounded&&ground-a.pos[1]<MAX_STEP&&ground>a.pos[1]){
+      a.pos[1]=ground;
+    }else{
+      Pl.grounded=(a.pos[1]-ground)<0.06;
+      if(!Pl.grounded&&a.pos[1]>ground)Pl.grounded=false;
+    }
+  }
+  if(a.pos[1]<ground){a.pos[1]=ground;Pl.grounded=true;if(Pl.vel[1]<0)Pl.vel[1]=0;}
+
+  /* ---- facing ---- */
+  var speed=Math.hypot(Pl.vel[0],Pl.vel[2]);
+  if(speed>0.35&&!Pl.aiming){
+    a.faceToward(Math.atan2(Pl.vel[0],Pl.vel[2]),dt,14);
+  }else if(Pl.aiming){
+    a.faceToward(Cam.yaw+Math.PI,dt,20);
+  }
+
+  /* ---- animation ---- */
+  var st=a.anim.state;
+  var busy=(st==='mine'||st==='build'||st==='attack'||st==='hurt'||
+            st==='fishCast'||st==='fishWait'||st==='fishReel'||
+            st==='wave'||st==='celebrate'||st==='dance'||st==='sit');
+  if(!busy){
+    if(Pl.swimming){
+      a.anim.play(speed>0.8?'swim':'tread');
+    }else if(!Pl.grounded){
+      if(Pl.vel[1]<-1.5&&st!=='jump')a.anim.play('fall');
+    }else if(speed>0.35){
+      a.anim.play('locomote');
+      /* speed drives the clip's amplitude and its playback rate, so a
+         run is not just a fast walk */
+      a.anim.params.speed=M.clamp((speed-WALK*0.55)/(RUN-WALK*0.55),0,1);
+      var st2=LH.Rig.STATES.locomote;
+      st2.period=M.lerp(0.86,0.52,a.anim.params.speed);
+    }else{
+      a.anim.play('idle');
+    }
+  }
+  a.grounded=Pl.grounded;
+};
+
+/* The ground the player is standing on, for footstep audio and for
+   the "you cannot build here" checks. */
+Pl.surfaceMat=function(){
+  var a=Pl.actor;if(!a)return 0;
+  var i=Math.round((a.pos[0]+T.HALF)),j=Math.round((a.pos[2]+T.HALF));
+  i=M.clamp(i,0,T.N-1);j=M.clamp(j,0,T.N-1);
+  return T.mats[j*T.N+i];
+};
+
+LH.Player=Pl;
+})();
+
+/* ============================================================
+   LH.Sky — time of day and weather.
+
+   The sun's colour, the sky gradient, the fog and the ambient are all
+   driven from one clock, so evening in the harbour is a single number
+   changing rather than a set of hand-tuned presets. Weather rides on
+   top: overcast desaturates and thickens the fog, rain adds particles
+   and drops the exposure.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,R=LH.Render,S={};
+
+S.time=9.2;            /* hours, 0..24 */
+S.rate=1/110;          /* game hours per real second — a day is ~30 min */
+S.weather='clear';
+S.wet=0;               /* 0..1, eased so weather changes are not a cut */
+
+/* Keyframes around the clock. Everything between them is interpolated,
+   which is why dawn actually passes through a colour rather than
+   snapping from night to day. */
+var KEY=[
+  /* hour  sun            zenith         horizon        fog            amb sky        amb gnd       exp   stars */
+  [ 0.0, [0.10,0.13,0.26],[0.01,0.02,0.07],[0.05,0.07,0.16],[0.05,0.07,0.14],[0.05,0.07,0.14],[0.02,0.02,0.03],1.10,1.0],
+  [ 5.0, [0.20,0.17,0.26],[0.03,0.05,0.14],[0.16,0.13,0.22],[0.14,0.13,0.20],[0.08,0.09,0.16],[0.03,0.03,0.04],1.05,0.8],
+  [ 6.6, [1.05,0.55,0.34],[0.09,0.16,0.38],[0.72,0.44,0.34],[0.56,0.42,0.40],[0.16,0.16,0.26],[0.07,0.06,0.06],1.00,0.15],
+  [ 8.5, [1.15,0.96,0.78],[0.10,0.26,0.58],[0.58,0.68,0.84],[0.55,0.66,0.80],[0.17,0.23,0.34],[0.11,0.10,0.09],1.00,0.0],
+  [12.5, [1.18,1.10,0.98],[0.11,0.31,0.66],[0.62,0.74,0.90],[0.60,0.72,0.88],[0.20,0.26,0.36],[0.13,0.12,0.11],0.98,0.0],
+  [17.0, [1.16,0.98,0.74],[0.10,0.27,0.60],[0.64,0.70,0.84],[0.60,0.68,0.82],[0.18,0.23,0.34],[0.12,0.11,0.10],1.00,0.0],
+  [19.2, [1.20,0.52,0.26],[0.10,0.14,0.36],[0.86,0.42,0.26],[0.66,0.40,0.34],[0.18,0.15,0.22],[0.08,0.06,0.05],1.02,0.2],
+  [20.6, [0.42,0.26,0.30],[0.04,0.06,0.18],[0.26,0.16,0.26],[0.20,0.16,0.26],[0.09,0.10,0.18],[0.04,0.03,0.04],1.08,0.7],
+  [24.0, [0.10,0.13,0.26],[0.01,0.02,0.07],[0.05,0.07,0.16],[0.05,0.07,0.14],[0.05,0.07,0.14],[0.02,0.02,0.03],1.10,1.0]
+];
+
+function sample(h){
+  var i=0;
+  while(i<KEY.length-2&&KEY[i+1][0]<=h)i++;
+  var a=KEY[i],b=KEY[i+1];
+  var t=M.smooth(M.clamp((h-a[0])/((b[0]-a[0])||1),0,1));
+  var out=[];
+  for(var k=1;k<=6;k++){
+    out.push([M.lerp(a[k][0],b[k][0],t),M.lerp(a[k][1],b[k][1],t),
+              M.lerp(a[k][2],b[k][2],t)]);
+  }
+  out.push(M.lerp(a[7],b[7],t));
+  out.push(M.lerp(a[8],b[8],t));
+  return out;
+}
+
+var WEATHER={
+  clear:   {fogMul:1.00,sunMul:1.00,ambMul:1.00,exp:1.00,cloud:0.0,rain:0},
+  cloudy:  {fogMul:1.55,sunMul:0.62,ambMul:1.25,exp:0.97,cloud:0.6,rain:0},
+  overcast:{fogMul:2.30,sunMul:0.32,ambMul:1.45,exp:0.94,cloud:1.0,rain:0},
+  rain:    {fogMul:3.10,sunMul:0.22,ambMul:1.35,exp:0.90,cloud:1.0,rain:1},
+  fog:     {fogMul:5.20,sunMul:0.45,ambMul:1.30,exp:0.96,cloud:0.4,rain:0}
+};
+S.WEATHER=Object.keys(WEATHER);
+var cur=WEATHER.clear, want=WEATHER.clear, blend=1;
+
+S.setWeather=function(name){
+  if(!WEATHER[name]||S.weather===name)return;
+  cur=mixW(cur,want,blend);
+  want=WEATHER[name];blend=0;S.weather=name;
+};
+function mixW(a,b,t){
+  return {fogMul:M.lerp(a.fogMul,b.fogMul,t),sunMul:M.lerp(a.sunMul,b.sunMul,t),
+    ambMul:M.lerp(a.ambMul,b.ambMul,t),exp:M.lerp(a.exp,b.exp,t),
+    cloud:M.lerp(a.cloud,b.cloud,t),rain:M.lerp(a.rain,b.rain,t)};
+}
+
+S.update=function(dt){
+  S.time=(S.time+dt*S.rate*(S.paused?0:1))%24;
+  blend=Math.min(1,blend+dt*0.28);
+  var w=mixW(cur,want,M.smooth(blend));
+  S.wet=M.damp(S.wet,w.rain,0.02,dt);
+
+  var k=sample(S.time);
+  var sc=k[0],zen=k[1],hor=k[2],fog=k[3],ambS=k[4],ambG=k[5],exp=k[6],stars=k[7];
+  var sd=R.scene;
+
+  /* The sun tracks an arc tilted off true east-west, so shadows sweep
+     across the island through the day instead of along one axis. */
+  var ang=((S.time-6)/12)*Math.PI;
+  var elev=Math.sin(ang);
+  var tilt=0.34;
+  M.set3(sd.sunDir,Math.cos(ang)*0.86,Math.max(0.06,elev),Math.sin(ang)*tilt+0.22);
+  M.norm3(sd.sunDir,sd.sunDir);
+
+  M.set3(sd.sunCol,sc[0]*w.sunMul,sc[1]*w.sunMul,sc[2]*w.sunMul);
+  M.set3(sd.zenith,zen[0],zen[1],zen[2]);
+  M.set3(sd.horizon,hor[0],hor[1],hor[2]);
+  M.set3(sd.ground,hor[0]*0.20,hor[1]*0.20,hor[2]*0.24);
+  M.set3(sd.fogCol,fog[0],fog[1],fog[2]);
+  M.set3(sd.skyCol,ambS[0]*w.ambMul,ambS[1]*w.ambMul,ambS[2]*w.ambMul);
+  M.set3(sd.gndCol,ambG[0]*w.ambMul,ambG[1]*w.ambMul,ambG[2]*w.ambMul);
+  sd.fogDensity=0.0021*w.fogMul;
+  sd.exposure=exp*w.exp;
+  sd.stars=stars;
+  /* Night and rain both want more bloom: wet surfaces and lit windows
+     are most of what you can see. */
+  sd.bloom=0.72+stars*0.55+S.wet*0.35;
+  sd.bloomThresh=1.05-stars*0.30;
+  /* Lit windows and neon are dialled right down at noon and carry the
+     scene at night. Baking one value into the mesh would mean the
+     harbour glows through the middle of the day. */
+  sd.emisScale=0.26+stars*1.05+w.cloud*0.16;
+  S.rain=w.rain;
+  S.cloud=w.cloud;
+};
+
+/* Is it dark enough that street lamps and windows should be lit? */
+S.isNight=function(){return S.time<6.4||S.time>19.4;};
+
+LH.Sky=S;
+})();
+
+/* ============================================================
+   LH.Game — the assembly point.
+
+   Boot stages, the frame loop's game half, and the draw order. This
+   is the only file section that knows about all the others.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,GL=LH.GL,R=LH.Render,App=LH.App,Cam=LH.Cam,Geo=LH.Geo;
+var T=LH.Terrain,W=LH.World,P=LH.Props,Act=LH.Actors,I=LH.Input,Pl=LH.Player,Sky=LH.Sky;
+var G={};
+
+G.player=null;
+G.crowd=[];
+G.ready=false;
+
+/* ---------------- boot ---------------- */
+App.stage('Painting surfaces',function(){
+  LH.Tex.buildAll();
+});
+App.stage('Raising the island',function(){
+  T.generate();
+});
+App.stage('Cutting the coastline',function(){
+  T.buildChunks();
+});
+App.stage('Building Lumen Harbor',function(){
+  W.build();
+});
+App.stage('Waking the harbour',function(){
+  var spawn=W.spawn;
+  var kit=Act.defaultKit(7);
+  kit.hair.style='swept';
+  kit.shirt.style='jacket';kit.shirt.color='#3A4658';kit.shirt.sleeve='long';
+  kit.pants.color='#2E3542';
+  kit.shoes.color='#22262E';
+  G.player=Act.Actor({x:spawn[0],y:spawn[1],z:spawn[2],kit:kit,name:'You'});
+  Pl.init(G.player);
+
+  /* Simulated residents. There is no server behind them — they walk a
+     patrol, and the crowd is honest fiction until there is one. */
+  var NAMES=['Skylar','Zenn','Mochi','Noctis','Lumi','Kestrel','Vale',
+             'Orin','Sable','Wren','Pico','Juno'];
+  var rng=M.rng(4242);
+  for(var i=0;i<12;i++){
+    var pt=[T.pad('plaza'),T.pad('market'),T.pad('harbour')][i%3];
+    var a=rng()*M.TAU,rr=6+rng()*14;
+    var x=pt.x+Math.cos(a)*rr, z=pt.z+Math.sin(a)*rr;
+    var k=Act.defaultKit(i*31+5);
+    k.hair.style=LH.Body.HAIR[(rng()*LH.Body.HAIR.length)|0];
+    k.shirt.style=['tee','jacket','hoodie'][(rng()*3)|0];
+    k.shirt.color=['#C4485E','#3E7BE0','#38A86A','#F5A03C','#B269FF','#3BE0C8',
+                   '#8E97A4','#D8D2C4'][(rng()*8)|0];
+    k.shirt.sleeve=rng()<0.5?'long':'short';
+    k.pants.color=Geo.shade(k.shirt.color,-58);
+    k.shoes.color='#2E333C';
+    if(rng()<0.25)k.hat.style=LH.Body.HATS[(rng()*LH.Body.HATS.length)|0];
+    if(rng()<0.14){k.wings.style=LH.Cos.WINGS[(rng()*LH.Cos.WINGS.length)|0];
+      k.wings.color=k.shirt.color;}
+    if(rng()<0.14)k.pet.style=LH.Cos.PETS[(rng()*LH.Cos.PETS.length)|0];
+    var npc=Act.Actor({x:x,y:T.heightAt(x,z),z:z,kit:k,
+      name:NAMES[i%NAMES.length],facing:rng()*M.TAU});
+    npc.home=[pt.x,pt.z];
+    npc.wander=[x,z];
+    npc.wait=rng()*4;
+    npc.speed=1.5+rng()*0.9;
+    G.crowd.push(npc);
+  }
+  G.ready=true;
 });
 
-var _mdl=M.m4(),_t=M.v3(0,0,0),_s=M.v3(1,1,1);
-var follow=M.v3(0,0.05,0);
+/* ---------------- crowd ----------------
+   A patrol with pauses. Deliberately simple: they exist to make the
+   town feel inhabited, not to be simulated citizens. */
+function updateCrowd(dt){
+  var rng=Math.random;
+  for(var i=0;i<G.crowd.length;i++){
+    var n=G.crowd[i];
+    var dx=n.wander[0]-n.pos[0], dz=n.wander[1]-n.pos[2];
+    var d=Math.hypot(dx,dz);
+    if(d<0.8){
+      n.wait-=dt;
+      if(n.wait<=0){
+        var a=rng()*M.TAU,rr=4+rng()*16;
+        n.wander[0]=n.home[0]+Math.cos(a)*rr;
+        n.wander[1]=n.home[1]+Math.sin(a)*rr;
+        n.wait=1.5+rng()*6;
+      }
+      if(n.anim.state==='locomote'||n.anim.state==='idle'){
+        if(n.wait>0.2&&rng()<0.0016)n.anim.play('wave');
+        else if(n.anim.state!=='wave')n.anim.play('idle');
+      }
+    }else{
+      var sp=n.speed;
+      n.pos[0]+=dx/d*sp*dt;
+      n.pos[2]+=dz/d*sp*dt;
+      n.faceToward(Math.atan2(dx,dz),dt,7);
+      n.anim.play('locomote');
+      n.anim.params.speed=M.clamp((sp-2.2)/5.2,0,1);
+    }
+    n.pos[1]=W.groundAt(n.pos[0],n.pos[2]);
+    n.update(dt);
+  }
+}
 
+/* ---------------- update ---------------- */
 App.onUpdate(function(dt,time){
-  if(!cast.length)return;
-  Cam.yaw=Math.sin(time*0.14)*0.16;
-  Cam.pitch=0.02;
-  Cam.wantDist=8.4;
-  Cam.height=0.98;
-  Cam.update(dt,follow,null);
-  for(var i=0;i<cast.length;i++){
-    /* keep the one-shots cycling so a screenshot catches them mid-motion */
-    var st=cast[i].anim.state;
-    if(cast[i].anim.done&&(st==='idle'))
-      cast[i].anim.play(['idle','mine','attack','celebrate','fishWait','locomote'][i],true);
-    cast[i].update(dt);
-  }
-  var s=R.scene;
-  M.norm3(s.sunDir,M.set3(s.sunDir,0.40,0.62,0.42));
-  R.updateLight(follow,10);
+  if(!G.ready)return;
+  I.begin();
+
+  Sky.update(dt);
+
+  /* camera first, so movement is relative to what you can see */
+  if(I.look.x||I.look.y)Cam.orbit(I.look.x,I.look.y);
+  if(I.zoom)Cam.zoom(I.zoom);
+
+  Pl.update(dt);
+  G.player.update(dt);
+  updateCrowd(dt);
+
+  /* The camera follows the player's chest, not their feet, so a jump
+     does not swing the whole view. */
+  Cam.update(dt,G.player.pos,function(x,y,z){
+    if(y<T.heightAt(x,z)+0.35)return true;
+    return W.solidAt(x,y,z);
+  });
+
+  /* Shadows are fitted to a box around the player rather than the
+     island: at 2048 across 224 m the character's own shadow would be
+     four texels wide. */
+  R.updateLight(G.player.pos,44);
+  T.extractFrustum(R.vp);
+  /* Cull around what the camera is looking at, with the radius opened
+     up by however far the boom is out. Culling around the eye instead
+     is wrong for any wide shot: at a 290 m orbit the eye sits off the
+     island entirely and most of the world vanishes. */
+  /* Capped: a very wide orbit would otherwise open the radius far
+     enough to draw every prop on the island. */
+  W.cullProps(Cam.target[0],Cam.target[2],Math.min(1.7,1+Cam.dist*0.030));
+
+  I.end();
 });
 
+/* ---------------- draw ---------------- */
+var _id=M.m4();
 App.onDraw(function(dt,time){
-  if(!ground||!cast.length)return;
-  M.fromTRS(_mdl,_t,0,0,0,_s);
+  if(!G.ready)return;
+  M.ident(_id);
 
   Act.beginFrame();
-  for(var i=0;i<cast.length;i++){Act.submit(cast[i]);Act.submitPet(cast[i],time);}
+  Act.submit(G.player);
+  Act.submitPet(G.player,time);
+  for(var i=0;i<G.crowd.length;i++){
+    var n=G.crowd[i];
+    /* Skip characters far enough away to be a couple of pixels. */
+    if(M.dist2(n.pos,G.player.pos)>150)continue;
+    Act.submit(n);Act.submitPet(n,time);
+  }
 
+  /* --- shadow --- */
   var dp=R.beginShadow();
   GL.u1i(dp,'uInstanced',0);
-  GL.uM4(dp,'uModel',_mdl);
-  GL.draw(ground);
+  GL.uM4(dp,'uModel',_id);
+  T.drawChunksNear(G.player.pos[0],G.player.pos[2],48);
+  W.drawStatics();
+  GL.u1i(dp,'uInstanced',1);
+  W.drawProps(dp);
   Act.flushShadow(dp);
   R.endShadow();
 
+  /* --- opaque --- */
   R.beginScene();
   var p=R.beginOpaque();
-  GL.uM4(p,'uModel',_mdl);
-  GL.draw(ground);
+  GL.uM4(p,'uModel',_id);
+  GL.u1f(p,'uSpec',0.18+LH.Sky.wet*0.55);
+  T.drawChunks(true);
+  W.drawStatics();
+  W.drawProps(p);
   Act.flush(p);
 
-  /* auras go additive on top */
+  /* --- water --- */
+  var wp=R.beginWater(-7.0);
+  GL.uM4(wp,'uModel',_id);
+  GL.draw(W.water);
+  R.endWater();
+
+  /* --- additive: auras --- */
   Act.beginFrame();
-  for(var j=0;j<cast.length;j++)Act.submitAura(cast[j],time);
+  Act.submitAura(G.player,time);
+  for(var j=0;j<G.crowd.length;j++)Act.submitAura(G.crowd[j],time);
   var ap=R.beginAdditive();
   Act.flush(ap);
   R.endBlend();
@@ -4762,6 +7119,13 @@ App.onDraw(function(dt,time){
   R.present();
 });
 
-if(LH.App.start())LH.App.runBoot();
+/* ---------------- go ---------------- */
+if(LH.App.start()){
+  LH.Input.attach(document.getElementById('gl'));
+  LH.App.runBoot(function(){
+    /* nothing yet — the UI hooks in here */
+  });
+}
+LH.Game=G;
 })();
 </script>
