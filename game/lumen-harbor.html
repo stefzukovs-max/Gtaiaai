@@ -1002,9 +1002,10 @@ Builder.prototype.cylinder=function(x,y,z,r0,r1,h,seg,c,o){
     this.vert(x+ca*r0,y-hh,z+sa*r0,nx,ny,nz,i/seg*(o.uvScale||1),0,col);
     this.vert(x+ca*r1,y+hh,z+sa*r1,nx,ny,nz,i/seg*(o.uvScale||1),(o.uvScale||1),col);
   }
+  /* same winding rule as loft: up the wall first, then around */
   for(var k=0;k<seg;k++){
     var p=base+k*2;
-    this.quad(p,p+2,p+3,p+1);
+    this.quad(p,p+1,p+3,p+2);
   }
   if(!o.open){
     if(r1>1e-5){
@@ -1012,14 +1013,14 @@ Builder.prototype.cylinder=function(x,y,z,r0,r1,h,seg,c,o){
       for(var t=0;t<=seg;t++){var aa=t/seg*TAU;
         this.vert(x+Math.cos(aa)*r1,y+hh,z+Math.sin(aa)*r1,0,1,0,
           Math.cos(aa)*.5+.5,Math.sin(aa)*.5+.5,col);}
-      for(var t2=0;t2<seg;t2++)this.tri(ct,t0+t2,t0+t2+1);
+      for(var t2=0;t2<seg;t2++)this.tri(ct,t0+t2+1,t0+t2);
     }
     if(r0>1e-5){
       var cb=this.vert(x,y-hh,z,0,-1,0,.5,.5,col),b0=this.n;
       for(var u=0;u<=seg;u++){var ab=u/seg*TAU;
         this.vert(x+Math.cos(ab)*r0,y-hh,z+Math.sin(ab)*r0,0,-1,0,
           Math.cos(ab)*.5+.5,Math.sin(ab)*.5+.5,col);}
-      for(var u2=0;u2<seg;u2++)this.tri(cb,b0+u2+1,b0+u2);
+      for(var u2=0;u2<seg;u2++)this.tri(cb,b0+u2,b0+u2+1);
     }
   }
   return this;
@@ -1088,6 +1089,141 @@ Builder.prototype.extrude=function(pts,depth,c,o){
     var C=this.vert(pts[s2][0],pts[s2][1],-hd,nx,ny,0,l,depth,col);
     var D=this.vert(pts[s][0],pts[s][1],-hd,nx,ny,0,0,depth,col);
     this.quad(A,D,C,B);
+  }
+  return this;
+};
+
+/* ---------------- lofting ----------------
+   Stitch a stack of cross-sections into a surface. This is the single
+   most useful builder in the file: torsos, limbs, boat hulls, tree
+   trunks, fish and rooftops are all a list of outlines at increasing
+   heights. Every section needs the same point count so the rings
+   correspond; the helpers below all take `n` for exactly that reason. */
+
+/* a circle, for limbs and trunks */
+Geo.circle=function(r,n,sx,sz){
+  sx=sx===undefined?1:sx;sz=sz===undefined?1:sz;
+  var out=[];
+  for(var i=0;i<n;i++){
+    var a=i/n*TAU;
+    out.push([Math.cos(a)*r*sx,Math.sin(a)*r*sz]);
+  }
+  return out;
+};
+/* a rounded rectangle, for torsos and anything built rather than grown */
+Geo.roundRect=function(w,d,r,n){
+  var hw=Math.max(0.0001,w/2-r),hd=Math.max(0.0001,d/2-r);
+  var out=[],per=Math.max(1,Math.floor(n/4));
+  var corners=[[hw,hd,0],[-hw,hd,Math.PI/2],[-hw,-hd,Math.PI],[hw,-hd,-Math.PI/2]];
+  for(var c=0;c<4;c++){
+    var cc=corners[c];
+    for(var i=0;i<per;i++){
+      var a=cc[2]+(i/per)*(Math.PI/2);
+      out.push([cc[0]+Math.cos(a)*r,cc[1]+Math.sin(a)*r]);
+    }
+  }
+  /* pad to exactly n so sections always line up */
+  while(out.length<n)out.push(out[out.length-1].slice());
+  return out.slice(0,n);
+};
+
+/* `sections` is [{y, pts:[[x,z]...], scale?, col?}]. Normals come from
+   the surface itself — the ring tangent crossed with the rise to the
+   next ring — so a taper lights correctly instead of like a cylinder. */
+Builder.prototype.loft=function(sections,c,o){
+  o=o||{};
+  var col=col3(c),n=sections[0].pts.length,rings=sections.length;
+  var base=this.n,i,j;
+  /* Sections may be listed bottom-up (a torso) or top-down (a limb
+     hanging from its pivot). Rather than make every caller remember
+     which way round to write them, detect the direction and flip the
+     winding to match — otherwise half the meshes in the game face
+     inward and vanish into the back-face cull. */
+  var up=(sections[rings-1].y>=sections[0].y);
+  var uvScale=o.uvScale||1;
+  for(j=0;j<rings;j++){
+    var S=sections[j],pts=S.pts,cc=S.col?col3(S.col):col;
+    var sc=S.scale===undefined?1:S.scale;
+    /* rise toward the neighbouring ring, used for the normal's tilt */
+    var prev=sections[Math.max(0,j-1)],next=sections[Math.min(rings-1,j+1)];
+    var dy=(next.y-prev.y)||1;
+    for(i=0;i<n;i++){
+      var px=pts[i][0]*sc,pz=pts[i][1]*sc;
+      /* ring tangent */
+      var a=pts[(i+1)%n],b=pts[(i-1+n)%n];
+      var tx=(a[0]-b[0])*sc,tz=(a[1]-b[1])*sc;
+      /* radial outward */
+      var rx=px,rz=pz;
+      var rl=Math.hypot(rx,rz)||1;rx/=rl;rz/=rl;
+      /* how much the profile grows between neighbouring rings decides
+         how far the normal tips up or down */
+      var pn=next.pts[i],pp=prev.pts[i];
+      var nsc=next.scale===undefined?1:next.scale,psc=prev.scale===undefined?1:prev.scale;
+      var dr=Math.hypot(pn[0]*nsc,pn[1]*nsc)-Math.hypot(pp[0]*psc,pp[1]*psc);
+      var ny=-dr/dy;
+      var nx=rx,nz=rz;
+      var nl=Math.hypot(nx,ny,nz)||1;
+      this.vert(px,S.y,pz,nx/nl,ny/nl,nz/nl,i/n*uvScale,S.y*uvScale,cc);
+    }
+  }
+  /* Wind along the stack before going around the ring: sections from
+     Geo.circle/roundRect run counter-clockwise in XZ, so the reverse
+     order puts every face normal on the inside. */
+  for(j=0;j<rings-1;j++)for(i=0;i<n;i++){
+    var i2=(i+1)%n;
+    var A=base+j*n+i, B=base+j*n+i2, C2=base+(j+1)*n+i2, D=base+(j+1)*n+i;
+    if(up)this.quad(A,D,C2,B);else this.quad(A,B,C2,D);
+  }
+  /* caps, unless the loft joins something else */
+  /* `openTop` always means the last section and `openBottom` the first,
+     whichever way the stack runs. The cap's normal and winding follow
+     the same direction flag. */
+  var ny=up?1:-1;
+  if(!o.openTop){
+    var top=sections[rings-1],tsc=top.scale===undefined?1:top.scale;
+    var tcol=top.col?col3(top.col):col;
+    var tc=this.vert(0,top.y,0,0,ny,0,.5,.5,tcol),t0=this.n;
+    for(i=0;i<n;i++)this.vert(top.pts[i][0]*tsc,top.y,top.pts[i][1]*tsc,0,ny,0,
+      top.pts[i][0]+.5,top.pts[i][1]+.5,tcol);
+    for(i=0;i<n;i++){
+      if(up)this.tri(tc,t0+(i+1)%n,t0+i);else this.tri(tc,t0+i,t0+(i+1)%n);
+    }
+  }
+  if(!o.openBottom){
+    var bo=sections[0],bsc=bo.scale===undefined?1:bo.scale;
+    var bcol=bo.col?col3(bo.col):col;
+    var bc=this.vert(0,bo.y,0,0,-ny,0,.5,.5,bcol),b0=this.n;
+    for(i=0;i<n;i++)this.vert(bo.pts[i][0]*bsc,bo.y,bo.pts[i][1]*bsc,0,-ny,0,
+      bo.pts[i][0]+.5,bo.pts[i][1]+.5,bcol);
+    for(i=0;i<n;i++){
+      if(up)this.tri(bc,b0+i,b0+(i+1)%n);else this.tri(bc,b0+(i+1)%n,b0+i);
+    }
+  }
+  return this;
+};
+
+/* A limb: a tapered loft between two radii with rounded ends, built
+   downward from the bone pivot at y=0 the way the skeleton expects. */
+Builder.prototype.limb=function(len,r0,r1,c,o){
+  o=o||{};
+  var n=o.seg||10,secs=[],steps=o.steps||7;
+  for(var i=0;i<=steps;i++){
+    var t=i/steps;
+    var y=-len*t;
+    /* ease the radius so the limb swells slightly at the top rather
+       than tapering linearly like a traffic cone */
+    var r=M.lerp(r0,r1,t*t*(3-2*t));
+    if(o.bulge)r*=1+Math.sin(t*Math.PI)*o.bulge;
+    var cap=1;
+    if(i===0)cap=0.82;
+    if(i===steps)cap=0.86;
+    secs.push({y:y,pts:Geo.circle(r*cap,n,o.flatX||1,o.flatZ||1)});
+  }
+  this.loft(secs,c,{uvScale:o.uvScale||1});
+  /* joint spheres hide the seam where rigid parts meet */
+  if(o.joint!==false){
+    this.sphere(0,0,0,r0*0.96,n,Math.max(5,n>>1),c);
+    this.sphere(0,-len,0,r1*0.94,n,Math.max(5,n>>1),c);
   }
   return this;
 };
@@ -1776,7 +1912,7 @@ void main(){
   // Rim light picked out of the sky colour: separates a character from
   // the background without a outline pass.
   float rim = pow(1.0-saturate(dot(n,v)),3.0);
-  col += uSkyCol*rim*0.35;
+  col += uSkyCol*rim*0.16;
 
   col += albedo*vEmis*3.0;
 
@@ -2045,9 +2181,13 @@ R.progs={};
 R.shadow=null;
 R.scene={
   sunDir:M.v3(0.45,0.72,0.28),
-  sunCol:M.v3(1.32,1.16,0.92),
-  skyCol:M.v3(0.30,0.42,0.60),
-  gndCol:M.v3(0.16,0.15,0.14),
+  /* Calibrated so a mid-grey albedo comes back mid-grey. Sun plus
+     ambient has to land near 1.0 combined; the first pass at this had
+     them summing to ~1.7 and every surface blew out a stop and a half
+     hot, which reads as "washed out" long before it reads as "bright". */
+  sunCol:M.v3(1.15,1.03,0.86),
+  skyCol:M.v3(0.17,0.23,0.34),
+  gndCol:M.v3(0.11,0.10,0.09),
   zenith:M.v3(0.10,0.26,0.58),
   horizon:M.v3(0.62,0.72,0.86),
   ground:M.v3(0.10,0.11,0.14),
@@ -2530,93 +2670,2094 @@ Cam.ray=function(sx,sy,outO,outD){
 LH.Cam=Cam;
 })();
 
-/* ---- TEMPORARY SMOKE SCENE — replaced by LH.World ---- */
+
+/* ============================================================
+   LH.Rig — skeleton and animation.
+
+   Seventeen bones in a parent-child hierarchy, posed every frame by
+   an animation state machine that crossfades between clips.
+
+   The clips are functions of phase, not keyframe tables. That is a
+   deliberate choice and not just a way of avoiding an importer: a
+   procedural walk can take stride length, lean and limp as live
+   parameters, so the same clip covers walking, sprinting, wading
+   and carrying something heavy without any extra data.
+
+   Parts are rigid per bone with a joint sphere at each pivot rather
+   than skinned. At this stylisation the joint reads as an elbow, and
+   it saves a skinning shader and the bone-weight data behind it.
+   ============================================================ */
 (function(){
 'use strict';
-var M=LH.M,GL=LH.GL,R=LH.Render,App=LH.App,Cam=LH.Cam,Geo=LH.Geo;
-var ground=null,props=null,water=null;
+var M=LH.M,Rig={};
+
+/* ---------------- skeleton ----------------
+   Offsets are the bone's rest position in its parent's space, in
+   metres. The figure is 1.82 m to the crown with the ankle at zero,
+   which puts it at roughly seven heads — heroic, but not the
+   eight-head fashion-plate that would fight the sandbox proportions,
+   and nowhere near the three-head chibi we are moving away from. */
+var BONES=[
+  /* name,         parent,      offset x,y,z */
+  ['hips',        -1,           0,     0.98,  0    ],
+  ['spine',        0,           0,     0.12,  0    ],
+  ['chest',        1,           0,     0.26,  0    ],
+  ['neck',         2,           0,     0.20,  0    ],
+  ['head',         3,           0,     0.12,  0    ],
+  ['shoulderL',    2,           0.17,  0.13,  0    ],
+  ['armL',         5,           0.08,  0,     0    ],
+  ['forearmL',     6,           0,    -0.27,  0    ],
+  ['handL',        7,           0,    -0.25,  0    ],
+  ['shoulderR',    2,          -0.17,  0.13,  0    ],
+  ['armR',         9,          -0.08,  0,     0    ],
+  ['forearmR',    10,           0,    -0.27,  0    ],
+  ['handR',       11,           0,    -0.25,  0    ],
+  ['thighL',       0,           0.10, -0.06,  0    ],
+  ['shinL',       13,           0,    -0.46,  0    ],
+  ['footL',       14,           0,    -0.46,  0    ],
+  ['thighR',       0,          -0.10, -0.06,  0    ],
+  ['shinR',       16,           0,    -0.46,  0    ],
+  ['footR',       17,           0,    -0.46,  0    ]
+];
+
+var NB=BONES.length;
+var NAME={},PARENT=new Int8Array(NB),REST=new Float32Array(NB*3);
+for(var i=0;i<NB;i++){
+  NAME[BONES[i][0]]=i;
+  PARENT[i]=BONES[i][1];
+  REST[i*3]=BONES[i][2];REST[i*3+1]=BONES[i][3];REST[i*3+2]=BONES[i][4];
+}
+Rig.NB=NB;Rig.NAME=NAME;Rig.PARENT=PARENT;Rig.REST=REST;
+Rig.BONE=function(n){return NAME[n];};
+
+/* A Pose is a flat rotation array plus a few whole-body channels.
+   Keeping it flat means blending two poses is one loop over floats
+   rather than a walk over objects. */
+function Pose(){
+  this.rot=new Float32Array(NB*3);   /* euler per bone, radians */
+  this.off=new Float32Array(NB*3);   /* additive offset on the rest position */
+  this.rootY=0;                      /* whole-body bob */
+  this.rootLean=0;                   /* forward pitch of the whole figure */
+  this.rootRoll=0;
+  this.rootYaw=0;
+}
+Rig.Pose=Pose;
+Pose.prototype.clear=function(){
+  this.rot.fill(0);this.off.fill(0);
+  this.rootY=0;this.rootLean=0;this.rootRoll=0;this.rootYaw=0;
+  return this;
+};
+Pose.prototype.set=function(bone,x,y,z){
+  var b=(typeof bone==='number')?bone:NAME[bone];
+  if(b===undefined)return this;
+  this.rot[b*3]=x||0;this.rot[b*3+1]=y||0;this.rot[b*3+2]=z||0;return this;
+};
+Pose.prototype.add=function(bone,x,y,z){
+  var b=(typeof bone==='number')?bone:NAME[bone];
+  if(b===undefined)return this;
+  this.rot[b*3]+=x||0;this.rot[b*3+1]+=y||0;this.rot[b*3+2]+=z||0;return this;
+};
+Pose.prototype.copyFrom=function(o){
+  this.rot.set(o.rot);this.off.set(o.off);
+  this.rootY=o.rootY;this.rootLean=o.rootLean;
+  this.rootRoll=o.rootRoll;this.rootYaw=o.rootYaw;return this;
+};
+/* Euler lerp is wrong in general but correct here: no clip in this game
+   swings a joint more than a half turn between blended states, so the
+   shortest-path ambiguity never arises and quaternions would only cost
+   conversions. */
+Pose.blend=function(out,a,b,t){
+  var ar=a.rot,br=b.rot,orr=out.rot,ao=a.off,bo=b.off,oo=out.off;
+  for(var i=0;i<NB*3;i++){
+    orr[i]=ar[i]+(br[i]-ar[i])*t;
+    oo[i]=ao[i]+(bo[i]-ao[i])*t;
+  }
+  out.rootY=a.rootY+(b.rootY-a.rootY)*t;
+  out.rootLean=a.rootLean+(b.rootLean-a.rootLean)*t;
+  out.rootRoll=a.rootRoll+(b.rootRoll-a.rootRoll)*t;
+  out.rootYaw=a.rootYaw+(b.rootYaw-a.rootYaw)*t;
+  return out;
+};
+
+/* ---------------- clip library ----------------
+   Each clip fills a pose from (phase, params). Phase is 0..1 for
+   looping clips and 0..1 elapsed for one-shots. */
+var C={};
+Rig.clips=C;
+var sin=Math.sin,cos=Math.cos,PI=Math.PI,TAU=M.TAU;
+
+/* Small shared shapes. `ease` gives a clip its weight — a limb that
+   accelerates and settles reads as mass, a linear one reads as a
+   puppet. */
+function ease(t){return t*t*(3-2*t);}
+function bell(t){return sin(t*PI);}
+
+C.idle=function(p,ph,pr){
+  p.clear();
+  var t=ph*TAU;
+  /* Breathing drives the chest and, a beat later, the shoulders. */
+  var br=sin(t)*0.5+0.5;
+  p.set('chest',-0.03-br*0.030,0,0);
+  p.set('spine',0.012+br*0.012,0,0);
+  p.set('neck',0.02-br*0.02,0,0);
+  /* A slow weight shift on a different period from the breath, so the
+     two never sync up and the loop stops being obvious. */
+  var sw=sin(ph*TAU*0.37);
+  p.rootRoll=sw*0.020;
+  p.rootYaw=sw*0.045;
+  p.rootY=-Math.abs(sw)*0.012+br*0.006;
+  p.set('hips',0,-sw*0.05,sw*0.03);
+  /* Arms hang with a natural outward flare and a slight lag. */
+  var lag=sin((ph-0.08)*TAU*0.37);
+  p.set('armL',0.05,0,0.13+lag*0.02);
+  p.set('armR',0.05,0,-0.13-lag*0.02);
+  p.set('forearmL',-0.16-br*0.02,0,0.05);
+  p.set('forearmR',-0.16-br*0.02,0,-0.05);
+  p.set('handL',0,0,0.10);
+  p.set('handR',0,0,-0.10);
+  /* Weight on alternating legs rather than a symmetric stance. */
+  p.set('thighL',-0.02+sw*0.03,0,0.035);
+  p.set('thighR',-0.02-sw*0.03,0,-0.035);
+  p.set('shinL',0.05-sw*0.02,0,0);
+  p.set('shinR',0.05+sw*0.02,0,0);
+  p.set('head',0.02,sw*0.10,0);
+  return p;
+};
+
+/* One clip covers walking through sprinting. `sp` is 0 at a slow walk
+   and 1 at a full run, and every amplitude scales off it, which is why
+   there is no visible pop as the player accelerates. */
+C.locomote=function(p,ph,pr){
+  p.clear();
+  var sp=pr&&pr.speed!==undefined?M.clamp(pr.speed,0,1):0;
+  var t=ph*TAU;
+  var swing=0.55+sp*0.52;
+  var lift=0.35+sp*0.68;
+  var lean=0.06+sp*0.30;
+
+  /* Legs: thigh swings on the fundamental, knee bends on a phase-shifted
+     rectified sine so it straightens on the drive and folds on the return. */
+  var lp=sin(t),rp=sin(t+PI);
+  p.set('thighL',lp*swing,0,0.03);
+  p.set('thighR',rp*swing,0,-0.03);
+  var kL=Math.max(0,-sin(t-0.5))*lift+0.06;
+  var kR=Math.max(0,-sin(t+PI-0.5))*lift+0.06;
+  p.set('shinL',kL,0,0);
+  p.set('shinR',kR,0,0);
+  /* Ankle rolls through the step: toe-off then heel-strike. */
+  p.set('footL',-lp*0.32+kL*0.30,0,0);
+  p.set('footR',-rp*0.32+kR*0.30,0,0);
+
+  /* Hips rise twice per cycle and roll toward the supporting leg. */
+  p.rootY=(Math.abs(sin(t))*0.055-0.028)*(0.5+sp);
+  p.rootRoll=cos(t)*(0.03+sp*0.05);
+  p.set('hips',0,cos(t)*(0.05+sp*0.09),0);
+  /* Chest counter-rotates against the hips — the thing that makes a walk
+     look like a person rather than a marching toy. */
+  p.set('chest',-lean*0.5,-cos(t)*(0.07+sp*0.13),0);
+  p.rootLean=lean;
+  p.set('spine',lean*0.25,0,0);
+  /* Head stays level while the body pitches under it. */
+  p.set('neck',-lean*0.55,0,0);
+  p.set('head',-lean*0.20,cos(t)*0.03,0);
+
+  /* Arms oppose the legs, with the forearm trailing a quarter phase. */
+  var aL=rp*(0.42+sp*0.55),aR=lp*(0.42+sp*0.55);
+  p.set('armL',aL,0,0.11-sp*0.04);
+  p.set('armR',aR,0,-0.11+sp*0.04);
+  p.set('forearmL',-0.22-sp*0.55-Math.max(0,rp)*(0.20+sp*0.42),0,0.04);
+  p.set('forearmR',-0.22-sp*0.55-Math.max(0,lp)*(0.20+sp*0.42),0,-0.04);
+  p.set('handL',0.05,0,0.08);
+  p.set('handR',0.05,0,-0.08);
+  return p;
+};
+
+C.jump=function(p,ph,pr){
+  p.clear();
+  /* Launch: legs still extended from the push, arms thrown up. */
+  var e=ease(M.clamp(ph*2.2,0,1));
+  p.rootLean=0.10;
+  p.set('thighL',-0.30-e*0.35,0,0.05);
+  p.set('thighR',-0.26-e*0.30,0,-0.05);
+  p.set('shinL',0.55+e*0.55,0,0);
+  p.set('shinR',0.40+e*0.45,0,0);
+  p.set('footL',-0.30,0,0);
+  p.set('footR',-0.26,0,0);
+  p.set('armL',-1.55-e*0.55,0,0.42);
+  p.set('armR',-1.50-e*0.50,0,-0.42);
+  p.set('forearmL',-0.50,0,0.12);
+  p.set('forearmR',-0.46,0,-0.12);
+  p.set('chest',-0.14,0,0);
+  p.set('head',-0.10,0,0);
+  return p;
+};
+
+C.fall=function(p,ph,pr){
+  p.clear();
+  var t=ph*TAU;
+  /* Windmilling arms and trailing legs: reads as "not in control". */
+  p.rootLean=0.16+sin(t*0.7)*0.05;
+  p.set('armL',-2.10+sin(t*1.3)*0.24,0,0.62);
+  p.set('armR',-2.05+sin(t*1.3+1.1)*0.24,0,-0.62);
+  p.set('forearmL',-0.75,0,0.2);
+  p.set('forearmR',-0.70,0,-0.2);
+  p.set('thighL',0.34+sin(t)*0.12,0,0.08);
+  p.set('thighR',0.12+sin(t+PI)*0.12,0,-0.08);
+  p.set('shinL',0.55,0,0);
+  p.set('shinR',0.78,0,0);
+  p.set('footL',-0.2,0,0);p.set('footR',-0.2,0,0);
+  p.set('chest',-0.10,0,0);
+  return p;
+};
+
+C.land=function(p,ph,pr){
+  p.clear();
+  /* Absorb on impact then push back up. One-shot over ~0.35 s. */
+  var d=bell(M.clamp(ph,0,1));
+  p.rootY=-d*0.30;
+  p.rootLean=d*0.34;
+  p.set('thighL',d*0.86,0,0.10);
+  p.set('thighR',d*0.82,0,-0.10);
+  p.set('shinL',d*1.15,0,0);
+  p.set('shinR',d*1.10,0,0);
+  p.set('footL',-d*0.42,0,0);
+  p.set('footR',-d*0.40,0,0);
+  p.set('armL',-d*0.75,0,0.30+d*0.20);
+  p.set('armR',-d*0.72,0,-0.30-d*0.20);
+  p.set('forearmL',-0.30-d*0.45,0,0.08);
+  p.set('forearmR',-0.30-d*0.42,0,-0.08);
+  p.set('chest',d*0.24,0,0);
+  p.set('head',-d*0.18,0,0);
+  return p;
+};
+
+/* Mining and building share a swing; the difference is where it stops
+   and how hard it lands. */
+function swingClip(p,ph,reach,power){
+  p.clear();
+  /* Anticipation to about a third, then a fast strike, then recovery. */
+  var wind=M.clamp(ph/0.34,0,1);
+  var strike=M.clamp((ph-0.34)/0.20,0,1);
+  var recov=M.clamp((ph-0.54)/0.46,0,1);
+  var raise=ease(wind)*(1-ease(strike));
+  var hit=ease(strike)*(1-ease(recov));
+  var a=-2.30*raise+0.85*hit;
+  p.set('armR',a,0,-0.30+raise*0.34);
+  p.set('forearmR',-0.30-raise*1.35+hit*0.60,0,-0.10);
+  p.set('handR',0.10-raise*0.30,0,-0.10);
+  /* The off hand braces and follows a beat behind. */
+  p.set('armL',-0.55*raise+0.35*hit,0,0.36);
+  p.set('forearmL',-0.75-raise*0.55,0,0.16);
+  /* Whole-body rotation into the swing — the power comes from the hips,
+     not the shoulder, and it looks wrong if the torso stays square. */
+  p.rootYaw=raise*0.30-hit*0.34;
+  p.set('hips',0,raise*0.18-hit*0.22,0);
+  p.set('chest',-raise*0.22+hit*0.34*power,raise*0.30-hit*0.36,0);
+  p.rootLean=hit*0.26*power-raise*0.10;
+  p.set('head',hit*0.18-raise*0.06,raise*0.10-hit*0.12,0);
+  p.set('thighL',-0.08+hit*0.12,0,0.05);
+  p.set('thighR',-0.14-raise*0.10,0,-0.05);
+  p.set('shinL',0.16,0,0);
+  p.set('shinR',0.22+raise*0.10,0,0);
+  p.rootY=-hit*0.05*power;
+  return p;
+}
+C.mine=function(p,ph,pr){return swingClip(p,ph,0.9,1.0);};
+C.build=function(p,ph,pr){
+  p.clear();
+  /* Placing is a reach and a press, not a swing. */
+  var out=ease(M.clamp(ph/0.42,0,1));
+  var press=bell(M.clamp((ph-0.36)/0.34,0,1));
+  var back=ease(M.clamp((ph-0.70)/0.30,0,1));
+  var f=out*(1-back);
+  p.set('armR',-1.15*f-press*0.14,0,-0.24+f*0.12);
+  p.set('forearmR',-0.55+f*0.34,0,-0.10);
+  p.set('handR',0.20*f+press*0.24,0,-0.06);
+  p.set('armL',-0.30*f,0,0.30);
+  p.set('forearmL',-0.70,0,0.14);
+  p.rootLean=f*0.14+press*0.06;
+  p.set('chest',-f*0.12,-f*0.20,0);
+  p.set('head',-f*0.06,-f*0.12,0);
+  p.set('thighL',-0.06,0,0.05);
+  p.set('thighR',-0.10,0,-0.05);
+  p.set('shinL',0.12,0,0);p.set('shinR',0.16,0,0);
+  return p;
+};
+
+C.attack=function(p,ph,pr){
+  p.clear();
+  /* A horizontal slash: wind across the body, whip through, recover. */
+  var wind=M.clamp(ph/0.26,0,1);
+  var cut=M.clamp((ph-0.26)/0.18,0,1);
+  var rec=M.clamp((ph-0.44)/0.56,0,1);
+  var w=ease(wind)*(1-ease(cut));
+  var c=ease(cut)*(1-ease(rec));
+  p.set('armR',-0.55-w*0.70+c*0.30,w*1.15-c*1.40,-0.30-w*0.55+c*0.30);
+  p.set('forearmR',-0.95-w*0.75+c*0.85,0,-0.12);
+  p.set('handR',0,0,-0.15-w*0.25);
+  p.set('armL',-0.25-w*0.30+c*0.55,0,0.42);
+  p.set('forearmL',-0.85,0,0.18);
+  p.rootYaw=w*0.52-c*0.62;
+  p.set('hips',0,w*0.24-c*0.30,0);
+  p.set('chest',-0.06,w*0.40-c*0.50,0);
+  p.set('head',0,w*0.20-c*0.28,0);
+  p.rootLean=c*0.16;
+  p.set('thighL',-0.10+c*0.16,0,0.06);
+  p.set('thighR',-0.12-w*0.10,0,-0.06);
+  p.set('shinL',0.18,0,0);p.set('shinR',0.20,0,0);
+  return p;
+};
+
+C.fishCast=function(p,ph,pr){
+  p.clear();
+  /* Rod back over the shoulder, then a flick forward. */
+  var back=M.clamp(ph/0.38,0,1);
+  var flick=M.clamp((ph-0.38)/0.22,0,1);
+  var settle=M.clamp((ph-0.60)/0.40,0,1);
+  var b=ease(back)*(1-ease(flick));
+  var f=ease(flick)*(1-ease(settle)*0.55);
+  p.set('armR',-1.30-b*0.75+f*0.55,0,-0.26);
+  p.set('forearmR',-0.55-b*0.95+f*0.80,0,-0.10);
+  p.set('handR',-0.20-b*0.30+f*0.40,0,-0.08);
+  p.set('armL',-0.85,0,0.34);
+  p.set('forearmL',-0.95,0,0.20);
+  p.rootLean=-b*0.10+f*0.16;
+  p.set('chest',b*0.12-f*0.14,-b*0.20+f*0.16,0);
+  p.set('thighL',-0.08,0,0.06);p.set('thighR',-0.10,0,-0.06);
+  p.set('shinL',0.14,0,0);p.set('shinR',0.16,0,0);
+  return p;
+};
+
+C.fishWait=function(p,ph,pr){
+  p.clear();
+  var t=ph*TAU;
+  /* Rod held out, tip drifting. Almost still — the tension comes from
+     the bobber, not the angler. */
+  var br=sin(t)*0.5+0.5;
+  p.set('armR',-1.02+sin(t*0.6)*0.03,0,-0.24);
+  p.set('forearmR',-0.62-br*0.03,0,-0.10);
+  p.set('handR',-0.16,0,-0.06);
+  p.set('armL',-0.72,0,0.30);
+  p.set('forearmL',-1.05,0,0.24);
+  p.set('chest',-0.05-br*0.02,-0.12,0);
+  p.set('neck',0.04,0.06,0);
+  p.set('head',0.06,0.06,0);
+  p.rootY=br*0.006;
+  p.set('thighL',-0.06,0,0.06);p.set('thighR',-0.08,0,-0.06);
+  p.set('shinL',0.12,0,0);p.set('shinR',0.14,0,0);
+  return p;
+};
+
+C.fishReel=function(p,ph,pr){
+  p.clear();
+  var t=ph*TAU*3;   /* the crank turns faster than the clip loops */
+  /* Rod up and straining, off hand winding the reel. */
+  p.set('armR',-1.35+sin(t*0.5)*0.06,0,-0.30);
+  p.set('forearmR',-0.95,0,-0.12);
+  p.set('handR',-0.10,0,-0.06);
+  p.set('armL',-1.05,0.10,0.26);
+  p.set('forearmL',-1.15+sin(t)*0.30,cos(t)*0.22,0.20);
+  p.set('handL',sin(t)*0.5,0,0.10);
+  p.rootLean=-0.10+sin(t*0.5)*0.03;
+  p.set('chest',0.10,-0.16,0);
+  p.set('head',0.10,0.08,0);
+  p.set('thighL',-0.14,0,0.07);p.set('thighR',-0.10,0,-0.07);
+  p.set('shinL',0.24,0,0);p.set('shinR',0.20,0,0);
+  p.rootY=-0.03;
+  return p;
+};
+
+C.hurt=function(p,ph,pr){
+  p.clear();
+  var d=bell(M.clamp(ph,0,1));
+  /* Recoil away from the hit, arms in. */
+  p.rootLean=-d*0.34;
+  p.rootYaw=d*0.22;
+  p.set('chest',-d*0.26,d*0.20,0);
+  p.set('head',-d*0.30,d*0.16,0);
+  p.set('armL',-d*0.85,0,0.50);
+  p.set('armR',-d*0.80,0,-0.50);
+  p.set('forearmL',-0.55-d*0.70,0,0.20);
+  p.set('forearmR',-0.55-d*0.65,0,-0.20);
+  p.set('thighL',d*0.22,0,0.06);
+  p.set('thighR',d*0.16,0,-0.06);
+  p.set('shinL',0.20+d*0.20,0,0);
+  p.set('shinR',0.18+d*0.18,0,0);
+  p.rootY=-d*0.06;
+  return p;
+};
+
+C.swim=function(p,ph,pr){
+  p.clear();
+  var t=ph*TAU;
+  /* Face-down crawl: body flat, alternating arm pull, flutter kick. */
+  p.rootLean=1.28;
+  p.rootY=-0.36;
+  p.set('chest',-0.16,0,0);
+  p.set('neck',-0.34,0,0);
+  p.set('head',-0.30,sin(t)*0.30,0);
+  p.set('armL',-1.55+sin(t)*1.55,0,0.30);
+  p.set('armR',-1.55+sin(t+PI)*1.55,0,-0.30);
+  p.set('forearmL',-0.45-Math.max(0,sin(t))*0.55,0,0.12);
+  p.set('forearmR',-0.45-Math.max(0,sin(t+PI))*0.55,0,-0.12);
+  p.set('thighL',sin(t*2)*0.30,0,0.05);
+  p.set('thighR',sin(t*2+PI)*0.30,0,-0.05);
+  p.set('shinL',0.22+Math.max(0,sin(t*2))*0.34,0,0);
+  p.set('shinR',0.22+Math.max(0,sin(t*2+PI))*0.34,0,0);
+  p.set('footL',-0.30,0,0);p.set('footR',-0.30,0,0);
+  return p;
+};
+
+C.tread=function(p,ph,pr){
+  p.clear();
+  var t=ph*TAU;
+  /* Upright in deep water, sculling. */
+  p.rootY=-0.30;
+  p.rootLean=0.12;
+  p.set('armL',-1.15,0,0.62+sin(t)*0.18);
+  p.set('armR',-1.15,0,-0.62-sin(t+PI)*0.18);
+  p.set('forearmL',-0.80,0,0.30);
+  p.set('forearmR',-0.80,0,-0.30);
+  p.set('thighL',0.55+sin(t)*0.28,0,0.10);
+  p.set('thighR',0.55+sin(t+PI)*0.28,0,-0.10);
+  p.set('shinL',0.60,0,0);p.set('shinR',0.60,0,0);
+  p.set('chest',-0.08,0,0);
+  return p;
+};
+
+/* ---------------- emotes ---------------- */
+C.wave=function(p,ph,pr){
+  C.idle(p,ph*0.4,pr);
+  var t=M.clamp(ph,0,1);
+  var up=ease(M.clamp(t/0.2,0,1))*(1-ease(M.clamp((t-0.78)/0.22,0,1)));
+  p.set('armR',-2.35*up,0,-0.30-up*0.42);
+  p.set('forearmR',-0.55-up*0.42,0,-0.20);
+  p.set('handR',0,0,-0.12+sin(t*TAU*3.2)*0.55*up);
+  p.set('chest',-0.04,-0.14*up,0);
+  p.set('head',0.02,-0.16*up,0.04*up);
+  return p;
+};
+C.celebrate=function(p,ph,pr){
+  p.clear();
+  var t=ph*TAU;
+  var hop=Math.max(0,sin(t*2));
+  p.rootY=hop*0.16;
+  p.set('armL',-2.55+sin(t*2)*0.24,0,0.55);
+  p.set('armR',-2.55+sin(t*2+0.4)*0.24,0,-0.55);
+  p.set('forearmL',-0.30,0,0.18);
+  p.set('forearmR',-0.30,0,-0.18);
+  p.set('chest',-0.18,sin(t)*0.12,0);
+  p.set('head',-0.16,sin(t)*0.18,0);
+  p.set('thighL',-0.10-hop*0.30,0,0.08);
+  p.set('thighR',-0.10-hop*0.26,0,-0.08);
+  p.set('shinL',0.20+hop*0.55,0,0);
+  p.set('shinR',0.20+hop*0.50,0,0);
+  p.set('footL',-0.20,0,0);p.set('footR',-0.20,0,0);
+  return p;
+};
+C.dance=function(p,ph,pr){
+  p.clear();
+  var t=ph*TAU;
+  var b=sin(t*2);
+  p.rootY=Math.abs(sin(t*2))*0.09-0.045;
+  p.rootRoll=sin(t)*0.14;
+  p.rootYaw=sin(t*0.5)*0.30;
+  p.set('hips',0,sin(t)*0.26,sin(t*2)*0.10);
+  p.set('chest',-0.06,-sin(t)*0.32,sin(t)*0.12);
+  p.set('head',0.04,-sin(t)*0.24,sin(t)*0.10);
+  p.set('armL',-1.30+b*0.62,0.30,0.55+b*0.24);
+  p.set('armR',-1.30-b*0.62,-0.30,-0.55+b*0.24);
+  p.set('forearmL',-1.05-Math.max(0,b)*0.42,0,0.24);
+  p.set('forearmR',-1.05-Math.max(0,-b)*0.42,0,-0.24);
+  p.set('thighL',-0.08+Math.max(0,b)*0.34,0,0.09);
+  p.set('thighR',-0.08+Math.max(0,-b)*0.34,0,-0.09);
+  p.set('shinL',0.16+Math.max(0,b)*0.40,0,0);
+  p.set('shinR',0.16+Math.max(0,-b)*0.40,0,0);
+  return p;
+};
+C.sit=function(p,ph,pr){
+  p.clear();
+  var t=ph*TAU;
+  var br=sin(t)*0.5+0.5;
+  p.rootY=-0.44;
+  p.rootLean=0.10;
+  p.set('thighL',-1.48,0,0.10);
+  p.set('thighR',-1.48,0,-0.10);
+  p.set('shinL',1.42,0,0);
+  p.set('shinR',1.42,0,0);
+  p.set('footL',0.10,0,0);p.set('footR',0.10,0,0);
+  p.set('armL',-0.18,0,0.24);
+  p.set('armR',-0.18,0,-0.24);
+  p.set('forearmL',-0.95-br*0.03,0,0.14);
+  p.set('forearmR',-0.95-br*0.03,0,-0.14);
+  p.set('chest',-0.06-br*0.025,0,0);
+  p.set('head',0.04,sin(ph*TAU*0.3)*0.12,0);
+  return p;
+};
+
+/* ---------------- the state machine ----------------
+   States name a clip, a period, whether they loop, and what they fall
+   back to. Transitions crossfade; a one-shot returns to its `next`
+   when it finishes, unless something interrupts with higher priority. */
+var STATES={
+  idle:      {clip:'idle',      period:4.2,  loop:true,  blend:0.28, pri:0},
+  locomote:  {clip:'locomote',  period:1.0,  loop:true,  blend:0.18, pri:0},
+  jump:      {clip:'jump',      period:0.42, loop:false, blend:0.10, pri:2, next:'fall'},
+  fall:      {clip:'fall',      period:1.6,  loop:true,  blend:0.20, pri:1},
+  land:      {clip:'land',      period:0.34, loop:false, blend:0.07, pri:2, next:'idle'},
+  swim:      {clip:'swim',      period:1.5,  loop:true,  blend:0.30, pri:1},
+  tread:     {clip:'tread',     period:2.4,  loop:true,  blend:0.30, pri:1},
+  mine:      {clip:'mine',      period:0.72, loop:false, blend:0.10, pri:3, next:'idle'},
+  build:     {clip:'build',     period:0.54, loop:false, blend:0.10, pri:3, next:'idle'},
+  attack:    {clip:'attack',    period:0.58, loop:false, blend:0.08, pri:3, next:'idle'},
+  fishCast:  {clip:'fishCast',  period:0.85, loop:false, blend:0.16, pri:3, next:'fishWait'},
+  fishWait:  {clip:'fishWait',  period:5.0,  loop:true,  blend:0.30, pri:3},
+  fishReel:  {clip:'fishReel',  period:1.1,  loop:true,  blend:0.16, pri:4},
+  hurt:      {clip:'hurt',      period:0.40, loop:false, blend:0.06, pri:5, next:'idle'},
+  wave:      {clip:'wave',      period:1.6,  loop:false, blend:0.22, pri:3, next:'idle'},
+  celebrate: {clip:'celebrate', period:1.5,  loop:true,  blend:0.24, pri:3},
+  dance:     {clip:'dance',     period:2.0,  loop:true,  blend:0.30, pri:3},
+  sit:       {clip:'sit',       period:6.0,  loop:true,  blend:0.34, pri:3}
+};
+Rig.STATES=STATES;
+Rig.EMOTES=['wave','celebrate','dance','sit'];
+
+function Anim(){
+  this.state='idle';
+  this.phase=0;
+  this.prev='idle';
+  this.prevPhase=0;
+  this.blend=1;         /* 1 = fully in `state` */
+  this.blendRate=1;
+  this.params={speed:0};
+  this.a=new Pose();
+  this.b=new Pose();
+  this.out=new Pose();
+  this.done=false;
+}
+Rig.Anim=function(){return new Anim();};
+
+Anim.prototype.play=function(name,force){
+  if(!STATES[name])return this;
+  if(this.state===name&&!force)return this;
+  var cur=STATES[this.state],nxt=STATES[name];
+  /* A lower-priority state cannot interrupt a running one-shot; that is
+     what stops a stray movement key from cancelling a swing mid-strike. */
+  if(!force&&cur&&!cur.loop&&!this.done&&nxt.pri<cur.pri)return this;
+  this.prev=this.state;this.prevPhase=this.phase;
+  this.state=name;this.phase=0;this.done=false;
+  this.blend=0;
+  this.blendRate=1/Math.max(0.016,nxt.blend);
+  return this;
+};
+
+Anim.prototype.update=function(dt){
+  var st=STATES[this.state];
+  if(!st)return this.out;
+  this.phase+=dt/st.period;
+  if(this.phase>=1){
+    if(st.loop)this.phase%=1;
+    else{
+      this.phase=1;
+      if(!this.done){
+        this.done=true;
+        if(st.next)this.play(st.next);
+      }
+    }
+  }
+  if(this.blend<1){
+    this.blend=Math.min(1,this.blend+dt*this.blendRate);
+    var pst=STATES[this.prev];
+    if(pst){
+      this.prevPhase+=dt/pst.period;
+      if(pst.loop)this.prevPhase%=1;else this.prevPhase=Math.min(1,this.prevPhase);
+    }
+  }
+
+  var C2=Rig.clips;
+  C2[st.clip](this.b,this.phase,this.params);
+  if(this.blend>=1)return this.out.copyFrom(this.b);
+  var pst2=STATES[this.prev];
+  C2[pst2?pst2.clip:'idle'](this.a,this.prevPhase,this.params);
+  return Pose.blend(this.out,this.a,this.b,M.smooth(this.blend));
+};
+
+/* ---------------- posing ----------------
+   Walk the hierarchy once, writing each bone's world matrix. Parents
+   always precede children in BONES, so a single forward pass is
+   enough — no recursion, no sort. */
+var _bt=M.v3(),_bs=M.v3(1,1,1),_lm=M.m4();
+
+Rig.poseMatrices=function(out,pose,rootMat){
+  for(var i=0;i<NB;i++){
+    var p=PARENT[i];
+    M.set3(_bt,
+      REST[i*3]+pose.off[i*3],
+      REST[i*3+1]+pose.off[i*3+1],
+      REST[i*3+2]+pose.off[i*3+2]);
+    M.fromTRS(_lm,_bt,pose.rot[i*3],pose.rot[i*3+1],pose.rot[i*3+2],_bs);
+    var dst=out[i]||(out[i]=M.m4());
+    if(p<0)M.mul(dst,rootMat,_lm);
+    else M.mul(dst,out[p],_lm);
+  }
+  return out;
+};
+
+/* The whole-body channels (bob, lean, roll, yaw) apply above the hips,
+   so they are folded into the root matrix rather than any one bone. */
+var _rt=M.v3(),_rs=M.v3(1,1,1),_rm=M.m4(),_rm2=M.m4();
+Rig.rootMatrix=function(out,pos,facing,pose,scale){
+  var s=scale||1;
+  M.set3(_rt,pos[0],pos[1]+pose.rootY*s,pos[2]);
+  M.set3(_rs,s,s,s);
+  M.fromTRS(out,_rt,0,facing+pose.rootYaw,0,_rs);
+  M.set3(_rt,0,0,0);M.set3(_rs,1,1,1);
+  M.fromTRS(_rm,_rt,pose.rootLean,0,pose.rootRoll,_rs);
+  M.mul(out,M.copy(_rm2,out),_rm);
+  return out;
+};
+
+LH.Rig=Rig;
+})();
+
+/* ============================================================
+   LH.Body — the character's meshes.
+
+   One mesh per bone-part, built once and drawn instanced, so a plaza
+   with forty people costs the same number of draw calls as one
+   person. Colour comes from the per-instance tint, which is why the
+   geometry is painted in greys: white takes the tint at full
+   strength, darker vertices read as the part's own shading and
+   survive any colour the player picks.
+
+   Cosmetics are parts too. A cape is not a special case in the
+   renderer — it is a mesh bound to the chest bone.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,Geo=LH.Geo,Body={};
+
+var cache={};
+/* Parts are built on demand: a session that never equips wings never
+   pays to generate them. */
+function part(key,fn,maxInst){
+  var hit=cache[key];
+  if(hit)return hit;
+  var b=Geo.build();
+  fn(b);
+  var mesh=b.upload(maxInst||64);
+  mesh.key=key;
+  cache[key]=mesh;
+  return mesh;
+}
+Body.part=part;
+Body.cache=cache;
+
+/* Shading constants. Everything is a multiplier on the instance tint. */
+var LIT='#FFFFFF', MID='#D2D2D2', LOW='#A8A8A8', DARK='#7C7C7C', DEEP='#585858';
+
+/* ---------------- head ----------------
+   Built as a loft rather than a sphere so the cranium, cheekbone and
+   jaw can each have their own width. A sphere with a face stuck on it
+   is the single clearest tell of programmer-art character work. */
+Body.head=function(){
+  return part('head',function(b){
+    b.mat('blank');
+    var n=14;
+    /* cross-sections from under the chin up over the crown */
+    var secs=[
+      {y:-0.118,pts:Geo.roundRect(0.076,0.090,0.033,n)},  /* chin    */
+      {y:-0.078,pts:Geo.roundRect(0.126,0.144,0.050,n)},  /* jaw     */
+      {y:-0.036,pts:Geo.roundRect(0.166,0.180,0.063,n)},  /* cheek   */
+      {y: 0.005,pts:Geo.roundRect(0.185,0.196,0.076,n)},  /* eyeline */
+      {y: 0.048,pts:Geo.roundRect(0.192,0.200,0.087,n)},  /* brow    */
+      {y: 0.094,pts:Geo.roundRect(0.185,0.196,0.089,n)},
+      {y: 0.131,pts:Geo.roundRect(0.152,0.163,0.076,n)},
+      {y: 0.155,pts:Geo.roundRect(0.091,0.100,0.046,n)}   /* crown   */
+    ];
+    /* Push the face forward: a head whose front and back are the same
+       curve reads as a ball, not a skull. */
+    for(var i=0;i<secs.length;i++){
+      var f=M.clamp((secs[i].y+0.11)/0.25,0,1);
+      for(var j=0;j<secs[i].pts.length;j++){
+        if(secs[i].pts[j][1]>0)secs[i].pts[j][1]*=1.0+0.16*f;
+      }
+    }
+    b.loft(secs,LIT,{openBottom:false});
+
+    /* Brow ridge, kept almost entirely inside the skull so it only
+       shades the eye sockets. An earlier version stood proud of the
+       face and read as a plank bolted across the eyes — the eyebrows
+       are a separate tinted part and they do the actual reading. */
+    b.push();b.translate(0,0.046,0.074);b.rotate(-0.20,0,0);
+    b.chamfer(0,0,0,0.150,0.015,0.038,MID,0.006,{noBand:true});b.pop();
+    /* nose — a wedge, not a cone */
+    /* Nose: a wedge running down the face, widening to the tip. */
+    b.push();b.translate(0,-0.006,0.086);b.rotate(0.10,0,0);
+    b.loft([
+      {y: 0.052,pts:[[0.011,-0.004],[0.011,0.018],[-0.011,0.018],[-0.011,-0.004]]},
+      {y: 0.006,pts:[[0.016,-0.004],[0.016,0.030],[-0.016,0.030],[-0.016,-0.004]]},
+      {y:-0.034,pts:[[0.023,-0.004],[0.023,0.040],[-0.023,0.040],[-0.023,-0.004]]}
+    ],MID,{openTop:true,openBottom:true});
+    b.pop();
+    b.push();b.translate(0,-0.038,0.116);
+    b.sphere(0,0,0,0.019,8,6,MID,{squash:0.66});b.pop();
+    /* ears */
+    for(var e=-1;e<=1;e+=2){
+      b.push();b.translate(e*0.092,-0.006,-0.006);b.rotate(0,0,e*0.16);
+      /* scale before the sphere, not after: a transform applied after
+         the geometry is emitted does nothing at all */
+      b.scale(0.38,1,0.78);
+      b.sphere(0,0,0,0.029,8,6,MID,{squash:1.40});
+      b.pop();
+    }
+    /* lips: a shallow shelf, enough to catch a shadow */
+    b.push();b.translate(0,-0.056,0.100);
+    b.chamfer(0,0,0,0.054,0.015,0.015,DARK,0.005,{noBand:true});b.pop();
+  });
+};
+
+/* Eyes are their own part so they can be tinted per player without
+   dragging the whole head's colour with them. */
+Body.eyes=function(){
+  return part('eyes',function(b){
+    b.mat('blank');
+    for(var s=-1;s<=1;s+=2){
+      var x=s*0.046;
+      /* Socket, then eyeball. Both are pulled back so their front
+         sits flush with the face rather than standing off it — a
+         sphere centred on the surface reads as a bug's eye. */
+      /* The face plane sits at about z = 0.105 at the eyeline. Each
+         layer has to end just in front of the one behind it: a socket
+         whose own front surface is ahead of the eyeball hides the
+         eyeball completely, which is what the first attempt did. */
+      b.push();b.translate(x,0.008,0.072);b.rotate(0,s*-0.14,0);
+      b.sphere(0,0,0,0.031,10,8,DEEP,{squash:0.60});
+      b.pop();
+      b.push();b.translate(x,0.008,0.087);b.rotate(0,s*-0.14,0);
+      b.sphere(0,0,0,0.0200,10,8,LIT,{squash:0.72});
+      b.pop();
+    }
+  });
+};
+/* The iris carries the player's eye colour, so it is a separate tint. */
+Body.iris=function(){
+  return part('iris',function(b){
+    b.mat('blank');
+    for(var s=-1;s<=1;s+=2){
+      var x=s*0.050;
+      b.push();b.translate(x,0.008,0.0995);b.rotate(0,s*-0.14,0);
+      b.sphere(0,0,0,0.0105,10,8,LIT,{squash:0.95});
+      /* pupil and a single specular glint — the glint is what makes a
+         stylised eye look alive rather than glassy */
+      b.sphere(0,0,0.005,0.0052,8,6,'#101010');
+      b.sphere(0.004,0.005,0.007,0.0026,6,5,'#FFFFFF');
+      b.pop();
+    }
+  });
+};
+
+Body.brows=function(){
+  return part('brows',function(b){
+    b.mat('blank');
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.051,0.036,0.099);b.rotate(0,s*-0.16,s*0.10);
+      b.chamfer(0,0,0,0.052,0.010,0.014,LIT,0.004,{noBand:true});
+      b.pop();
+    }
+  });
+};
+
+/* ---------------- torso ---------------- */
+Body.chest=function(kind){
+  kind=kind||'base';
+  return part('chest:'+kind,function(b){
+    b.mat('blank');
+    var n=16;
+    var bulk=kind==='bulk'?1.10:(kind==='slim'?0.93:1.0);
+    /* The chest bone sits at 1.36 m and the hips mesh tops out at
+       1.07 m, so this loft has to reach down past its own bone to
+       close the abdomen — otherwise the figure has a hole at the
+       waist that clothing does not cover either. */
+    var secs=[
+      {y:-0.31,pts:Geo.roundRect(0.252*bulk,0.158*bulk,0.062,n)},  /* pelvis   */
+      {y:-0.22,pts:Geo.roundRect(0.268*bulk,0.164*bulk,0.066,n)},  /* belly    */
+      {y:-0.12,pts:Geo.roundRect(0.278*bulk,0.170*bulk,0.068,n)},  /* waist    */
+      {y:-0.02,pts:Geo.roundRect(0.290*bulk,0.176*bulk,0.070,n)},
+      {y: 0.04,pts:Geo.roundRect(0.318*bulk,0.188*bulk,0.078,n)},  /* ribs     */
+      {y: 0.09,pts:Geo.roundRect(0.360*bulk,0.206*bulk,0.086,n)},  /* pecs     */
+      /* The shoulder bones sit at chest-space y = 0.13, i.e. 1.49 m.
+         The loft has to peak there and fall away, because the chin is
+         at 1.565 m — an earlier version topped out at 1.66 and the
+         torso quietly ate the character's jaw. */
+      {y: 0.13,pts:Geo.roundRect(0.386*bulk,0.208*bulk,0.092,n)},  /* shoulder */
+      {y: 0.163,pts:Geo.roundRect(0.300*bulk,0.180*bulk,0.078,n)},
+      {y: 0.186,pts:Geo.roundRect(0.176,0.148,0.060,n)}            /* neck base*/
+    ];
+    b.loft(secs,LIT,{});
+    /* Collarbone shelf and a shallow sternum line: two small pieces of
+       geometry that stop the chest reading as a barrel. */
+    b.push();b.translate(0,0.140,0.068);
+    b.chamfer(0,0,0,0.246,0.015,0.028,MID,0.007,{noBand:true});b.pop();
+    b.push();b.translate(0,0.055,0.098);
+    b.chamfer(0,0,0,0.013,0.120,0.014,LOW,0.005,{noBand:true});b.pop();
+    /* shoulder blades */
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.104,0.078,-0.086);b.rotate(0,0,s*0.2);
+      b.chamfer(0,0,0,0.106,0.120,0.018,MID,0.010,{noBand:true});b.pop();
+    }
+  });
+};
+
+Body.neck=function(){
+  return part('neck',function(b){
+    b.mat('blank');
+    b.loft([
+      {y:-0.06,pts:Geo.circle(0.072,10,1.10,1.0)},
+      {y: 0.00,pts:Geo.circle(0.062,10,1.04,1.0)},
+      {y: 0.06,pts:Geo.circle(0.058,10,1.00,1.0)}
+    ],MID,{openTop:true,openBottom:true});
+  });
+};
+
+Body.hips=function(){
+  return part('hips',function(b){
+    b.mat('blank');
+    var n=14;
+    b.loft([
+      {y:-0.14,pts:Geo.roundRect(0.240,0.170,0.070,n)},
+      {y:-0.06,pts:Geo.roundRect(0.296,0.190,0.082,n)},
+      {y: 0.02,pts:Geo.roundRect(0.302,0.186,0.084,n)},
+      {y: 0.09,pts:Geo.roundRect(0.276,0.172,0.076,n)}
+    ],LIT,{});
+  });
+};
+
+/* ---------------- limbs ---------------- */
+Body.upperArm=function(){
+  return part('upperArm',function(b){
+    b.mat('blank');
+    b.limb(0.27,0.062,0.050,LIT,{seg:10,bulge:0.10});
+  });
+};
+Body.forearm=function(){
+  return part('forearm',function(b){
+    b.mat('blank');
+    b.limb(0.25,0.052,0.038,LIT,{seg:10,bulge:0.06});
+  });
+};
+Body.hand=function(){
+  return part('hand',function(b){
+    b.mat('blank');
+    /* palm plus a mitten of fingers and a separate thumb — at the size
+       a hand occupies on screen, five modelled fingers are wasted
+       triangles, but a visible thumb is the difference between a hand
+       and a paddle */
+    b.push();b.translate(0,-0.042,0);
+    b.chamfer(0,0,0,0.048,0.072,0.070,LIT,0.020);b.pop();
+    b.push();b.translate(0,-0.098,0.006);b.rotate(0.10,0,0);
+    b.chamfer(0,0,0,0.044,0.056,0.062,MID,0.022);b.pop();
+    b.push();b.translate(0.030,-0.048,0.028);b.rotate(0,0,-0.5);
+    b.chamfer(0,0,0,0.024,0.048,0.026,MID,0.010);b.pop();
+  });
+};
+Body.thigh=function(){
+  return part('thigh',function(b){
+    b.mat('blank');
+    b.limb(0.46,0.092,0.068,LIT,{seg:12,bulge:0.08,steps:8});
+  });
+};
+Body.shin=function(){
+  return part('shin',function(b){
+    b.mat('blank');
+    b.limb(0.46,0.070,0.046,LIT,{seg:10,bulge:0.10,steps:8});
+    /* calf mass sits behind and high */
+    b.push();b.translate(0,-0.14,-0.028);
+    b.sphere(0,0,0,0.052,10,8,MID,{squash:1.9});b.pop();
+  });
+};
+Body.foot=function(style){
+  style=style||'shoe';
+  return part('foot:'+style,function(b){
+    b.mat('blank');
+    if(style==='bare'){
+      b.push();b.translate(0,-0.030,0.036);
+      b.chamfer(0,0,0,0.082,0.056,0.190,LIT,0.024);b.pop();
+      return;
+    }
+    /* sole */
+    b.push();b.translate(0,-0.046,0.040);
+    b.chamfer(0,0,0,0.098,0.030,0.230,DARK,0.012);b.pop();
+    /* upper */
+    b.push();b.translate(0,-0.010,0.026);
+    b.loft([
+      {y:-0.020,pts:Geo.roundRect(0.094,0.216,0.034,12)},
+      {y: 0.026,pts:Geo.roundRect(0.092,0.196,0.036,12)},
+      {y: 0.058,pts:Geo.roundRect(0.084,0.136,0.034,12)}
+    ],LIT,{});
+    b.pop();
+    /* ankle collar and a toe cap, so a boot reads as a boot */
+    b.push();b.translate(0,0.040,-0.024);
+    b.chamfer(0,0,0,0.090,0.052,0.076,MID,0.018);b.pop();
+    b.push();b.translate(0,-0.018,0.128);
+    b.chamfer(0,0,0,0.086,0.044,0.052,MID,0.016);b.pop();
+  });
+};
+
+/* ---------------- garments ----------------
+   Garments are slightly inflated copies of the body parts they cover.
+   Building them from the same profiles guarantees they never clip
+   through, which is the failure mode that makes layered clothing
+   look cheap. */
+function inflate(pts,amt){
+  var out=[];
+  for(var i=0;i<pts.length;i++){
+    var x=pts[i][0],z=pts[i][1];
+    var l=Math.hypot(x,z)||1;
+    out.push([x+x/l*amt,z+z/l*amt]);
+  }
+  return out;
+}
+
+Body.shirt=function(style){
+  style=style||'tee';
+  return part('shirt:'+style,function(b){
+    b.mat('fabric');
+    var n=16,inf=0.014;
+    var lowY=style==='crop'?0.06:-0.27;
+    var secs=[
+      {y:lowY,   pts:inflate(Geo.roundRect(
+         style==='crop'?0.312:0.264,style==='crop'?0.186:0.166,0.066,n),inf+0.004)},
+      {y:-0.12,  pts:inflate(Geo.roundRect(0.280,0.172,0.068,n),inf)},
+      {y:-0.02,  pts:inflate(Geo.roundRect(0.292,0.178,0.070,n),inf)},
+      {y: 0.04,  pts:inflate(Geo.roundRect(0.320,0.190,0.078,n),inf)},
+      {y: 0.09,  pts:inflate(Geo.roundRect(0.362,0.208,0.086,n),inf)},
+      {y: 0.13,  pts:inflate(Geo.roundRect(0.388,0.210,0.092,n),inf)},
+      {y: 0.163, pts:inflate(Geo.roundRect(0.302,0.182,0.078,n),inf)},
+      {y: 0.184, pts:inflate(Geo.roundRect(0.192,0.156,0.062,n),inf)}
+    ];
+    b.loft(secs,LIT,{openTop:true,uvScale:2});
+    if(style==='jacket'){
+      /* lapels and a front seam */
+      b.mat('fabric');
+      for(var s=-1;s<=1;s+=2){
+        b.push();b.translate(s*0.050,0.085,0.112);b.rotate(0.12,0,s*0.30);
+        b.chamfer(0,0,0,0.066,0.130,0.018,MID,0.008,{noBand:true});b.pop();
+      }
+      b.push();b.translate(0,0.020,0.114);
+      b.chamfer(0,0,0,0.014,0.200,0.016,DEEP,0.005,{noBand:true});b.pop();
+      /* Collar. It stops at 0.176 in chest space (1.539 m) — anything
+         taller and the jacket eats the jaw. */
+      b.push();b.translate(0,0.150,0.026);
+      b.loft([
+        {y:0,    pts:inflate(Geo.roundRect(0.200,0.164,0.064,14),0.010)},
+        {y:0.026,pts:inflate(Geo.roundRect(0.216,0.176,0.070,14),0.016)}
+      ],MID,{openTop:true,openBottom:true});
+      b.pop();
+    }
+    if(style==='hoodie'){
+      b.mat('fabric');
+      b.push();b.translate(0,0.170,-0.076);b.rotate(-0.30,0,0);
+      b.sphere(0,0,0,0.132,12,9,MID,{squash:0.72});b.pop();
+      b.push();b.translate(0,-0.030,0.116);
+      b.chamfer(0,0,0,0.188,0.066,0.020,MID,0.010,{noBand:true});b.pop();
+    }
+  });
+};
+
+Body.sleeve=function(which){
+  return part('sleeve:'+which,function(b){
+    b.mat('fabric');
+    var len=which==='long'?0.28:0.14;
+    b.limb(len,0.074,which==='long'?0.052:0.064,LIT,
+      {seg:10,steps:5,joint:false,uvScale:2});
+    /* shoulder cap, so the deltoid does not show a ring of skin */
+    b.sphere(0,0.006,0,0.072,10,7,LIT);
+    /* a cuff, so the sleeve ends in something rather than stopping */
+    b.push();b.translate(0,-len,0);
+    b.loft([
+      {y:-0.014,pts:Geo.circle(which==='long'?0.050:0.062,10)},
+      {y: 0.010,pts:Geo.circle(which==='long'?0.052:0.064,10)}
+    ],MID,{openTop:true,openBottom:true});
+    b.pop();
+  });
+};
+
+Body.pants=function(style){
+  style=style||'long';
+  return part('pants:'+style,function(b){
+    b.mat('fabric');
+    var n=14;
+    /* the seat, over the hips bone */
+    b.loft([
+      {y:-0.15,pts:inflate(Geo.roundRect(0.244,0.172,0.070,n),0.016)},
+      {y:-0.06,pts:inflate(Geo.roundRect(0.298,0.192,0.082,n),0.014)},
+      {y: 0.03,pts:inflate(Geo.roundRect(0.304,0.188,0.084,n),0.014)},
+      {y: 0.075,pts:inflate(Geo.roundRect(0.286,0.178,0.078,n),0.012)}
+    ],LIT,{openTop:true,uvScale:2});
+    /* waistband */
+    b.push();b.translate(0,0.072,0);
+    b.loft([
+      {y:0,    pts:inflate(Geo.roundRect(0.288,0.180,0.078,n),0.020)},
+      {y:0.032,pts:inflate(Geo.roundRect(0.290,0.182,0.078,n),0.020)}
+    ],MID,{openTop:true,openBottom:true});
+    b.pop();
+  });
+};
+
+/* Lower leg, for anything that reaches past the knee. Split from the
+   thigh piece because they ride different bones. */
+Body.legwearLower=function(style){
+  return part('legwearLower:'+style,function(b){
+    b.mat('fabric');
+    var len=0.44;
+    b.limb(len,0.090,0.058,LIT,{seg:10,steps:5,joint:false,uvScale:2});
+    /* cover the knee: the shin's own joint sphere sits at this bone's
+       origin and pokes through anything cut flush */
+    b.sphere(0,0.010,0,0.086,10,7,LIT);
+    b.push();b.translate(0,-len,0);
+    b.loft([
+      {y:-0.014,pts:Geo.circle(0.060,10)},
+      {y: 0.014,pts:Geo.circle(0.062,10)}
+    ],MID,{openTop:true,openBottom:true});
+    b.pop();
+  });
+};
+
+Body.legwear=function(style){
+  return part('legwear:'+style,function(b){
+    b.mat('fabric');
+    var len=style==='shorts'?0.22:0.50;
+    b.limb(len,0.112,style==='shorts'?0.100:0.080,LIT,
+      {seg:12,steps:6,joint:false,uvScale:2});
+    b.sphere(0,0.010,0,0.108,12,8,LIT);
+    b.push();b.translate(0,-len,0);
+    b.loft([
+      {y:-0.016,pts:Geo.circle(style==='shorts'?0.096:0.078,12)},
+      {y: 0.012,pts:Geo.circle(style==='shorts'?0.098:0.080,12)}
+    ],MID,{openTop:true,openBottom:true});
+    b.pop();
+  });
+};
+
+/* ---------------- hair ---------------- */
+var HAIR_BUILD={
+  crop:function(b){
+    /* The cap starts above the eyebrows. It cannot simply be a taller
+       ring, because the same ring that covers the nape at the back
+       would cut across the face at the front. */
+    b.loft([
+      {y: 0.026,pts:Geo.roundRect(0.180,0.192,0.084,14)},
+      {y: 0.062,pts:Geo.roundRect(0.192,0.202,0.090,14)},
+      {y: 0.104,pts:Geo.roundRect(0.186,0.196,0.086,14)},
+      {y: 0.138,pts:Geo.roundRect(0.150,0.160,0.072,14)},
+      {y: 0.162,pts:Geo.roundRect(0.080,0.086,0.038,14)}
+    ],LIT,{openBottom:true});
+    /* Back and sides, dropped to the nape. The front half of each ring
+       is pulled back behind the ears so it never crosses the face. */
+    var back=[];
+    for(var i=0;i<4;i++){
+      var t=i/3, y=-0.062+t*0.096;
+      var pts=Geo.roundRect(0.176+t*0.014,0.190+t*0.012,0.082,14);
+      for(var j=0;j<pts.length;j++)
+        if(pts[j][1]>-0.010)pts[j][1]=-0.010-Math.max(0,pts[j][1])*0.16;
+      back.push({y:y,pts:pts});
+    }
+    b.loft(back,LIT,{openTop:true,openBottom:true});
+    /* A fringe swept off a parting. Spheres, not slabs — a flat plank
+       at the hairline reads as a headband bolted to the forehead. */
+    var sweep=[[0.052,0.076,0.058,0.062,0.26],[0.012,0.084,0.066,0.058,0.20],
+               [-0.030,0.082,0.062,0.054,-0.18],[-0.066,0.072,0.050,0.046,-0.30]];
+    for(var f=0;f<sweep.length;f++){
+      var S=sweep[f];
+      b.push();b.translate(S[0],S[1],S[2]);b.rotate(0.30,S[4],S[4]*0.7);
+      b.scale(1.15,0.52,1.0);
+      b.sphere(0,0,0,S[3],9,7,MID);b.pop();
+    }
+  },
+  swept:function(b){
+    HAIR_BUILD.crop(b);
+    /* volume pushed back and up on one side */
+    b.push();b.translate(0.014,0.126,-0.024);b.rotate(-0.20,0.10,0.12);
+    b.sphere(0,0,0,0.104,12,9,LIT,{squash:0.68});b.pop();
+    b.push();b.translate(-0.078,0.100,0.020);b.rotate(0,0,-0.42);
+    b.sphere(0,0,0,0.058,10,8,MID,{squash:1.2});b.pop();
+  },
+  long:function(b){
+    HAIR_BUILD.crop(b);
+    /* two curtains down the back, tapering and flaring out */
+    b.push();b.translate(0,0.020,-0.060);
+    b.loft([
+      {y:-0.300,pts:Geo.roundRect(0.170,0.120,0.055,12)},
+      {y:-0.190,pts:Geo.roundRect(0.208,0.140,0.062,12)},
+      {y:-0.070,pts:Geo.roundRect(0.216,0.156,0.068,12)},
+      {y: 0.040,pts:Geo.roundRect(0.200,0.170,0.070,12)}
+    ],LIT,{openTop:true});
+    b.pop();
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.096,-0.060,0.032);b.rotate(0,0,s*0.10);
+      b.chamfer(0,0,0,0.052,0.230,0.070,MID,0.024);b.pop();
+    }
+  },
+  bun:function(b){
+    HAIR_BUILD.crop(b);
+    b.push();b.translate(0,0.156,-0.078);
+    b.sphere(0,0,0,0.078,12,9,LIT,{squash:0.92});
+    b.sphere(0.034,0.020,0.020,0.040,10,8,MID);b.pop();
+  },
+  spiked:function(b){
+    HAIR_BUILD.crop(b);
+    var rng=M.rng(41);
+    for(var i=0;i<11;i++){
+      var a=rng()*M.TAU,r=0.02+rng()*0.088;
+      var x=Math.cos(a)*r,z=Math.sin(a)*r*1.05;
+      b.push();
+      b.translate(x,0.128+rng()*0.02,z);
+      b.rotate(z*2.6,0,-x*2.6);
+      b.cylinder(0,0.040,0,0.028,0.002,0.090,6,i%2?LIT:MID);
+      b.pop();
+    }
+  },
+  braids:function(b){
+    HAIR_BUILD.crop(b);
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.094,0.020,-0.010);
+      for(var i=0;i<5;i++){
+        b.push();
+        b.translate(s*i*0.010,-0.060*i,0.004*i);
+        b.sphere(0,0,0,0.042-i*0.004,9,7,i%2?LIT:MID,{squash:0.9});
+        b.pop();
+      }
+      b.pop();
+    }
+  },
+  bald:function(b){}
+};
+Body.HAIR=Object.keys(HAIR_BUILD);
+/* Hair and hats are authored against a reference skull and scaled onto
+   the real one here, so changing the head's profile does not mean
+   re-measuring eleven hairstyles by hand. */
+var HEAD_FIT=[1.085,1.060,1.085];
+Body.hair=function(style){
+  style=HAIR_BUILD[style]?style:'crop';
+  return part('hair:'+style,function(b){
+    b.mat('blank');
+    b.push();b.scale(HEAD_FIT[0],HEAD_FIT[1],HEAD_FIT[2]);
+    HAIR_BUILD[style](b);
+    b.pop();
+  });
+};
+
+/* ---------------- headwear ---------------- */
+var HAT_BUILD={
+  cap:function(b){
+    b.loft([
+      {y:0.020,pts:Geo.roundRect(0.200,0.208,0.092,14)},
+      {y:0.090,pts:Geo.roundRect(0.198,0.204,0.090,14)},
+      {y:0.140,pts:Geo.roundRect(0.160,0.168,0.074,14)},
+      {y:0.168,pts:Geo.roundRect(0.084,0.088,0.040,14)}
+    ],LIT,{openBottom:true});
+    b.push();b.translate(0,0.026,0.140);b.rotate(-0.16,0,0);
+    b.loft([
+      {y:-0.008,pts:Geo.roundRect(0.190,0.150,0.070,12)},
+      {y: 0.010,pts:Geo.roundRect(0.196,0.156,0.072,12)}
+    ],MID,{});
+    b.pop();
+    b.push();b.translate(0,0.176,0);b.sphere(0,0,0,0.016,8,6,MID);b.pop();
+  },
+  beanie:function(b){
+    b.loft([
+      {y:-0.010,pts:Geo.roundRect(0.206,0.214,0.096,14)},
+      {y: 0.060,pts:Geo.roundRect(0.208,0.216,0.096,14)},
+      {y: 0.120,pts:Geo.roundRect(0.186,0.194,0.086,14)},
+      {y: 0.164,pts:Geo.roundRect(0.120,0.126,0.056,14)},
+      {y: 0.188,pts:Geo.roundRect(0.052,0.056,0.024,14)}
+    ],LIT,{openBottom:true});
+    b.push();b.translate(0,0.006,0);
+    b.loft([
+      {y:0,    pts:Geo.roundRect(0.216,0.224,0.100,14)},
+      {y:0.044,pts:Geo.roundRect(0.216,0.224,0.100,14)}
+    ],MID,{openTop:true,openBottom:true});
+    b.pop();
+    b.push();b.translate(0,0.202,0);b.sphere(0,0,0,0.030,10,8,MID);b.pop();
+  },
+  brim:function(b){
+    b.loft([
+      {y:0.010,pts:Geo.roundRect(0.196,0.202,0.090,14)},
+      {y:0.120,pts:Geo.roundRect(0.190,0.196,0.088,14)},
+      {y:0.176,pts:Geo.roundRect(0.176,0.182,0.082,14)}
+    ],LIT,{openBottom:true});
+    b.push();b.translate(0,0.014,0);
+    b.loft([
+      {y:0,     pts:Geo.circle(0.300,16,1.0,1.06)},
+      {y:0.016, pts:Geo.circle(0.296,16,1.0,1.06)}
+    ],MID,{});
+    b.pop();
+    b.push();b.translate(0,0.100,0);
+    b.loft([
+      {y:0,     pts:Geo.roundRect(0.206,0.212,0.094,14)},
+      {y:0.030, pts:Geo.roundRect(0.206,0.212,0.094,14)}
+    ],DARK,{openTop:true,openBottom:true});
+    b.pop();
+  },
+  crown:function(b){
+    /* band */
+    b.mat('gold');
+    b.loft([
+      {y:0.030,pts:Geo.roundRect(0.198,0.204,0.092,16)},
+      {y:0.100,pts:Geo.roundRect(0.202,0.208,0.094,16)}
+    ],LIT,{openTop:true,openBottom:true});
+    /* five points, tallest at the front */
+    for(var i=0;i<5;i++){
+      var a=(-0.5+i/4)*2.0;
+      var tall=0.062+Math.cos(a)*0.040;
+      b.push();
+      b.translate(Math.sin(a)*0.100,0.100,Math.cos(a)*0.104);
+      b.rotate(0,a,0);
+      b.extrude([[-0.030,0],[0.030,0],[0,tall]],0.020,LIT);
+      b.pop();
+      /* a set jewel at each point's base */
+      b.mat('crystal',0.30);
+      b.push();
+      b.translate(Math.sin(a)*0.104,0.070,Math.cos(a)*0.108);
+      b.sphere(0,0,0,0.017,8,6,LIT,{squash:0.8});
+      b.pop();
+      b.mat('gold');
+    }
+  },
+  halo:function(b){
+    /* a ring of overlapping emissive beads reads as a torus at this
+       size and costs a fraction of one */
+    b.mat('neon',1.0);
+    b.push();b.translate(0,0.230,0);
+    for(var k=0;k<26;k++){
+      var a=k/26*M.TAU;
+      b.push();
+      b.translate(Math.cos(a)*0.145,0,Math.sin(a)*0.145);
+      b.sphere(0,0,0,0.016,6,5,LIT);
+      b.pop();
+    }
+    b.pop();
+  },
+  visor:function(b){
+    b.mat('panel');
+    b.loft([
+      {y:0.030,pts:Geo.roundRect(0.204,0.210,0.094,14)},
+      {y:0.096,pts:Geo.roundRect(0.200,0.206,0.092,14)},
+      {y:0.150,pts:Geo.roundRect(0.160,0.166,0.074,14)}
+    ],LIT,{openBottom:true});
+    b.mat('neon',0.85);
+    b.push();b.translate(0,0.026,0.108);b.rotate(-0.10,0,0);
+    b.chamfer(0,0,0,0.216,0.040,0.036,LIT,0.014,{noBand:true});b.pop();
+  },
+  none:function(b){}
+};
+Body.HATS=Object.keys(HAT_BUILD);
+Body.hat=function(style){
+  style=HAT_BUILD[style]?style:'none';
+  return part('hat:'+style,function(b){
+    b.mat('blank');
+    b.push();b.scale(HEAD_FIT[0],HEAD_FIT[1],HEAD_FIT[2]);
+    HAT_BUILD[style](b);
+    b.pop();
+  });
+};
+
+LH.Body=Body;
+})();
+
+/* ============================================================
+   LH.Cosmetic — back items, auras and held objects.
+
+   These are the parts players actually chase, so they get the most
+   geometry per part. Everything still binds to a bone: wings and
+   capes to the chest, tools to the right hand, auras to the root.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,Geo=LH.Geo,Body=LH.Body,Cos={};
+var part=Body.part;
+var LIT='#FFFFFF',MID='#D2D2D2',LOW='#A8A8A8',DARK='#7C7C7C',DEEP='#585858';
+
+/* ---------------- wings ---------------- */
+/* One feathered wing built along +X; the pair is drawn twice with the
+   second mirrored, so a style is written once. */
+function featherWing(b,opts){
+  var n=opts.feathers||7;
+  var span=opts.span||0.62,rise=opts.rise||0.30;
+  /* the arm of the wing */
+  b.push();b.rotate(0,0,-0.34);
+  b.limb(0.30,0.036,0.020,MID,{seg:8,steps:4,joint:false});
+  b.pop();
+  for(var i=0;i<n;i++){
+    var t=i/(n-1);
+    /* Primaries at the tip are long and swept; coverts near the body
+       are short and stacked. */
+    var len=M.lerp(0.20,span,Math.pow(t,0.72));
+    var wid=M.lerp(0.090,0.052,t);
+    var ax=M.lerp(0.055,0.235,t);
+    var ay=M.lerp(-0.010,rise,Math.pow(t,1.25));
+    b.push();
+    b.translate(ax,ay,-0.010-t*0.012);
+    b.rotate(0,0,-0.30-t*0.62);
+    b.rotate(0.10*t,0,0);
+    /* a feather is a long tapered card with a shaft down the middle */
+    b.extrude([
+      [0,-wid*0.42],[len*0.55,-wid*0.50],[len,-wid*0.16],
+      [len,wid*0.16],[len*0.55,wid*0.50],[0,wid*0.42]
+    ],0.014,i>n-4?LIT:MID);
+    b.push();b.translate(len*0.5,0,0.009);
+    b.chamfer(0,0,0,len,0.008,0.006,LOW,0.003,{noBand:true});
+    b.pop();
+    b.pop();
+  }
+}
+
+var WING_BUILD={
+  feathered:function(b){b.mat('blank');featherWing(b,{feathers:8,span:0.66,rise:0.32});},
+  angelic:function(b){
+    b.mat('blank');featherWing(b,{feathers:10,span:0.86,rise:0.42});
+    b.mat('neon',0.45);
+    b.push();b.translate(0.20,0.20,0);b.sphere(0,0,0,0.045,8,6,LIT);b.pop();
+  },
+  bat:function(b){
+    b.mat('blank');
+    /* three fingers with membrane panels stretched between them */
+    var fing=[[-0.10,0.34,0.70],[0.10,0.16,0.78],[0.26,-0.06,0.64]];
+    b.push();b.rotate(0,0,-0.26);
+    b.limb(0.24,0.030,0.018,DARK,{seg:6,steps:3,joint:false});
+    b.pop();
+    for(var i=0;i<3;i++){
+      var f=fing[i];
+      b.push();b.translate(0.14,0.02,0);b.rotate(0,0,f[0]);
+      b.cylinder(f[2]/2,f[1]/2,0,0.014,0.006,f[2],6,DARK,{open:true});
+      b.pop();
+    }
+    b.push();b.translate(0.42,0.12,-0.004);
+    b.extrude([[-0.30,-0.30],[0.34,-0.10],[0.30,0.26],[-0.24,0.30]],0.008,MID);
+    b.pop();
+  },
+  crystal:function(b){
+    b.mat('crystal',0.42);
+    for(var i=0;i<5;i++){
+      var t=i/4;
+      b.push();
+      b.translate(0.08+t*0.20,-0.02+t*0.34,-0.008-t*0.010);
+      b.rotate(0,0,-0.26-t*0.70);
+      b.extrude([[0,-0.052],[M.lerp(0.24,0.62,t),-0.014],
+                 [M.lerp(0.24,0.62,t),0.014],[0,0.052]],0.020,LIT);
+      b.pop();
+    }
+  },
+  mech:function(b){
+    /* Overlapping plates fanned from a shared root, like a folding
+       blade. Thin struts read as scaffolding rather than a wing —
+       the silhouette has to be solid to hold at gameplay distance. */
+    b.mat('panel');
+    b.push();b.rotate(0,0,-0.26);
+    b.chamfer(0.15,0,0,0.32,0.075,0.062,LIT,0.018);
+    b.pop();
+    for(var i=0;i<4;i++){
+      var t=i/3;
+      var len=M.lerp(0.38,0.72,t);
+      var wid=M.lerp(0.150,0.096,t);
+      b.push();
+      b.translate(0.20,0.02,-0.010-t*0.013);
+      b.rotate(0,0,-0.30-t*0.52);
+      /* a plate: root wide, tip swept and narrow */
+      b.extrude([
+        [0,-wid*0.44],[len*0.62,-wid*0.50],[len,-wid*0.16],
+        [len,wid*0.20],[len*0.55,wid*0.46],[0,wid*0.40]
+      ],0.026,i%2?LIT:MID);
+      /* a lit seam down each plate */
+      b.mat('neon',0.85);
+      b.push();b.translate(len*0.46,wid*0.06,0.015);
+      b.chamfer(0,0,0,len*0.80,0.012,0.008,LIT,0.003,{noBand:true});
+      b.pop();
+      b.mat('panel');
+      b.pop();
+    }
+    b.mat('neon',0.95);
+    b.push();b.translate(0.18,0.05,0.034);
+    b.sphere(0,0,0,0.036,8,6,LIT,{squash:0.7});b.pop();
+  },
+  ember:function(b){
+    b.mat('neon',0.8);
+    var rng=M.rng(17);
+    for(var i=0;i<14;i++){
+      var t=rng();
+      b.push();
+      b.translate(0.06+t*0.52,-0.04+t*0.44+rng()*0.10,(rng()-0.5)*0.06);
+      b.sphere(0,0,0,0.020+rng()*0.030,7,6,LIT,{squash:1.4});
+      b.pop();
+    }
+  },
+  none:function(b){}
+};
+Cos.WINGS=Object.keys(WING_BUILD);
+Cos.wings=function(style){
+  style=WING_BUILD[style]?style:'none';
+  return part('wings:'+style,function(b){
+    b.mat('blank');
+    /* both sides from one description */
+    b.push();b.translate(0.070,0.150,-0.104);b.rotate(0.10,-0.30,0);
+    WING_BUILD[style](b);b.pop();
+    b.push();b.translate(-0.070,0.150,-0.104);b.rotate(0.10,0.30,0);
+    b.scale(-1,1,1);
+    WING_BUILD[style](b);b.pop();
+  },96);
+};
+
+/* ---------------- capes ---------------- */
+Cos.cape=function(style){
+  style=style||'plain';
+  return part('cape:'+style,function(b){
+    b.mat('fabric');
+    /* Lofted with a widening, rippling hem. The ripple is what stops a
+       cape reading as a flat sheet of cardboard hanging off the neck. */
+    var n=16,secs=[];
+    var steps=9;
+    for(var i=0;i<=steps;i++){
+      var t=i/steps;
+      var y=0.28-t*0.86;
+      var w=M.lerp(0.30,0.60,Math.pow(t,0.85));
+      var d=M.lerp(0.16,0.30,t);
+      var pts=Geo.roundRect(w,d,0.07,n);
+      /* keep only the back half — a cape does not wrap the chest */
+      for(var j=0;j<pts.length;j++){
+        if(pts[j][1]>0)pts[j][1]*=0.16;
+        else pts[j][1]-=0.055*t;
+        /* scallop the hem */
+        pts[j][0]*=1+Math.sin(j*2.4)*0.055*t;
+        pts[j][1]*=1+Math.cos(j*2.4)*0.070*t;
+      }
+      secs.push({y:y,pts:pts,col:i<2?MID:(i>steps-2?LOW:LIT)});
+    }
+    b.push();b.translate(0,0,-0.020);
+    b.loft(secs,LIT,{openTop:true,openBottom:true,uvScale:1.6});
+    b.pop();
+    /* clasp across the collarbone */
+    b.mat(style==='royal'?'gold':'panel');
+    b.push();b.translate(0,0.262,0.060);
+    b.chamfer(0,0,0,0.150,0.026,0.030,LIT,0.010,{noBand:true});
+    b.sphere(0,0,0.020,0.026,10,8,MID);
+    b.pop();
+  },64);
+};
+
+Cos.backpack=function(style){
+  style=style||'satchel';
+  return part('back:'+style,function(b){
+    b.mat('fabric');
+    b.push();b.translate(0,0.130,-0.150);
+    b.chamfer(0,0,0,0.260,0.320,0.140,LIT,0.030);
+    b.mat('panel');
+    b.push();b.translate(0,-0.070,0.010);
+    b.chamfer(0,0,0,0.270,0.110,0.150,MID,0.024);b.pop();
+    b.mat('fabric');
+    b.push();b.translate(0,0.130,0.076);
+    b.chamfer(0,0,0,0.230,0.090,0.020,DARK,0.008,{noBand:true});b.pop();
+    b.pop();
+    /* shoulder straps */
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.090,0.180,0.020);b.rotate(0.16,0,0);
+      b.chamfer(0,0,0,0.048,0.240,0.150,MID,0.014);b.pop();
+    }
+  },48);
+};
+
+/* ---------------- auras ----------------
+   The rarity tell. Drawn additively under the character, so it lights
+   the ground the way the 2D build's ground bloom did.  */
+Cos.aura=function(kind){
+  return part('aura:'+kind,function(b){
+    b.mat('neon',1.0);
+    if(kind==='ring'){
+      for(var k=0;k<30;k++){
+        var a=k/30*M.TAU;
+        b.push();b.translate(Math.cos(a)*0.44,0.012,Math.sin(a)*0.44);
+        b.sphere(0,0,0,0.036,6,5,LIT,{squash:0.30});b.pop();
+      }
+    }else if(kind==='pillar'){
+      for(var i=0;i<10;i++){
+        var t=i/9;
+        b.push();b.translate(0,t*1.9,0);
+        var r=0.40*(1-t*0.55);
+        for(var j=0;j<8;j++){
+          var aa=j/8*M.TAU+t*1.4;
+          b.push();b.translate(Math.cos(aa)*r,0,Math.sin(aa)*r);
+          b.sphere(0,0,0,0.030*(1-t*0.5),5,4,LIT);b.pop();
+        }
+        b.pop();
+      }
+    }else{ /* motes */
+      var rng=M.rng(23);
+      for(var m=0;m<24;m++){
+        var ang=rng()*M.TAU,rad=0.18+rng()*0.36;
+        b.push();
+        b.translate(Math.cos(ang)*rad,0.10+rng()*1.5,Math.sin(ang)*rad);
+        b.sphere(0,0,0,0.014+rng()*0.018,5,4,LIT);
+        b.pop();
+      }
+    }
+  },48);
+};
+
+/* ---------------- held objects ----------------
+   Built in the hand's space with the grip at the origin, so any tool
+   drops into any hand without a per-item offset table. */
+var TOOL_BUILD={
+  pickaxe:function(b){
+    b.mat('planks');
+    b.push();b.rotate(0,0,Math.PI/2);
+    b.cylinder(0,0.16,0,0.019,0.016,0.66,8,LIT);b.pop();
+    b.mat('panel');
+    b.push();b.translate(0.34,0,0);
+    b.extrude([[-0.05,-0.030],[0.05,-0.030],[0.05,0.030],[-0.05,0.030]],0.048,MID);
+    /* two swept tines rather than a symmetric double-head */
+    b.push();b.translate(0.02,0.010,0);b.rotate(0,0,0.34);
+    b.extrude([[0,-0.026],[0.20,-0.010],[0.21,0.008],[0,0.026]],0.030,LIT);b.pop();
+    b.push();b.translate(-0.02,0.010,0);b.rotate(0,0,Math.PI-0.34);
+    b.extrude([[0,-0.026],[0.15,-0.010],[0.16,0.008],[0,0.026]],0.030,MID);b.pop();
+    b.pop();
+  },
+  sword:function(b){
+    b.mat('planks');
+    b.push();b.rotate(0,0,Math.PI/2);
+    b.cylinder(0,-0.02,0,0.020,0.022,0.20,8,MID);b.pop();
+    b.mat('gold');
+    b.push();b.translate(-0.13,0,0);b.sphere(0,0,0,0.030,8,6,LIT);b.pop();
+    b.push();b.translate(0.10,0,0);
+    b.chamfer(0,0,0,0.036,0.170,0.046,LIT,0.012);b.pop();
+    b.mat('panel');
+    /* a real blade: a tapered diamond section with a fuller, so it
+       catches two highlights instead of reading as a grey stick */
+    b.push();b.translate(0.13,0,0);b.rotate(0,0,0);
+    b.loft([
+      {y:0,   pts:[[0.030,0],[0,0.024],[-0.030,0],[0,-0.024]]},
+      {y:0.34,pts:[[0.028,0],[0,0.022],[-0.028,0],[0,-0.022]]},
+      {y:0.62,pts:[[0.022,0],[0,0.017],[-0.022,0],[0,-0.017]]},
+      {y:0.76,pts:[[0.004,0],[0,0.004],[-0.004,0],[0,-0.004]]}
+    ],LIT,{});
+    b.pop();
+    b.push();b.rotate(0,0,-Math.PI/2);
+    b.push();b.translate(0,-0.13,0.011);
+    b.chamfer(0,0,0,0.012,0.58,0.006,MID,0.003,{noBand:true});b.pop();
+    b.pop();
+  },
+  axe:function(b){
+    b.mat('planks');
+    b.push();b.rotate(0,0,Math.PI/2);
+    b.cylinder(0,0.12,0,0.020,0.017,0.56,8,LIT);b.pop();
+    b.mat('panel');
+    b.push();b.translate(0.28,0.02,0);
+    b.extrude([[-0.03,-0.10],[0.10,-0.16],[0.16,0],[0.10,0.16],[-0.03,0.10]],0.036,MID);
+    b.pop();
+  },
+  rod:function(b){
+    b.mat('planks');
+    b.push();b.rotate(0,0,Math.PI/2);
+    b.cylinder(0,-0.04,0,0.020,0.021,0.16,8,MID);
+    /* the blank tapers hard — a fishing rod that stays thick looks
+       like a broom handle */
+    b.cylinder(0,0.52,0,0.015,0.004,0.96,8,LIT);
+    b.pop();
+    b.mat('panel');
+    b.push();b.translate(0.10,-0.038,0);
+    b.cylinder(0,0,0,0.040,0.040,0.036,10,MID);
+    b.push();b.rotate(0,0,Math.PI/2);b.cylinder(0,0.030,0,0.008,0.008,0.06,6,LIT);b.pop();
+    b.pop();
+    /* line guides */
+    for(var i=0;i<4;i++){
+      b.push();b.translate(0.26+i*0.20,0.006,0);
+      b.cylinder(0,0,0,0.014,0.014,0.005,8,DARK);b.pop();
+    }
+  },
+  wrench:function(b){
+    b.mat('panel');
+    b.push();b.rotate(0,0,Math.PI/2);
+    b.cylinder(0,0.10,0,0.019,0.017,0.30,8,LIT);b.pop();
+    b.push();b.translate(0.28,0,0);
+    b.extrude([[-0.03,-0.05],[0.05,-0.07],[0.09,-0.03],[0.04,-0.02],
+               [0.04,0.02],[0.09,0.03],[0.05,0.07],[-0.03,0.05]],0.030,MID);
+    b.pop();
+  },
+  torch:function(b){
+    b.mat('planks');
+    b.push();b.rotate(0,0,Math.PI/2);
+    b.cylinder(0,0.14,0,0.018,0.016,0.34,8,LIT);b.pop();
+    b.mat('neon',1.0);
+    b.push();b.translate(0.32,0,0);
+    b.sphere(0,0,0,0.050,10,8,'#FFC46A',{squash:1.4});b.pop();
+  },
+  net:function(b){
+    b.mat('planks');
+    b.push();b.rotate(0,0,Math.PI/2);
+    b.cylinder(0,0.16,0,0.018,0.015,0.48,8,LIT);b.pop();
+    b.mat('panel');
+    b.push();b.translate(0.36,0,0);b.rotate(0,0,Math.PI/2);
+    for(var i=0;i<14;i++){
+      var a=i/14*M.TAU;
+      b.push();b.translate(Math.cos(a)*0.14,0,Math.sin(a)*0.14);
+      b.sphere(0,0,0,0.014,5,4,MID);b.pop();
+    }
+    b.pop();
+    b.mat('fabric');
+    b.push();b.translate(0.44,0,0);b.rotate(0,0,Math.PI/2);
+    b.loft([
+      {y:0,    pts:Geo.circle(0.140,12)},
+      {y:-0.10,pts:Geo.circle(0.120,12)},
+      {y:-0.20,pts:Geo.circle(0.070,12)}
+    ],LOW,{openTop:true});
+    b.pop();
+  },
+  none:function(b){}
+};
+Cos.TOOLS=Object.keys(TOOL_BUILD);
+Cos.tool=function(style){
+  style=TOOL_BUILD[style]?style:'none';
+  return part('tool:'+style,function(b){
+    b.mat('blank');
+    /* grip at the origin, shaft running along the hand's -Y */
+    b.push();b.rotate(0,0,-Math.PI/2);
+    TOOL_BUILD[style](b);
+    b.pop();
+  },48);
+};
+
+/* ---------------- pets ---------------- */
+var PET_BUILD={
+  cat:function(b){
+    b.mat('blank');
+    b.loft([
+      {y:0.06,pts:Geo.roundRect(0.14,0.24,0.06,10)},
+      {y:0.14,pts:Geo.roundRect(0.17,0.30,0.07,10)},
+      {y:0.20,pts:Geo.roundRect(0.14,0.24,0.06,10)}
+    ],LIT,{});
+    b.push();b.translate(0,0.24,0.13);
+    b.sphere(0,0,0,0.085,10,8,LIT,{squash:0.92});
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.045,0.070,-0.01);b.rotate(0,0,s*0.24);
+      b.extrude([[-0.028,0],[0.028,0],[0,0.062]],0.014,MID);b.pop();
+    }
+    b.sphere(0,-0.010,0.076,0.020,8,6,MID);
+    b.pop();
+    for(var i=0;i<4;i++){
+      b.push();b.translate((i<2?0.055:-0.055),0.03,(i%2?0.09:-0.09));
+      b.cylinder(0,0,0,0.026,0.024,0.10,6,MID);b.pop();
+    }
+    b.push();b.translate(0,0.18,-0.16);b.rotate(-0.7,0,0);
+    b.cylinder(0,0.09,0,0.022,0.012,0.22,6,MID);b.pop();
+  },
+  drone:function(b){
+    b.mat('panel');
+    b.push();b.translate(0,0.20,0);
+    b.chamfer(0,0,0,0.20,0.13,0.20,LIT,0.035);
+    b.mat('neon',0.9);
+    b.push();b.translate(0,0,0.10);b.sphere(0,0,0,0.045,10,8,'#4FD8FF',{squash:0.8});b.pop();
+    b.mat('panel');
+    for(var i=0;i<4;i++){
+      var a=i/4*M.TAU+0.785;
+      b.push();b.translate(Math.cos(a)*0.15,0.02,Math.sin(a)*0.15);
+      b.cylinder(0,0,0,0.055,0.055,0.012,10,MID);b.pop();
+    }
+    b.pop();
+  },
+  sprite:function(b){
+    b.mat('neon',1.0);
+    b.push();b.translate(0,0.34,0);
+    b.sphere(0,0,0,0.085,12,9,LIT);
+    for(var i=0;i<7;i++){
+      var a=i/7*M.TAU;
+      b.push();b.translate(Math.cos(a)*0.14,Math.sin(a)*0.06,Math.sin(a)*0.14);
+      b.sphere(0,0,0,0.026,6,5,LIT);b.pop();
+    }
+    b.pop();
+  },
+  none:function(b){}
+};
+Cos.PETS=Object.keys(PET_BUILD);
+Cos.pet=function(style){
+  style=PET_BUILD[style]?style:'none';
+  return part('pet:'+style,function(b){PET_BUILD[style](b);},32);
+};
+
+LH.Cos=Cos;
+})();
+
+/* ============================================================
+   LH.Actors — character instances and their batching.
+
+   An actor is a position, a facing, an animation, and a kit. Every
+   frame each actor walks its kit, poses the bones its parts hang
+   from, and pushes one instance into that part's buffer. Parts are
+   then drawn once each, instanced, so a plaza of forty people costs
+   the same draw calls as one person standing alone.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,GL=LH.GL,Rig=LH.Rig,Body=LH.Body,Cos=LH.Cos,Geo=LH.Geo;
+var A={};
+
+/* Which bone each part rides, and where it sits on that bone. Data,
+   because adding a cosmetic slot should not mean editing the drawer. */
+var SLOTS=[
+  /* slot,      bone,        offset,             mirror */
+  ['head',      'head',      [0,0.030,0]],
+  ['eyes',      'head',      [0,0.030,0]],
+  ['iris',      'head',      [0,0.030,0]],
+  ['brows',     'head',      [0,0.030,0]],
+  ['hair',      'head',      [0,0.030,0]],
+  ['hat',       'head',      [0,0.030,0]],
+  ['neck',      'neck',      [0,0,0]],
+  ['chest',     'chest',     [0,0,0]],
+  ['shirt',     'chest',     [0,0,0]],
+  ['cape',      'chest',     [0,0,0]],
+  ['wings',     'chest',     [0,0,0]],
+  ['back',      'chest',     [0,0,0]],
+  ['hips',      'hips',      [0,0,0]],
+  ['pants',     'hips',      [0,0,0]],
+  ['armL',      'armL',      [0,0,0]],
+  ['armR',      'armR',      [0,0,0]],
+  ['sleeveL',   'armL',      [0,0,0]],
+  ['sleeveR',   'armR',      [0,0,0]],
+  ['forearmL',  'forearmL',  [0,0,0]],
+  ['forearmR',  'forearmR',  [0,0,0]],
+  ['handL',     'handL',     [0,0,0]],
+  ['handR',     'handR',     [0,0,0]],
+  ['thighL',    'thighL',    [0,0,0]],
+  ['thighR',    'thighR',    [0,0,0]],
+  ['legL',      'thighL',    [0,0,0]],
+  ['legR',      'thighR',    [0,0,0]],
+  ['shinL',     'shinL',     [0,0,0]],
+  ['shinR',     'shinR',     [0,0,0]],
+  ['footL',     'footL',     [0,0,0]],
+  ['footR',     'footR',     [0,0,0]],
+  ['tool',      'handR',     [0,-0.10,0.02]]
+];
+var SLOT_BONE={};
+for(var si=0;si<SLOTS.length;si++)SLOT_BONE[SLOTS[si][0]]=SLOTS[si];
+
+/* ---------------- default kit ----------------
+   The 2D build let players start dressed. This one does not: you
+   arrive in the simplest possible clothes and everything after that
+   is something you found, earned or bought. */
+A.defaultKit=function(seed){
+  var rng=M.rng(seed||1);
+  var SKIN=['#F2C9A4','#E3AE83','#C98B62','#9C6242','#75462C','#54321F','#FBDCC0'];
+  var HAIRC=['#2B2118','#4A3222','#7A5230','#A87740','#D8B978','#8E3B2E','#2A2E3A'];
+  var EYEC=['#4A7FB5','#4E6B3A','#6B4A2C','#3A3F4A','#5C4B8A'];
+  return {
+    scale:1,
+    skin:SKIN[(rng()*SKIN.length)|0],
+    eye:EYEC[(rng()*EYEC.length)|0],
+    build:'base',
+    hair:{style:'crop',color:HAIRC[(rng()*HAIRC.length)|0]},
+    hat:{style:'none',color:'#FFFFFF'},
+    shirt:{style:'tee',color:'#8C93A0',sleeve:'short'},
+    pants:{style:'long',color:'#4A5160',leg:'long'},
+    shoes:{style:'shoe',color:'#3A3F4A'},
+    wings:{style:'none',color:'#FFFFFF'},
+    cape:{style:'none',color:'#FFFFFF'},
+    back:{style:'none',color:'#FFFFFF'},
+    tool:{style:'none',color:'#FFFFFF'},
+    aura:{style:'none',color:'#3BE0C8'},
+    pet:{style:'none',color:'#FFFFFF'}
+  };
+};
+
+/* ---------------- actor ---------------- */
+function Actor(opt){
+  opt=opt||{};
+  this.pos=M.v3(opt.x||0,opt.y||0,opt.z||0);
+  this.vel=M.v3();
+  this.facing=opt.facing||0;
+  this.wantFacing=this.facing;
+  this.kit=opt.kit||A.defaultKit(opt.seed||1);
+  this.anim=Rig.Anim();
+  this.mats=[];
+  this.root=M.m4();
+  this.name=opt.name||'';
+  this.visible=true;
+  this.scale=this.kit.scale||1;
+  this.grounded=true;
+  this.tag=null;         /* DOM name tag, attached by the UI */
+  this.petPos=M.v3(opt.x||0,opt.y||0,opt.z||0);
+  this.petPhase=Math.random()*6.28;
+  this.id=opt.id||('a'+(A._next++));
+}
+A._next=1;
+A.Actor=function(o){return new Actor(o);};
+
+/* Turn toward the movement direction rather than snapping. The rate is
+   deliberately high — a character that lags its input feels broken —
+   but not instant, which would look robotic. */
+Actor.prototype.faceToward=function(yaw,dt,rate){
+  this.wantFacing=yaw;
+  var d=M.angDelta(this.facing,yaw);
+  this.facing+=d*Math.min(1,dt*(rate||14));
+};
+
+Actor.prototype.update=function(dt){
+  var pose=this.anim.update(dt);
+  Rig.rootMatrix(this.root,this.pos,this.facing,pose,this.scale);
+  Rig.poseMatrices(this.mats,pose,this.root);
+  /* the pet trails with a spring rather than sticking to a fixed offset */
+  if(this.kit.pet&&this.kit.pet.style!=='none'){
+    this.petPhase+=dt;
+    var bx=this.pos[0]-Math.sin(this.facing)*0.75;
+    var bz=this.pos[2]-Math.cos(this.facing)*0.75;
+    this.petPos[0]=M.damp(this.petPos[0],bx,0.10,dt);
+    this.petPos[2]=M.damp(this.petPos[2],bz,0.10,dt);
+    this.petPos[1]=M.damp(this.petPos[1],this.pos[1],0.16,dt);
+  }
+  return pose;
+};
+
+/* ---------------- batching ---------------- */
+var touched=[],touchedSet={};
+function pushInstance(mesh,mat,tint,emis){
+  if(!mesh)return;
+  if(mesh.instances>=mesh.maxInstances)return;
+  if(!touchedSet[mesh.key]){touchedSet[mesh.key]=1;touched.push(mesh);}
+  var o=mesh.instances*GL.ISTRIDE,d=mesh.idata;
+  for(var i=0;i<16;i++)d[o+i]=mat[i];
+  d[o+16]=tint[0];d[o+17]=tint[1];d[o+18]=tint[2];d[o+19]=emis||0;
+  mesh.instances++;
+}
+A.pushInstance=pushInstance;
+
+A.beginFrame=function(){
+  for(var i=0;i<touched.length;i++)touched[i].instances=0;
+  touched.length=0;touchedSet={};
+};
+
+var _m=M.m4(),_t=M.v3(),_s=M.v3(1,1,1),_off=M.m4(),_tmp=M.m4();
+function boneMat(actor,boneName,offset){
+  var bi=Rig.NAME[boneName];
+  var bm=actor.mats[bi];
+  if(!bm)return null;
+  if(!offset||(!offset[0]&&!offset[1]&&!offset[2]))return bm;
+  M.set3(_t,offset[0],offset[1],offset[2]);
+  M.set3(_s,1,1,1);
+  M.fromTRS(_off,_t,0,0,0,_s);
+  return M.mul(_m,bm,_off);
+}
+
+/* Kit -> a list of (mesh, bone, tint) for this frame. Written as one
+   pass rather than a table of closures so a new slot is one line. */
+A.submit=function(actor){
+  if(!actor.visible)return;
+  var k=actor.kit;
+  var skin=Geo.col3(k.skin);
+  function P(mesh,bone,off,col,emis){
+    var m=boneMat(actor,bone,off);
+    if(m)pushInstance(mesh,m,col,emis);
+  }
+  var headOff=SLOT_BONE.head[2];
+
+  /* --- head --- */
+  P(Body.head(),'head',headOff,skin);
+  P(Body.eyes(),'head',headOff,Geo.col3('#FFFFFF'));
+  P(Body.iris(),'head',headOff,Geo.col3(k.eye));
+  P(Body.brows(),'head',headOff,Geo.col3(k.hair.color));
+  if(k.hair.style!=='bald')
+    P(Body.hair(k.hair.style),'head',headOff,Geo.col3(k.hair.color));
+  if(k.hat.style!=='none')
+    P(Body.hat(k.hat.style),'head',headOff,Geo.col3(k.hat.color));
+  P(Body.neck(),'neck',null,skin);
+
+  /* --- torso --- */
+  P(Body.chest(k.build),'chest',null,skin);
+  if(k.shirt.style!=='none')
+    P(Body.shirt(k.shirt.style),'chest',null,Geo.col3(k.shirt.color));
+  if(k.cape.style!=='none')
+    P(Cos.cape(k.cape.style),'chest',null,Geo.col3(k.cape.color));
+  if(k.back.style!=='none')
+    P(Cos.backpack(k.back.style),'chest',null,Geo.col3(k.back.color));
+  if(k.wings.style!=='none')
+    P(Cos.wings(k.wings.style),'chest',null,Geo.col3(k.wings.color),
+      k.wings.emis||0);
+
+  /* --- hips and legs --- */
+  P(Body.hips(),'hips',null,skin);
+  if(k.pants.style!=='none')
+    P(Body.pants(k.pants.style),'hips',null,Geo.col3(k.pants.color));
+  P(Body.thigh(),'thighL',null,skin);
+  P(Body.thigh(),'thighR',null,skin);
+  if(k.pants.leg&&k.pants.leg!=='none'){
+    P(Body.legwear(k.pants.leg),'thighL',null,Geo.col3(k.pants.color));
+    P(Body.legwear(k.pants.leg),'thighR',null,Geo.col3(k.pants.color));
+    if(k.pants.leg==='long'){
+      P(Body.legwearLower('long'),'shinL',null,Geo.col3(k.pants.color));
+      P(Body.legwearLower('long'),'shinR',null,Geo.col3(k.pants.color));
+    }
+  }
+  P(Body.shin(),'shinL',null,skin);
+  P(Body.shin(),'shinR',null,skin);
+  P(Body.foot(k.shoes.style),'footL',null,Geo.col3(k.shoes.color));
+  P(Body.foot(k.shoes.style),'footR',null,Geo.col3(k.shoes.color));
+
+  /* --- arms --- */
+  P(Body.upperArm(),'armL',null,skin);
+  P(Body.upperArm(),'armR',null,skin);
+  if(k.shirt.sleeve&&k.shirt.sleeve!=='none'){
+    P(Body.sleeve(k.shirt.sleeve),'armL',null,Geo.col3(k.shirt.color));
+    P(Body.sleeve(k.shirt.sleeve),'armR',null,Geo.col3(k.shirt.color));
+  }
+  P(Body.forearm(),'forearmL',null,skin);
+  P(Body.forearm(),'forearmR',null,skin);
+  P(Body.hand(),'handL',null,skin);
+  P(Body.hand(),'handR',null,skin);
+
+  /* --- held --- */
+  if(k.tool.style!=='none')
+    P(Cos.tool(k.tool.style),'handR',SLOT_BONE.tool[2],Geo.col3(k.tool.color));
+};
+
+/* Auras and pets are drawn in their own passes — additive and
+   world-space respectively — so they are submitted separately. */
+A.submitAura=function(actor,time){
+  var k=actor.kit;
+  if(!k.aura||k.aura.style==='none')return;
+  var mesh=Cos.aura(k.aura.style);
+  M.set3(_t,actor.pos[0],actor.pos[1]+0.02,actor.pos[2]);
+  M.set3(_s,actor.scale,actor.scale,actor.scale);
+  M.fromTRS(_m,_t,0,time*0.6,0,_s);
+  pushInstance(mesh,_m,Geo.col3(k.aura.color),1);
+};
+A.submitPet=function(actor,time){
+  var k=actor.kit;
+  if(!k.pet||k.pet.style==='none')return;
+  var mesh=Cos.pet(k.pet.style);
+  var bob=Math.sin(time*3+actor.petPhase)*0.05;
+  var yaw=Math.atan2(actor.pos[0]-actor.petPos[0],actor.pos[2]-actor.petPos[2]);
+  M.set3(_t,actor.petPos[0],actor.petPos[1]+bob,actor.petPos[2]);
+  M.set3(_s,actor.scale,actor.scale,actor.scale);
+  M.fromTRS(_m,_t,0,yaw,0,_s);
+  pushInstance(mesh,_m,Geo.col3(k.pet.color),k.pet.style==='sprite'?1:0);
+};
+
+/* Draw whatever was submitted. `prog` must already be bound. */
+A.flush=function(prog){
+  GL.u1i(prog,'uInstanced',1);
+  for(var i=0;i<touched.length;i++){
+    var m=touched[i];
+    if(!m.instances)continue;
+    GL.updateInstances(m,m.instances);
+    GL.drawInstanced(m,m.instances);
+  }
+  GL.u1i(prog,'uInstanced',0);
+};
+/* The shadow pass needs the same batches without re-submitting, and it
+   must not clear them — the colour pass runs afterwards. */
+A.flushShadow=function(prog){
+  GL.u1i(prog,'uInstanced',1);
+  for(var i=0;i<touched.length;i++){
+    var m=touched[i];
+    if(!m.instances)continue;
+    GL.updateInstances(m,m.instances);
+    GL.drawInstanced(m,m.instances);
+  }
+  GL.u1i(prog,'uInstanced',0);
+};
+
+A.touched=function(){return touched;};
+
+LH.Actors=A;
+})();
+
+/* ---- TEMPORARY CHARACTER TEST — replaced by LH.World ---- */
+(function(){
+'use strict';
+var M=LH.M,GL=LH.GL,R=LH.Render,App=LH.App,Cam=LH.Cam,Geo=LH.Geo,Act=LH.Actors;
+var ground=null,cast=[];
 
 App.stage('Painting surfaces',function(){LH.Tex.buildAll();});
 App.stage('Raising the ground',function(){
   var b=Geo.build();
-  b.mat('grass');
-  b.plane(0,0,0,120,120,'#FFFFFF',64,26,function(x,z){
-    var h=M.fbm(x*0.03,z*0.03,7,4)*4.2-2.0;
-    h+=M.fbm(x*0.11,z*0.11,13,3)*0.8;
-    return {y:h};
-  });
+  b.mat('tile');
+  b.plane(0,0,0,40,40,'#FFFFFF',8,10);
   ground=b.upload();
 });
-App.stage('Placing props',function(){
-  var b=Geo.build();
-  var rng=M.rng(99);
-  for(var i=0;i<70;i++){
-    var x=(rng()-0.5)*90,z=(rng()-0.5)*90;
-    var h=M.fbm(x*0.03,z*0.03,7,4)*4.2-2.0+M.fbm(x*0.11,z*0.11,13,3)*0.8;
-    var k=rng();
-    if(k<0.45){
-      b.mat('bark');b.cylinder(x,h+2.0,z,0.32,0.24,4.0,8,'#8A6B4E');
-      b.mat('foliage');
-      b.sphere(x,h+4.6,z,1.7,10,7,'#7ACB63',{squash:0.8});
-      b.sphere(x+0.7,h+3.9,z-0.4,1.1,8,6,'#5FB050',{squash:0.85});
-    }else if(k<0.75){
-      b.mat('brick');b.box(x,h+1.6,z,3.2,3.2,3.0,'#C7A38C',{uvScale:0.5});
-      b.mat('roof');b.box(x,h+3.5,z,3.6,0.7,3.4,'#B08497',{uvScale:0.5});
-      b.mat('neon',0.9);b.box(x,h+1.3,z+1.55,1.0,0.5,0.08,'#3BE0C8');
-    }else{
-      b.mat('panel');b.chamfer(x,h+1.0,z,1.6,2.0,1.6,'#8FA0B6',0.12);
-      b.mat('crystal',0.35);b.sphere(x,h+2.4,z,0.45,10,8,'#7FE8FF');
-    }
+App.stage('Casting the players',function(){
+  var demos=[
+    {st:'idle',     hair:'swept', hat:'none',   shirt:'jacket', wings:'none'},
+    {st:'locomote', hair:'long',  hat:'none',   shirt:'tee',    wings:'none'},
+    {st:'mine',     hair:'crop',  hat:'cap',    shirt:'hoodie', wings:'none'},
+    {st:'fishWait', hair:'bun',   hat:'brim',   shirt:'tee',    wings:'none'},
+    {st:'attack',   hair:'spiked',hat:'visor',  shirt:'jacket', wings:'mech'},
+    {st:'celebrate',hair:'braids',hat:'crown',  shirt:'jacket', wings:'angelic'}
+  ];
+  var COL=['#C4485E','#3E7BE0','#38A86A','#B269FF','#F5A03C','#3BE0C8'];
+  for(var i=0;i<demos.length;i++){
+    var d=demos[i];
+    var a=Act.Actor({x:(i-2.5)*1.9,y:0,z:0,seed:i*7+3,facing:0});
+    a.kit.hair.style=d.hair;
+    a.kit.hat.style=d.hat;a.kit.hat.color=COL[i];
+    a.kit.shirt.style=d.shirt;a.kit.shirt.color=COL[i];
+    a.kit.shirt.sleeve=i%2?'long':'short';
+    a.kit.pants.color=Geo.shade(COL[i],-55);
+    a.kit.wings.style=d.wings;a.kit.wings.color=COL[i];
+    if(i===5){a.kit.cape.style='royal';a.kit.cape.color='#8E2440';a.kit.aura.style='ring';}
+    if(i===2){a.kit.tool.style='pickaxe';a.kit.tool.color='#C8CEDA';}
+    if(i===3){a.kit.tool.style='rod';a.kit.tool.color='#D8C49A';}
+    if(i===4){a.kit.tool.style='sword';a.kit.tool.color='#DCE4F0';a.kit.pet.style='drone';}
+    if(i===1){a.kit.pet.style='cat';a.kit.pet.color='#E08A45';}
+    a.anim.play(d.st,true);
+    a.anim.params.speed=0.5;
+    cast.push(a);
   }
-  props=b.upload();
-});
-App.stage('Filling the harbour',function(){
-  var b=Geo.build();
-  b.mat('water');
-  b.plane(0,0,0,140,140,'#FFFFFF',48,10);
-  water=b.upload();
 });
 
-var _mdl=M.m4(),_t=M.v3(0,0,0),_s=M.v3(1,1,1),_wt=M.v3(0,-2.9,0);
-var follow=M.v3(0,0,0);
+var _mdl=M.m4(),_t=M.v3(0,0,0),_s=M.v3(1,1,1);
+var follow=M.v3(0,0.05,0);
 
 App.onUpdate(function(dt,time){
-  /* slow orbit so a screenshot shows the lighting move */
-  Cam.yaw=time*0.06;
-  Cam.pitch=0.20;
-  Cam.wantDist=11;
-  Cam.height=2.2;
-  follow[1]=1.2;
+  if(!cast.length)return;
+  Cam.yaw=Math.sin(time*0.14)*0.16;
+  Cam.pitch=0.02;
+  Cam.wantDist=8.4;
+  Cam.height=0.98;
   Cam.update(dt,follow,null);
+  for(var i=0;i<cast.length;i++){
+    /* keep the one-shots cycling so a screenshot catches them mid-motion */
+    var st=cast[i].anim.state;
+    if(cast[i].anim.done&&(st==='idle'))
+      cast[i].anim.play(['idle','mine','attack','celebrate','fishWait','locomote'][i],true);
+    cast[i].update(dt);
+  }
   var s=R.scene;
-  M.norm3(s.sunDir,M.set3(s.sunDir,0.42,0.66,0.30));
-  R.updateLight(Cam.focus,46);
+  M.norm3(s.sunDir,M.set3(s.sunDir,0.40,0.62,0.42));
+  R.updateLight(follow,10);
 });
 
-App.onDraw(function(){
-  var gl=GL.gl;
-  /* draw hooks are live from frame one, but boot stages build across
-     several frames — skip until the meshes exist */
-  if(!ground||!props||!water)return;
+App.onDraw(function(dt,time){
+  if(!ground||!cast.length)return;
   M.fromTRS(_mdl,_t,0,0,0,_s);
+
+  Act.beginFrame();
+  for(var i=0;i<cast.length;i++){Act.submit(cast[i]);Act.submitPet(cast[i],time);}
 
   var dp=R.beginShadow();
   GL.u1i(dp,'uInstanced',0);
   GL.uM4(dp,'uModel',_mdl);
-  GL.draw(ground);GL.draw(props);
+  GL.draw(ground);
+  Act.flushShadow(dp);
   R.endShadow();
 
   R.beginScene();
   var p=R.beginOpaque();
   GL.uM4(p,'uModel',_mdl);
   GL.draw(ground);
-  GL.draw(props);
+  Act.flush(p);
 
-  var wp=R.beginWater(-5.6);
-  M.fromTRS(_mdl,_wt,0,0,0,_s);
-  GL.uM4(wp,'uModel',_mdl);
-  GL.draw(water);
-  R.endWater();
+  /* auras go additive on top */
+  Act.beginFrame();
+  for(var j=0;j<cast.length;j++)Act.submitAura(cast[j],time);
+  var ap=R.beginAdditive();
+  Act.flush(ap);
+  R.endBlend();
 
   R.present();
 });
