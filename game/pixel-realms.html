@@ -2277,6 +2277,69 @@ A.leaves=function(c0,c1,c2,spark){
     return h>.66?c0:(h>.33?c1:c2);
   };
 };
+/* a clipped hedge: dense leaf noise with a lit crown and a dark foot */
+A.hedge=function(c0,c1,c2,bloom){
+  return function(a,b,S,mask){
+    var m=Math.max(1,S/16), h=grain(a,b,S,23);
+    if(capTop(mask)&&b<m*1.5)return mixc(c0,'#FFFFFF',.34);
+    if(b>S-m*1.5)return c2;
+    if(bloom&&hash(a,b,24)>.955)return bloom;
+    return h>.62?c0:(h>.30?c1:c2);
+  };
+};
+/* a picket fence — posts and two rails, the rest see-through */
+A.fence=function(c0,c1,c2){
+  return function(a,b,S){
+    var m=Math.max(1,S/16), post=S/2;
+    if(b<m*2)return CLEAR;
+    if(a%post<m*2){                       /* uprights */
+      if(a%post<m)return mixc(c0,'#FFFFFF',.3);
+      return b>S-m*2?c2:c0;
+    }
+    if(b>S*0.24&&b<S*0.24+m*1.6)return c1; /* upper rail */
+    if(b>S*0.62&&b<S*0.62+m*1.6)return c1; /* lower rail */
+    return CLEAR;
+  };
+};
+/* a flower clump standing in grass */
+A.flowers=function(petal,heart,stem,leaf){
+  return function(a,b,S,mask){
+    var m=Math.max(1,S/16), u=a/S, v=b/S;
+    if(v>0.86)return leaf;                          /* the turf it grows from */
+    var heads=[[0.26,0.34],[0.52,0.20],[0.76,0.40]];
+    for(var i=0;i<heads.length;i++){
+      var dx=u-heads[i][0], dy=v-heads[i][1];
+      var d=Math.sqrt(dx*dx+dy*dy*1.25);
+      if(d<0.055)return heart;
+      if(d<0.13)return petal;
+    }
+    for(var j=0;j<heads.length;j++){                /* stems */
+      if(Math.abs(u-heads[j][0])<m/S&&v>heads[j][1])return stem;
+    }
+    if(v>0.6&&hash(a,b,26)>.86)return leaf;
+    return CLEAR;
+  };
+};
+/* a crate: planks with a corner brace */
+A.crate=function(c0,c1,c2,band){
+  return function(a,b,S){
+    var m=Math.max(1,S/16);
+    if(a<m||b<m||a>S-m-1||b>S-m-1)return c2;
+    if(Math.abs(a-b)<m*1.4||Math.abs(a-(S-1-b))<m*1.4)return band;
+    if(b%(S/4)<m)return c2;
+    return grain(a,b,S,27)>.5?c0:c1;
+  };
+};
+/* a billboard panel with a lit face and a frame */
+A.billboard=function(frame,face,line,glow){
+  return function(a,b,S){
+    var m=Math.max(1,S/16);
+    if(a<m*1.5||b<m*1.5||a>S-m*1.5-1||b>S-m*1.5-1)return frame;
+    if(b<m*3)return glow;
+    if((b-m*3)%(S/4)<m*1.2&&a>m*3&&a<S-m*3)return line;
+    return face;
+  };
+};
 /* night sky wallpaper */
 A.starfield=function(bg0,bg1,star){
   return function(a,b,S,mask){
@@ -2592,6 +2655,22 @@ It('leaves','Leaves',{r:3,hits:2,art:A.leaves('#4FAE45','#3E8C38','#2A6428','#7F
 It('log','Log',{r:4,art:A.plank('#7A5632','#644426','#4E341C','#2E1E10')});
 It('sakura','Sakura Bloom',{r:9,hits:2,art:A.leaves('#FFA8CE','#E07FAA','#C2608E','#FFE0EE')});
 It('sakuralog','Sakura Log',{r:9,art:A.plank('#6E4A5E','#573A4A','#412A38','#281822')});
+It('hedge','Hedge',{r:4,hits:3,art:A.hedge('#4FA83E','#3C8A32','#2A6626','#8FE06A')});
+It('hedgeflower','Flowering Hedge',{r:7,hits:3,
+  art:A.hedge('#4FA83E','#3C8A32','#2A6626','#E86AC8')});
+It('fence','Wooden Fence',{r:3,hits:2,coll:'platform',
+  art:A.fence('#8A6038','#6E4A2A','#4E3220')});
+It('whitefence','White Fence',{r:5,hits:2,coll:'platform',
+  art:A.fence('#F0ECE4','#D2CCC0','#A69E90')});
+It('flowerp','Purple Flowers',{r:5,hits:1,coll:'none',
+  art:A.flowers('#A65CD8','#F0D86A','#3E8A34','#4FA83E')});
+It('flowerw','White Flowers',{r:5,hits:1,coll:'none',
+  art:A.flowers('#F4F0FA','#F0D86A','#3E8A34','#4FA83E')});
+It('flowerr','Red Flowers',{r:5,hits:1,coll:'none',
+  art:A.flowers('#E8544E','#F0D86A','#3E8A34','#4FA83E')});
+It('crate','Wooden Crate',{r:6,hits:3,art:A.crate('#A67A46','#8A6038','#4E3220','#C9A46A')});
+It('billboard','Billboard',{r:12,glow:'#8FE0FF',
+  art:A.billboard('#4E3220','#2A3A48','#7FC4E8','#8FE0FF')});
 It('display','Display Case',{r:14,glow:'#63D8FF',
   art:A.facet('#2A2448','#1B1730','#63D8FF','#0F0B1E')});
 It('hay','Hay Bale',{r:4,art:A.stripe('#E8C86A','#C9A44E',6)});
@@ -3143,46 +3222,110 @@ function genWorld(name){
 }
 function genStart(){
   var R=rng(1337);
-  var w=new World('START','System','dusk');
+  var w=new World('START','System','day');
   w.system=true;w.biome='plains';
-  var height=terrain(w,R,BIOMES[0],{flat:true,noCaves:true,noOre:true,noLava:true});
+  var height=terrain(w,R,BIOMES[0],{flat:true,noCaves:true,noOre:true,noLava:true,basic:true});
   var top=SURF;
-  /* an open plaza: two shopfronts under a wide sky, not a wall of hedge */
-  w.fillBg(26,top-13,48,top-1,ID.bgbrick);
-  w.fillBg(56,top-13,76,top-1,ID.bgbrick);
-  sign2(w,4,top-11,'PIXEL',ID.neonp);
-  sign2(w,2,top-5,'REALMS',ID.neonc);
-  [[37,'NEONSHOP','SHOP',ID.neonp],[66,'MYWORLD','HOME',ID.neonc]].forEach(function(d){
-    var gx=d[0];
-    w.fill(gx-6,top-8,gx+6,top-8,ID.shopbrick);
-    w.fill(gx-6,top-7,gx-6,top-1,ID.shopbrick);
-    w.fill(gx+6,top-7,gx+6,top-1,ID.shopbrick);
-    sign2(w,gx-Math.floor(signW(d[2])/2),top-12,d[2],d[3]);
-    putDoor(w,gx,top-1,d[1],d[2]);
-    /* lit display cases either side of the door, like a real shopfront */
-    [-4,-3,3,4].forEach(function(o){w.set(gx+o,top-4,ID.display);});
-    w.set(gx-6,top-9,ID.lantern);w.set(gx+6,top-9,ID.lantern);
-    w.set(gx-2,top-6,ID.lantern);w.set(gx+2,top-6,ID.lantern);
+
+  /* ---- helpers that keep the build readable ---- */
+  function terrace(x0,x1,y,block,railed){
+    w.fill(x0,y,x1,y,block);
+    if(railed){
+      for(var g=x0;g<=x1;g+=1)if(g%3===0)w.set(g,y-1,ID.fence);
+    }
+  }
+  function hedgeRun(x0,x1,y,h){
+    for(var x=x0;x<=x1;x++)
+      for(var d=0;d<(h||1);d++)
+        w.set(x,y-d,(x%5===2)?ID.hedgeflower:ID.hedge);
+  }
+  function bed(x0,x1,y){
+    var F=[ID.flowerp,ID.flowerw,ID.flowerr];
+    for(var x=x0;x<=x1;x++)if(R()<0.75)w.set(x,y,F[(x*7)%3]);
+  }
+  function lamps(x0,x1,y,step){
+    for(var x=x0;x<=x1;x+=(step||8))w.set(x,y,ID.lantern);
+  }
+  function stall(gx,y,dest,label,neon){
+    w.fill(gx-4,y-5,gx+4,y-5,ID.shopbrick);      /* the awning */
+    w.fill(gx-4,y-4,gx-4,y-1,ID.shopbrick);
+    w.fill(gx+4,y-4,gx+4,y-1,ID.shopbrick);
+    w.fillBg(gx-3,y-4,gx+3,y-1,ID.bgbrick);
+    /* the door carries the name; a wall of block letters over open sky
+       just reads as clutter, so the awning gets a neon strip instead */
+    for(var n=-3;n<=3;n++)w.set(gx+n,y-6,neon);
+    putDoor(w,gx,y-1,dest,label);
+    w.set(gx-2,y-3,ID.display);w.set(gx+2,y-3,ID.display);
+    w.set(gx-4,y-6,ID.lantern);w.set(gx+4,y-6,ID.lantern);
+    w.set(gx-3,y-1,ID.crate);w.set(gx+3,y-1,ID.crate);
+  }
+
+  /* ---- ground level: a planted, fenced promenade ---- */
+  hedgeRun(2,14,top-1,2);
+  bed(16,26,top-1);
+  hedgeRun(28,34,top-1,1);
+  bed(50,58,top-1);
+  hedgeRun(84,97,top-1,2);
+  lamps(6,96,top-3,10);
+  for(var c=0;c<8;c++)w.set(18+c*11,top-1,ID.crate);
+
+  /* ---- the terraces: three stacked decks with rails and ladders ---- */
+  terrace(8,40,top-5,ID.platform,true);
+  terrace(46,90,top-5,ID.platform,true);
+  terrace(14,34,top-10,ID.steelplat,true);
+  terrace(56,84,top-10,ID.steelplat,true);
+  terrace(30,68,top-15,ID.neonplat,true);
+  [[12,top-6,top-2],[42,top-6,top-2],[52,top-6,top-2],[92,top-6,top-2],
+   [18,top-11,top-6],[60,top-11,top-6],
+   [34,top-16,top-11],[64,top-16,top-11]].forEach(function(l){
+    for(var y=l[1];y<=l[2];y++)w.set(l[0],y,ID.ladder);
   });
-  /* a playground that shows off the behaviour types */
-  w.fill(16,top-3,26,top-3,ID.platform);
-  w.fill(46,top-10,56,top-10,ID.steelplat);
-  w.fill(78,top-6,88,top-6,ID.neonplat);
-  w.fill(47,top-9,47,top-2,ID.ladder);
-  w.set(20,top-1,ID.tramp);
-  w.set(24,top-1,ID.checkpoint);
-  w.set(74,top-1,ID.boombox);
-  w.set(76,top-1,ID.switch);
-  for(var i=0;i<9;i++)w.set(10+i*10,top-7,ID.lantern);
-  surfaceTree(w,21,top,'sakura',R);surfaceTree(w,52,top,'sakura',R);
-  surfaceTree(w,81,top,'sakura',R);surfaceTree(w,94,top,'oak',R);
-  w.fill(2,top-5,14,top-1,0);
-  putSign(w,12,top-1,'Type any world name in WORLDS\nto visit it. New names are\ngenerated fresh.');
-  putSign(w,92,top-1,'Splice two seeds on one tree\nto invent a new block.\nCheck the SPLICE book.');
-  w.spawn={x:7*TS,y:(top-2)*TS};
+  bed(20,32,top-6);bed(60,80,top-6);
+  hedgeRun(16,30,top-11,1);hedgeRun(58,80,top-11,1);
+  bed(34,64,top-16);
+  lamps(10,88,top-7,12);lamps(16,82,top-12,14);
+
+  /* ---- signage: billboards on the decks, not block letters in the sky.
+     Giant neon lettering worked against a wall; over open sky it is noise. */
+  for(var bb=0;bb<4;bb++){
+    w.set(42+bb,top-16,ID.billboard);
+    w.set(22+bb,top-6,ID.billboard);
+    w.set(70+bb,top-11,ID.billboard);
+  }
+
+  /* ---- three shopfronts along the promenade ---- */
+  stall(22,top,'NEONSHOP','SHOP',ID.neonp);
+  stall(50,top,'MYWORLD','HOME',ID.neonc);
+  stall(78,top,'TUTORIAL','LEARN',ID.neong);
+
+  /* ---- a playground that shows the behaviour types off ---- */
+  w.set(38,top-1,ID.tramp);
+  w.set(42,top-1,ID.checkpoint);
+  w.set(66,top-1,ID.boombox);
+  w.set(68,top-1,ID.switch);
+  w.set(70,top-1,ID.dice);
+  w.set(72,top-1,ID.pinata);
+  w.set(88,top-6,ID.chest);
+  w.set(86,top-6,ID.mailbox);
+
+  /* ---- trees, front and back ---- */
+  [10,30,44,62,76,94].forEach(function(tx,i){
+    surfaceTree(w,tx,top,(i%2)?'sakura':'oak',R);
+  });
+  surfaceTree(w,26,top-5,'sakura',R);
+  surfaceTree(w,70,top-5,'oak',R);
+
+  /* ---- a clear spawn pocket, then the signs ---- */
+  w.fill(3,top-4,7,top-1,0);
+  w.fill(3,top-1,7,top-1,ID.grass);
+  putSign(w,6,top-1,'Type any world name in WORLDS\nto visit it. New names are\ngenerated fresh.');
+  putSign(w,46,top-6,'Ladders climb. Fences are\none-way platforms — hop up,\nhold DOWN to drop through.');
+  putSign(w,82,top-1,'Splice two seeds on one tree\nto invent a new block.\nCheck the SPLICE book.');
+
+  w.spawn={x:5*TS,y:(top-2)*TS};
   w.visitors=ri(28,49);
-  w.npcs=[npc('skylar',22,'idle'),npc('yuki',44,'idle'),npc('noctis',70,'idle'),
-          npc('mochi',88,'idle')];
+  w.npcs=[npc('skylar',20,'idle'),npc('yuki',44,'idle'),npc('noctis',66,'idle'),
+          npc('mochi',86,'idle'),npc('zenn',34,'trade'),npc('lumiix',54,'shop')];
   return w;
 }
 function genShop(){

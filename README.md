@@ -41,9 +41,11 @@ is exactly that — flat grass over solid dirt with the odd pebble, a white exit
 door, and sky.
 
 **Play:** `A`/`D` move · `W` jump · `S` drop through a platform · `1`–`0` hotbar ·
-`E` items · `B` splice book · `G` worlds · `T` chat · `Z`/`X`/`C` punch/place/wrench.
-Click a block to punch it, click empty space to build, walk into a door and press
-`↑` to travel, click a player to trade. Touch pads appear on coarse-pointer devices.
+`E` backpack · `B` splice book · `G` worlds · `T` chat · `Esc` pause menu.
+**There is no tool button.** What you hold decides what you do: bare hands punch,
+a block in hand builds, and picking up the wrench puts you in wrench mode. Click a
+block to punch it, click empty space to build, walk into a door and press `↑` to
+travel, click a player to trade. Touch pads appear on coarse-pointer devices.
 
 ### The characters
 
@@ -68,11 +70,19 @@ not an asset.
 ### The interface (and the front end)
 
 Light blue panels with a white bevel and dark text, the way Growtopia does it.
-The default screen carries almost nothing: an identity chip, a currency chip,
-the world title, a row of icon buttons and the hotbar. Everything else opens on
-demand. The backpack is a grid of chunky slots — orange border for the selected
-stack, green for what you are wearing — with a **RECYCLE / STORE / DROP / INFO**
-column beside it that acts on whatever you picked.
+The game is **landscape only** — in portrait it keeps the landscape layout and asks
+you to turn the device, so nothing has to reflow.
+
+The default screen carries four things: one small box in the top-left holding your
+face, name, gems and locks together; a chat tab stuck to the top edge; two icon
+buttons; and the hotbar. No world title, no tool row, no button shelf — every other
+function lives on the pause menu.
+
+The backpack is the **swipe-up sheet**, the way Growtopia does it: drag the handle
+under the hotbar (or press `E`) and the grid rises over the world. Chunky slots —
+orange border for the selected stack, green for what you are wearing — with
+**RECYCLE / STORE / DROP / INFO** acting on whatever you picked, and a double-tap
+on a hundred World Locks fusing them into a Diamond Lock.
 
 ### Built on Growtopia's data model
 
@@ -81,7 +91,7 @@ behaviour type, rarity, layer, collision, hit count, grow time, spread rule,
 drop table and props — the same shape as the real game's `items.dat`. Adding a
 block is one line.
 
-- **144 items** across **31 behaviour types** from the decoded `TYPE_*` enum:
+- **153 items** across **31 behaviour types** from the decoded `TYPE_*` enum:
   locks, gateways, providers, chests, pinatas, dice, switcheroos, checkpoints,
   trampolines, weather machines, mannequins, magic eggs, lab benches,
   heart monitors, donation boxes, ice, lava, spikes, portals and more
@@ -92,8 +102,20 @@ block is one line.
 A sunset sky in six stops with a sun sitting on the horizon, a crescent moon,
 depth-faded stars, **two parallax bands of floating islands** (rock keels, grass
 lips, blossom trees, lit windows), drifting cloud bands and **34 sakura petals**
-falling at three depths. Shopfronts are lit purple brick with neon signage
-spelled out in real blocks you can punch out of the wall.
+falling at three depths. Shopfronts are lit purple brick under neon awnings, with
+signage spelled out in real blocks you can punch out of the wall.
+
+The spawn world is built to be **walked through, not across**. Instead of one flat
+strip of grass it stacks **three terraces** — wood at five rows up, steel platform
+at ten, neon at fifteen — joined by eight ladder runs, so there is always something
+above you and something below. Each level is dressed: clipped hedges and hedge
+blossom, flower beds in pink, white and red, white and timber fencing along every
+drop, hanging lanterns at a fixed rhythm, stacked crates, and sakura trees planted
+both in front of and behind the walkways. Three shopfronts open onto the promenade,
+a playground strip carries the trampoline, checkpoint, boombox, switcheroo, dice,
+pinata, chest and mailbox, and six NPCs walk it. Nine decorative blocks — hedge,
+hedge blossom, fence, white fence, three flower beds, crate and billboard — exist
+purely so a world can be *furnished* rather than merely built.
 
 ### Rendering
 
@@ -107,8 +129,8 @@ spelled out in real blocks you can punch out of the wall.
 - **Edge-aware tiling** — a 4-bit neighbour mask picks the right seams, so runs
   of the same block read as one surface
 
-Measured on a 960 × 540 canvas: **60 fps**, `drawWorld` 0.20 ms, `relight`
-0.32 ms, `chunkBuild` 0.23 ms.
+Measured on a 960 × 540 canvas: **60 fps**, `drawWorld` 0.17 ms, `relight`
+0.43 ms, `chunkBuild` 0.38 ms — the packed spawn world costs nothing measurable.
 
 **Systems**
 
@@ -127,6 +149,8 @@ Measured on a 960 × 540 canvas: **60 fps**, `drawWorld` 0.20 ms, `relight`
 | Physics blocks | Ice is slippery, trampolines and bouncy blocks launch you |
 | Worlds | Type any name in the WORLDS panel — existing worlds load, new names are generated deterministically from the name |
 | Terrain | 100 × 54 tiles: grass, dirt, stone, carved caves, ore veins, bedrock |
+| Level design | The spawn world is terraced three levels deep and dressed with hedges, flower beds, fencing, lanterns and crates, so it reads as a built place rather than a blank canvas |
+| Decoration | Nine furnishing blocks that do nothing but look like somewhere — hedges, four flower beds, two fence styles, crates and a billboard |
 | Inventory | 200 slots, 10-slot hotbar, stacking, rarity borders, shift-click to drop |
 | Wardrobe | Twelve slots including a pet — the world sprite updates live, with walk/jump/climb poses |
 | Name tags | A drawn country flag and a green handle over a dark plate. Flags are pixel designs, not emoji — emoji flags do not render on Windows at all. Your own comes from the browser's locale, read locally |
