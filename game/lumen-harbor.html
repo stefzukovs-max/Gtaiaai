@@ -273,6 +273,72 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 
 .empty-note{padding:2.4cqw;text-align:center;color:var(--ink3);font-size:.95cqw}
 
+/* ---- vitals and the fishing rig ---- */
+.vitals{position:absolute;left:1.4cqw;top:9.2cqw;width:14cqw}
+.bar{height:.72cqw;min-height:8px;border-radius:99px;overflow:hidden;
+  background:rgba(6,9,14,.72);border:1px solid var(--line);position:relative}
+.bar>i{display:block;height:100%;transition:width .22s ease}
+.bar .lbl{position:absolute;inset:0;display:grid;place-items:center;
+  font-size:.62cqw;font-weight:700;letter-spacing:.1em;color:var(--ink)}
+.bar.hp>i{background:linear-gradient(90deg,#B22C42,#FF6478)}
+
+.fishrig{position:absolute;left:50%;bottom:8.5cqw;transform:translateX(-50%);
+  width:min(30cqw,460px);display:none;flex-direction:column;gap:.5cqw;
+  padding:.8cqw 1.0cqw;border-radius:14px;
+  background:linear-gradient(180deg,rgba(20,27,42,.94),rgba(10,15,24,.92));
+  border:1px solid var(--line2);backdrop-filter:blur(12px);
+  box-shadow:0 14px 40px rgba(0,0,0,.55)}
+.fishrig.on{display:flex}
+.fishrig .cap{font-size:.82cqw;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink3);display:flex;justify-content:space-between}
+.fishrig .cap b{color:var(--acc);letter-spacing:.06em;text-transform:none}
+.prog{height:1.1cqw;min-height:12px;border-radius:99px;overflow:hidden;
+  background:rgba(6,9,14,.8);border:1px solid var(--line);position:relative}
+.prog>i{display:block;height:100%;
+  background:linear-gradient(90deg,var(--acc2),var(--acc));
+  box-shadow:0 0 14px rgba(59,224,200,.55)}
+.strain{height:.62cqw;min-height:7px;border-radius:99px;overflow:hidden;
+  background:rgba(6,9,14,.8);border:1px solid var(--line)}
+.strain>i{display:block;height:100%;
+  background:linear-gradient(90deg,#3FA46A,#F5C451 62%,#FF4F7A)}
+.strain.hot{animation:strainPulse .28s ease-in-out infinite alternate}
+@keyframes strainPulse{to{box-shadow:0 0 14px rgba(255,79,122,.8)}}
+.fishrig .hint{font-size:.80cqw;color:var(--ink2);text-align:center;min-height:1.1em}
+.fishrig .runs{color:#FFB86A;font-weight:700}
+
+/* the catch card */
+.catch{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) scale(.9);
+  display:none;flex-direction:column;align-items:center;gap:.5cqw;
+  padding:1.3cqw 2.0cqw;border-radius:16px;
+  background:linear-gradient(180deg,rgba(22,29,44,.97),rgba(12,17,26,.97));
+  border:1px solid var(--line2);opacity:0;transition:all .3s ease;
+  box-shadow:0 24px 60px rgba(0,0,0,.6)}
+.catch.on{display:flex;opacity:1;transform:translate(-50%,-50%) scale(1)}
+.catch .ic{width:7cqw;height:7cqw;background-size:cover;border-radius:12px}
+.catch h3{font-size:1.4cqw;font-weight:700}
+.catch .w{font-size:1.0cqw;color:var(--ink2)}
+.catch .r{font-size:.78cqw;letter-spacing:.18em;text-transform:uppercase}
+
+/* floating damage numbers */
+.dmg{position:absolute;font-family:var(--disp);font-weight:700;
+  font-size:1.3cqw;color:#FFD9A0;text-shadow:0 2px 6px rgba(0,0,0,.8);
+  pointer-events:none;animation:dfloat .9s ease-out both}
+.dmg.crit{font-size:1.9cqw;color:#FFE9A8}
+.dmg.hurt{color:#FF7A8E}
+@keyframes dfloat{from{opacity:1;transform:translate(-50%,0)}
+  to{opacity:0;transform:translate(-50%,-3.4cqw)}}
+
+/* enemy nameplate */
+.plate{position:absolute;transform:translate(-50%,-100%);pointer-events:none;
+  display:flex;flex-direction:column;align-items:center;gap:.16cqw}
+.plate .nm{font-size:.76cqw;font-weight:600;color:var(--ink);
+  text-shadow:0 2px 5px rgba(0,0,0,.9);white-space:nowrap}
+.plate .hb{width:5.5cqw;height:.34cqw;min-height:4px;border-radius:99px;
+  background:rgba(6,9,14,.8);border:1px solid rgba(0,0,0,.6);overflow:hidden}
+.plate .hb>i{display:block;height:100%;background:linear-gradient(90deg,#C4344A,#FF6478)}
+.plate.boss .hb{width:9cqw}
+.plate.boss .nm{color:#FFC46A}
+
 /* ---- narrow / touch ---- */
 @container app (max-aspect-ratio: 13/9){
   .idchip .who{min-width:11cqw}
@@ -8068,12 +8134,46 @@ H.setName=function(p){
   return {ok:true,state:snapshot()};
 };
 
-H.addXp=function(p){
+H.addXp=function(p,srv){
   /* Only ever called by other server handlers and by world events; the
      amount is clamped so a stray call cannot hand out a level. */
   var amt=M.clamp(p.amount|0,0,500);
   var lv=addXp(amt,p.skill);
   return {ok:true,levelled:lv,state:snapshot()};
+};
+
+/* ---------------- the server context ----------------
+   Handlers registered from outside this module — the fishing and
+   combat ones — still need to move inventory, coins and XP. Exposing
+   those as public actions would defeat the entire point: anything
+   that can call Net.request could then grant itself a star core.
+
+   Instead the dispatcher hands every handler a private context as its
+   second argument. It is created in this closure and never returned
+   from anything, so a handler receives it only by being called, and
+   no outside caller can obtain one. */
+var SRV={
+  give:function(key,n){return give(key,n);},
+  take:function(key,n){return take(key,n);},
+  has:has,
+  coins:function(n){state.coins+=n|0;},
+  shards:function(n){state.shards+=n|0;},
+  xp:function(amount,skill){return addXp(M.clamp(amount|0,0,600),skill);},
+  hurt:function(amount){
+    state.hp=Math.max(0,state.hp-Math.max(0,amount|0));
+    return state.hp;
+  },
+  heal:function(amount){
+    state.hp=Math.min(state.hpMax,state.hp+Math.max(0,amount|0));
+    return state.hp;
+  },
+  stat:function(key,n){
+    if(state.stats[key]!==undefined)state.stats[key]+=(n===undefined?1:n);
+  },
+  skill:function(name){return state.skills[name]||0;},
+  equippedTool:function(){return state.equipped.tool;},
+  buff:function(name){return !!state.buffs[name];},
+  snapshot:snapshot
 };
 
 /* ---------------- dispatch ----------------
@@ -8086,7 +8186,7 @@ Net.request=function(action,payload,cb){
   var res;
   if(!h)res={ok:false,why:'Unknown action: '+action};
   else{
-    try{res=h(payload||{});}
+    try{res=h(payload||{},SRV);}
     catch(e){res={ok:false,why:'Server error.'};console.error(action,e);}
   }
   log.push({t:Date.now(),action:action,ok:res.ok});
@@ -8570,6 +8670,36 @@ U.init=function(){
   hud.appendChild(els.hot);
   buildHotbar();
 
+  /* vitals */
+  var vit=el('div','vitals');
+  vit.innerHTML='<div class="bar hp"><i id="uihp" style="width:100%"></i>'+
+    '<span class="lbl" id="uihplbl">100 / 100</span></div>';
+  hud.appendChild(vit);
+  els.hp=vit.querySelector('#uihp');
+  els.hplbl=vit.querySelector('#uihplbl');
+
+  /* the fishing rig */
+  els.fish=el('div','fishrig');
+  els.fish.innerHTML=
+    '<div class="cap"><span id="ufstage">Cast</span><b id="ufclass"></b></div>'+
+    '<div class="prog"><i id="ufprog" style="width:0%"></i></div>'+
+    '<div class="strain" id="ufstrainwrap"><i id="ufstrain" style="width:0%"></i></div>'+
+    '<div class="hint" id="ufhint"></div>';
+  hud.appendChild(els.fish);
+  els.fstage=els.fish.querySelector('#ufstage');
+  els.fclass=els.fish.querySelector('#ufclass');
+  els.fprog=els.fish.querySelector('#ufprog');
+  els.fstrain=els.fish.querySelector('#ufstrain');
+  els.fstrainWrap=els.fish.querySelector('#ufstrainwrap');
+  els.fhint=els.fish.querySelector('#ufhint');
+
+  els.catch=el('div','catch');
+  hud.appendChild(els.catch);
+
+  els.world=el('div');
+  els.world.style.cssText='position:absolute;inset:0;pointer-events:none';
+  hud.appendChild(els.world);
+
   toastWrap=el('div','toasts');
   hud.appendChild(toastWrap);
 
@@ -8689,6 +8819,10 @@ U.sync=function(s){
   els.xp.style.width=Math.round(100*s.xp/Math.max(1,s.xpNext))+'%';
   els.coins.textContent=s.coins.toLocaleString();
   els.shards.textContent=s.shards.toLocaleString();
+  if(els.hp){
+    els.hp.style.width=Math.round(100*s.hp/Math.max(1,s.hpMax))+'%';
+    els.hplbl.textContent=Math.round(s.hp)+' / '+s.hpMax;
+  }
   refreshHotbar();
   if(openPanel)render(openPanel);
 };
@@ -9044,7 +9178,844 @@ function renderMenu(bd){
   bd.appendChild(wrap);
 }
 
+/* ---------------- fishing display ---------------- */
+var FSTAGE={
+  cast:'Cast',sink:'Sinking',wait:'Waiting',strike:'Bite!',reel:'Reeling'
+};
+U.fishing=function(F){
+  if(!els.fish)return;
+  if(!F.active()){els.fish.classList.remove('on');return;}
+  els.fish.classList.add('on');
+  els.fstage.textContent=FSTAGE[F.stage]||'';
+  var fight=F.fight();
+  els.fclass.textContent=fight?({light:'Light',solid:'Solid',
+    heavy:'Heavy — careful'})[fight.weightClass]:'';
+  if(F.stage==='cast'){
+    els.fprog.style.width=Math.round(F.power*100)+'%';
+    els.fstrain.style.width='0%';
+    els.fhint.innerHTML='Hold to cast further, release to drop the line';
+    return;
+  }
+  if(F.stage==='wait'){
+    els.fprog.style.width='0%';els.fstrain.style.width='0%';
+    els.fhint.innerHTML='Watch the float…';
+    return;
+  }
+  if(F.stage==='strike'){
+    els.fprog.style.width='100%';els.fstrain.style.width='0%';
+    els.fhint.innerHTML='<b style="color:var(--acc)">Strike now!</b>';
+    return;
+  }
+  els.fprog.style.width=Math.round(F.progress*100)+'%';
+  els.fstrain.style.width=Math.round(F.strain*100)+'%';
+  els.fstrainWrap.classList.toggle('hot',F.strain>0.72);
+  /* The one instruction that matters, phrased as what to do rather
+     than what is happening. */
+  els.fhint.innerHTML=fight&&fight.running
+    ? '<span class="runs">It is running — give it line</span>'
+    : 'Hold to reel it in';
+};
+U.showCatch=function(r){
+  if(!els.catch)return;
+  var col=D.rarityCol(r.rarity);
+  els.catch.innerHTML=
+    '<div class="ic" style="background-image:url('+Icon.of(r.key)+')"></div>'+
+    '<h3>'+r.name+'</h3>'+
+    '<div class="w">'+r.weight+' kg · worth '+r.value.toLocaleString()+'</div>'+
+    '<div class="r" style="color:'+col+'">'+D.RARITY[r.rarity]+'</div>';
+  els.catch.classList.add('on');
+  clearTimeout(els._catchT);
+  els._catchT=setTimeout(function(){els.catch.classList.remove('on');},2600);
+};
+
+/* ---------------- world-anchored overlays ----------------
+   Damage numbers and enemy nameplates are DOM projected to screen
+   space rather than drawn in the scene: text stays crisp, and they
+   never fight the depth buffer. */
+U.damage=function(sx,sy,amount,kind){
+  if(!els.world)return;
+  var d=el('div','dmg'+(kind?' '+kind:''),String(amount));
+  d.style.left=sx+'px';d.style.top=sy+'px';
+  els.world.appendChild(d);
+  setTimeout(function(){d.parentNode&&d.parentNode.removeChild(d);},950);
+};
+var plates=[];
+U.plates=function(list){
+  if(!els.world)return;
+  /* keep the pool the size of the list rather than churning nodes */
+  while(plates.length<list.length){
+    var p=el('div','plate','<div class="nm"></div><div class="hb"><i></i></div>');
+    els.world.appendChild(p);
+    plates.push({root:p,nm:p.querySelector('.nm'),hb:p.querySelector('i')});
+  }
+  for(var i=0;i<plates.length;i++){
+    var pl=plates[i], d=list[i];
+    if(!d){pl.root.style.display='none';continue;}
+    pl.root.style.display='flex';
+    pl.root.style.left=d.x+'px';
+    pl.root.style.top=d.y+'px';
+    pl.root.classList.toggle('boss',!!d.boss);
+    if(pl._nm!==d.name){pl.nm.textContent=d.name;pl._nm=d.name;}
+    pl.hb.style.width=Math.round(100*d.hp/d.hpMax)+'%';
+  }
+};
+
 LH.UI=U;
+})();
+
+/* ============================================================
+   LH.Enemies — creatures and the AI that drives them.
+
+   Two kinds of body. Humanoid enemies reuse the player's rig and
+   animation library outright — a rogue is an Actor in a dark kit —
+   which means every clip written for the player already applies to
+   them and a new humanoid enemy costs a palette rather than a mesh.
+   Everything else gets its own procedural body.
+
+   One AI state machine covers all of them: idle, patrol, aggro,
+   chase, attack, recover, hurt, dead. Behaviour differences are
+   numbers in the species table, not branches in the update.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,GL=LH.GL,Geo=LH.Geo,D=LH.Data,T=LH.Terrain,W=LH.World,Act=LH.Actors;
+var E={};
+
+/* ---------------- species ---------------- */
+var SPECIES={
+  slime:{
+    name:'Bog Slime',hp:26,dmg:6,speed:1.5,aggro:9,reach:1.5,
+    xp:12,level:1,body:'slime',scale:1.0,col:'#6FD08A',
+    loot:[['fibre',1,0.7],['clay',1,0.3],['glowmoss',1,0.06]]
+  },
+  crab:{
+    name:'Rock Crab',hp:34,dmg:9,speed:2.1,aggro:8,reach:1.6,
+    xp:16,level:2,body:'crab',scale:1.0,col:'#C4685E',
+    loot:[['stonechunk',1,0.6],['sandpile',1,0.4],['copper',1,0.12]]
+  },
+  wisp:{
+    name:'Drift Wisp',hp:22,dmg:11,speed:2.8,aggro:12,reach:2.2,
+    xp:22,level:4,body:'wisp',scale:1.0,col:'#7FE8FF',fly:1.7,
+    loot:[['crystal',1,0.22],['glowmoss',1,0.3],['silver',1,0.1]]
+  },
+  rogue:{
+    name:'Shore Rogue',hp:58,dmg:14,speed:3.4,aggro:13,reach:2.3,
+    xp:34,level:6,body:'humanoid',scale:1.0,col:'#54607A',
+    kit:{shirt:'jacket',shirtCol:'#3A3F4E',pants:'#23262E',hair:'spiked',
+         hairCol:'#1E2028',hat:'none',tool:'sword',toolCol:'#B8C0CC'},
+    loot:[['ingot_cu',1,0.4],['rope',1,0.35],['sword_copper',1,0.05]]
+  },
+  shade:{
+    name:'Shade',hp:92,dmg:22,speed:3.8,aggro:15,reach:2.4,
+    xp:60,level:12,body:'humanoid',scale:1.06,col:'#2A2438',
+    kit:{shirt:'hoodie',shirtCol:'#241E30',pants:'#141020',hair:'long',
+         hairCol:'#0E0C16',hat:'none',tool:'sword',toolCol:'#7A5ACC',
+         aura:'motes',auraCol:'#8A6ACC'},
+    loot:[['voidshard',1,0.3],['ingot_ag',1,0.3],['crystal',1,0.25]]
+  },
+  guardian:{
+    name:'Ancient Guardian',hp:420,dmg:38,speed:2.2,aggro:18,reach:3.4,
+    xp:340,level:22,body:'guardian',scale:1.0,col:'#8A8272',boss:true,
+    loot:[['mythril',2,0.8],['starcore',1,0.25],['crystal',3,0.9],
+          ['hat_crown',1,0.04]]
+  }
+};
+E.SPECIES=SPECIES;
+E.list=function(){return Object.keys(SPECIES);};
+
+/* ---------------- bodies ---------------- */
+var meshCache={};
+function body(kind,fn,maxInst){
+  var hit=meshCache[kind];if(hit)return hit;
+  var b=Geo.build();fn(b);
+  var m=b.upload(maxInst||48);
+  m.key='enemy:'+kind;
+  meshCache[kind]=m;return m;
+}
+
+E.mesh=function(kind){
+  if(kind==='slime')return body('slime',function(b){
+    b.mat('crystal',0.10);
+    /* a squashed dome with a lighter core, so it reads as translucent
+       without needing a transparent pass */
+    b.loft([
+      {y:0.00,pts:Geo.circle(0.62,14)},
+      {y:0.24,pts:Geo.circle(0.70,14)},
+      {y:0.52,pts:Geo.circle(0.58,14)},
+      {y:0.72,pts:Geo.circle(0.30,14)}
+    ],'#FFFFFF',{});
+    b.mat('blank');
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.20,0.42,0.44);
+      b.sphere(0,0,0,0.11,10,8,'#0E1219');
+      b.sphere(0.03,0.04,0.06,0.04,8,6,'#FFFFFF');
+      b.pop();
+    }
+    b.mat('crystal',0.35);
+    b.sphere(0,0.24,0,0.22,10,8,'#FFFFFF');
+  });
+
+  if(kind==='crab')return body('crab',function(b){
+    b.mat('cliff');
+    b.push();b.translate(0,0.36,0);b.scale(1,0.62,1.15);
+    b.sphere(0,0,0,0.62,14,10,'#FFFFFF');
+    b.pop();
+    b.mat('panel');
+    /* eight legs and two claws */
+    for(var i=0;i<8;i++){
+      var side=i<4?-1:1, t=(i%4)/3;
+      b.push();
+      b.translate(side*0.5,0.28,-0.34+t*0.7);
+      b.rotate(0,0,side*0.7);
+      b.cylinder(0,-0.16,0,0.06,0.03,0.44,6,'#B0B6C0');
+      b.pop();
+    }
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.60,0.30,0.52);b.rotate(0,s*0.4,0);
+      b.chamfer(0,0,0,0.24,0.18,0.34,'#D07A6E',0.05);
+      b.push();b.translate(0,0.06,0.22);b.rotate(0.4,0,0);
+      b.chamfer(0,0,0,0.18,0.08,0.26,'#E08A7A',0.03);b.pop();
+      b.pop();
+    }
+    b.mat('blank');
+    for(var e=-1;e<=1;e+=2){
+      b.push();b.translate(e*0.18,0.68,0.34);
+      b.cylinder(0,0,0,0.05,0.05,0.20,6,'#C4685E');
+      b.sphere(0,0.13,0,0.08,8,6,'#0E1219');
+      b.pop();
+    }
+  });
+
+  if(kind==='wisp')return body('wisp',function(b){
+    b.mat('neon',1.0);
+    b.sphere(0,0,0,0.34,14,10,'#FFFFFF');
+    var rng=M.rng(83);
+    for(var i=0;i<10;i++){
+      var a=rng()*M.TAU, r=0.42+rng()*0.30;
+      b.push();
+      b.translate(Math.cos(a)*r,(rng()-0.5)*0.6,Math.sin(a)*r);
+      b.sphere(0,0,0,0.05+rng()*0.06,6,5,'#FFFFFF');
+      b.pop();
+    }
+    b.mat('blank');
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.12,0.06,0.28);
+      b.sphere(0,0,0,0.07,8,6,'#0A0E16');b.pop();
+    }
+  });
+
+  if(kind==='guardian')return body('guardian',function(b){
+    b.mat('cliff');
+    /* a stone construct: floating shoulder slabs, no neck, a lit core */
+    b.push();b.translate(0,1.9,0);
+    b.chamfer(0,0,0,1.5,1.7,1.0,'#FFFFFF',0.16);
+    b.pop();
+    b.push();b.translate(0,3.1,0);
+    b.chamfer(0,0,0,0.95,0.85,0.85,'#E8E2D4',0.14);
+    b.pop();
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*1.15,2.6,0);b.rotate(0,0,s*0.16);
+      b.chamfer(0,0,0,0.7,0.6,0.9,'#D8D2C2',0.10);b.pop();
+      /* arms hang as three floating segments */
+      for(var k=0;k<3;k++){
+        b.push();b.translate(s*(1.25+k*0.10),2.1-k*0.62,0);
+        b.chamfer(0,0,0,0.46-k*0.06,0.5,0.46-k*0.06,'#C4BEB0',0.08);
+        b.pop();
+      }
+      b.push();b.translate(s*0.5,0.7,0);
+      b.chamfer(0,0,0,0.62,1.4,0.72,'#B8B2A4',0.10);b.pop();
+    }
+    b.mat('neon',1.0);
+    b.push();b.translate(0,2.1,0.54);
+    b.sphere(0,0,0,0.26,12,9,'#FFC46A');b.pop();
+    b.push();b.translate(0,3.1,0.44);
+    b.chamfer(0,0,0,0.52,0.10,0.06,'#FFC46A',0.02,{noBand:true});b.pop();
+  });
+
+  return null;
+};
+
+/* ---------------- instances ---------------- */
+function Enemy(kind,x,z,opt){
+  opt=opt||{};
+  var S=SPECIES[kind];
+  this.kind=kind;this.S=S;
+  this.pos=M.v3(x,W.groundAt(x,z),z);
+  this.home=M.v3(x,this.pos[1],z);
+  this.vel=M.v3();
+  this.facing=Math.random()*M.TAU;
+  this.hp=S.hp;this.hpMax=S.hp;
+  this.state='idle';
+  this.t=0;                  /* time in the current state */
+  this.cool=0;               /* attack cooldown */
+  this.target=null;
+  this.wander=M.v3(x,0,z);
+  this.phase=Math.random()*6.28;
+  this.dead=false;
+  this.deadT=0;
+  this.hurtT=0;
+  this.id='e'+(E._next++);
+  this.leash=opt.leash||22;
+  /* Humanoids borrow the player's rig outright. */
+  if(S.body==='humanoid'){
+    var k=Act.defaultKit(this.id.length*7+3);
+    var kt=S.kit||{};
+    k.shirt.style=kt.shirt||'jacket';k.shirt.color=kt.shirtCol||'#3A3F4E';
+    k.shirt.sleeve='long';
+    k.pants.color=kt.pants||'#23262E';
+    k.hair.style=kt.hair||'crop';k.hair.color=kt.hairCol||'#1E2028';
+    k.hat.style=kt.hat||'none';
+    k.shoes.color='#191C22';
+    k.skin=kt.skin||'#9C8878';
+    k.tool.style=kt.tool||'sword';k.tool.color=kt.toolCol||'#B8C0CC';
+    if(kt.aura){k.aura.style=kt.aura;k.aura.color=kt.auraCol||'#8A6ACC';}
+    this.actor=Act.Actor({x:x,y:this.pos[1],z:z,kit:k,name:S.name});
+    this.actor.scale=S.scale||1;
+  }
+}
+E._next=1;
+E.Enemy=Enemy;
+
+var live=[];
+E.live=live;
+E.spawn=function(kind,x,z,opt){
+  if(!SPECIES[kind])return null;
+  var e=new Enemy(kind,x,z,opt);
+  live.push(e);
+  return e;
+};
+E.clear=function(){live.length=0;};
+
+/* ---------------- AI ----------------
+   One update for every species. `S` supplies the numbers; the shape of
+   the behaviour is identical, which is what keeps adding a creature to
+   a table entry rather than a code path. */
+var _to=M.v3();
+E.update=function(dt,playerPos,onHit){
+  for(var i=live.length-1;i>=0;i--){
+    var e=live[i], S=e.S;
+    e.t+=dt;
+    if(e.hurtT>0)e.hurtT-=dt;
+
+    if(e.dead){
+      e.deadT+=dt;
+      if(e.actor)e.actor.update(dt);
+      /* sink and disappear rather than blink out */
+      if(e.deadT>0.6)e.pos[1]-=dt*0.9;
+      if(e.deadT>2.4)live.splice(i,1);
+      continue;
+    }
+
+    var dist=M.dist2(e.pos,playerPos);
+    var canSee=dist<S.aggro;
+    var leashed=M.dist2(e.pos,e.home)>e.leash;
+
+    /* --- transitions --- */
+    if(e.state!=='attack'&&e.state!=='recover'){
+      if(leashed)e.setState('return');
+      else if(canSee&&dist>S.reach)e.setState('chase');
+      else if(canSee&&dist<=S.reach&&e.cool<=0)e.setState('attack');
+      else if(!canSee&&e.state!=='patrol'&&e.state!=='idle')e.setState('idle');
+    }
+
+    e.cool-=dt;
+    var speed=0;
+
+    switch(e.state){
+      case 'idle':
+        /* pause, then pick somewhere nearby to amble to */
+        if(e.t>1.2+Math.random()*2.5){
+          var a=Math.random()*M.TAU,r=3+Math.random()*7;
+          M.set3(e.wander,e.home[0]+Math.cos(a)*r,0,e.home[2]+Math.sin(a)*r);
+          e.setState('patrol');
+        }
+        break;
+      case 'patrol':
+        speed=S.speed*0.42;
+        if(step(e,e.wander,speed,dt)<0.7||e.t>9)e.setState('idle');
+        break;
+      case 'chase':
+        speed=S.speed;
+        M.copy3(_to,playerPos);
+        step(e,_to,speed,dt);
+        if(dist<=S.reach&&e.cool<=0)e.setState('attack');
+        break;
+      case 'attack':
+        /* Wind up, land the blow at a fixed point in the clip, then
+           recover. The delay is what makes an attack dodgeable. */
+        face(e,playerPos,dt,10);
+        if(e.t>0.34&&!e.struck){
+          e.struck=true;
+          if(dist<=S.reach*1.25&&onHit)onHit(e,S.dmg);
+        }
+        if(e.t>0.62){e.cool=0.9+Math.random()*0.5;e.setState('recover');}
+        break;
+      case 'recover':
+        if(e.t>0.35)e.setState(canSee?'chase':'idle');
+        break;
+      case 'return':
+        speed=S.speed*0.8;
+        if(step(e,e.home,speed,dt)<1.2)e.setState('idle');
+        break;
+    }
+
+    /* --- placement --- */
+    var g=W.groundAt(e.pos[0],e.pos[2]);
+    e.pos[1]=S.fly?g+S.fly+Math.sin(e.t*1.6+e.phase)*0.22:g;
+
+    /* --- animation --- */
+    if(e.actor){
+      e.actor.pos[0]=e.pos[0];e.actor.pos[1]=e.pos[1];e.actor.pos[2]=e.pos[2];
+      e.actor.facing=e.facing;
+      var st=e.actor.anim.state;
+      if(e.hurtT>0.2)e.actor.anim.play('hurt');
+      else if(e.state==='attack')e.actor.anim.play('attack');
+      else if(speed>0.2){
+        e.actor.anim.play('locomote');
+        e.actor.anim.params.speed=M.clamp((speed-1.4)/4.0,0,1);
+      }else if(st!=='attack'&&st!=='hurt')e.actor.anim.play('idle');
+      e.actor.update(dt);
+    }
+  }
+};
+
+Enemy.prototype.setState=function(s){
+  if(this.state===s)return;
+  this.state=s;this.t=0;
+  if(s==='attack')this.struck=false;
+};
+
+function step(e,to,speed,dt){
+  var dx=to[0]-e.pos[0], dz=to[2]-e.pos[2];
+  var d=Math.hypot(dx,dz);
+  if(d<0.001)return d;
+  e.pos[0]+=dx/d*speed*dt;
+  e.pos[2]+=dz/d*speed*dt;
+  /* creatures respect buildings too, or a rogue walks through a wall */
+  W.resolve(e.pos,0.42,e.pos[1]);
+  face(e,to,dt,7);
+  return d;
+}
+function face(e,to,dt,rate){
+  var want=Math.atan2(to[0]-e.pos[0],to[2]-e.pos[2]);
+  var d=M.angDelta(e.facing,want);
+  e.facing+=d*Math.min(1,dt*rate);
+}
+
+/* Damage is applied here but authorised elsewhere: LH.Net decides
+   whether the hit was legal and how much it was worth. */
+E.damage=function(e,amount){
+  if(e.dead)return null;
+  e.hp-=amount;
+  e.hurtT=0.45;
+  if(e.hp<=0){
+    e.hp=0;e.dead=true;e.deadT=0;
+    if(e.actor)e.actor.anim.play('hurt',true);
+    return {killed:true,species:e.kind};
+  }
+  /* being hit interrupts whatever it was doing and makes it angry */
+  if(e.state!=='attack')e.setState('chase');
+  return {killed:false};
+};
+
+/* Nearest living enemy in front of the player, within a weapon's
+   reach. Cone rather than a sphere, so a swing has a direction. */
+E.pick=function(pos,facing,reach,arc){
+  arc=arc||0.9;
+  var best=null,bd=reach;
+  for(var i=0;i<live.length;i++){
+    var e=live[i];
+    if(e.dead)continue;
+    var dx=e.pos[0]-pos[0], dz=e.pos[2]-pos[2];
+    var d=Math.hypot(dx,dz);
+    if(d>bd)continue;
+    var ang=Math.abs(M.angDelta(facing,Math.atan2(dx,dz)));
+    if(ang>arc)continue;
+    bd=d;best=e;
+  }
+  return best;
+};
+E.byId=function(id){
+  for(var i=0;i<live.length;i++)if(live[i].id===id)return live[i];
+  return null;
+};
+
+/* ---------------- drawing ---------------- */
+var _m=M.m4(),_t=M.v3(),_s=M.v3();
+E.submit=function(time,playerPos){
+  for(var i=0;i<live.length;i++){
+    var e=live[i];
+    if(M.dist2(e.pos,playerPos)>120)continue;
+    if(e.actor){
+      Act.submit(e.actor);
+      continue;
+    }
+    var mesh=E.mesh(e.S.body);
+    if(!mesh)continue;
+    /* a hit flashes white, and a dying creature flattens as it sinks */
+    var flash=e.hurtT>0?M.clamp(e.hurtT/0.45,0,1):0;
+    var squash=1;
+    if(e.kind==='slime')squash=1+Math.sin(e.t*4+e.phase)*0.10;
+    if(e.dead)squash=Math.max(0.2,1-e.deadT*0.8);
+    M.set3(_t,e.pos[0],e.pos[1],e.pos[2]);
+    M.set3(_s,e.S.scale*(2-squash),e.S.scale*squash,e.S.scale*(2-squash));
+    M.fromTRS(_m,_t,0,e.facing,0,_s);
+    var col=Geo.col3(e.S.col);
+    var c=[M.lerp(col[0],2.2,flash),M.lerp(col[1],2.2,flash),
+           M.lerp(col[2],2.2,flash)];
+    Act.pushInstance(mesh,_m,c,e.kind==='wisp'?0.9:0);
+  }
+};
+E.submitAura=function(time,playerPos){
+  for(var i=0;i<live.length;i++){
+    var e=live[i];
+    if(!e.actor||e.dead)continue;
+    if(M.dist2(e.pos,playerPos)>90)continue;
+    Act.submitAura(e.actor,time);
+  }
+};
+
+LH.Enemies=E;
+})();
+
+/* ============================================================
+   LH.Fishing — the angling minigame.
+
+   Five stages: cast, sink, wait, strike, reel. The reel is the game:
+   a hooked fish runs and tires, and the line has a breaking strain,
+   so you give it slack when it fights and pull when it does not. A
+   big fish is genuinely harder to land than a small one, which is
+   the whole reason the weight matters.
+
+   The server decides what is on the hook the moment it bites — the
+   client is told the fight parameters, never the identity, so a
+   client that reads its own memory still cannot pick its catch.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,D=LH.Data,Net=LH.Net;
+var F={};
+
+F.stage='idle';        /* idle | cast | sink | wait | strike | reel | done */
+F.t=0;
+F.zone='harbour';
+F.bobber=M.v3();
+F.power=0;             /* cast charge, 0..1 */
+
+/* live fight state */
+var fight=null;
+F.fight=function(){return fight;};
+
+/* Tension bar: `pull` is what the player is doing, `strain` is the
+   line. Holding pulls the fish in and loads the line; letting go
+   recovers the line and lets the fish run. */
+F.progress=0;
+F.strain=0;
+F.pulling=false;
+
+var listeners=[];
+F.on=function(fn){listeners.push(fn);};
+function emit(ev,data){
+  for(var i=0;i<listeners.length;i++)listeners[i](ev,data);
+}
+
+/* ---------------- cast ---------------- */
+F.canFish=function(){
+  var st=Net.snapshot();
+  var rodKey=st.equipped.tool;
+  var rod=rodKey?D.byKey(rodKey):null;
+  if(!rod||rod.cat!=='fishing')return {ok:false,why:'Equip a rod first.'};
+  var bait=F.bestBait(st);
+  if(!bait)return {ok:false,why:'You have no bait.'};
+  return {ok:true,rod:rod,bait:bait};
+};
+/* Use the best bait you carry: nobody wants to manage a bait slot. */
+F.bestBait=function(st){
+  var best=null;
+  for(var k in st.inv){
+    var it=D.byKey(k);
+    if(!it||!it.props||!it.props.bait)continue;
+    if(!best||it.props.bait>best.props.bait)best=it;
+  }
+  return best;
+};
+
+F.beginCast=function(zone){
+  var can=F.canFish();
+  if(!can.ok){emit('reject',can.why);return false;}
+  F.zone=zone||'harbour';
+  F.stage='cast';F.t=0;F.power=0;
+  emit('stage','cast');
+  return true;
+};
+/* Charge while held; the longer the cast the better the water. */
+F.chargeCast=function(dt){
+  if(F.stage!=='cast')return;
+  F.power=Math.min(1,F.power+dt*0.85);
+};
+F.release=function(){
+  if(F.stage!=='cast')return;
+  F.stage='sink';F.t=0;
+  emit('stage','sink');
+};
+
+/* ---------------- waiting ---------------- */
+function rollWait(){
+  var st=Net.snapshot();
+  var rod=D.byKey(st.equipped.tool);
+  var bait=F.bestBait(st);
+  var power=(rod&&rod.props.power)||1;
+  var b=(bait&&bait.props.bait)||1;
+  /* Better tackle shortens the wait; a long cast helps a little. */
+  var base=9.5/(0.7+power*0.5+b*0.25+F.power*0.5);
+  return base*(0.55+Math.random()*0.9);
+}
+
+F.update=function(dt){
+  F.t+=dt;
+  switch(F.stage){
+    case 'cast': break;
+    case 'sink':
+      if(F.t>0.7){F.stage='wait';F.t=0;F.waitFor=rollWait();emit('stage','wait');}
+      break;
+    case 'wait':
+      if(F.t>=F.waitFor){
+        /* Ask the server what bit. It returns the fight, not the fish. */
+        Net.request('hook',{zone:F.zone,power:F.power},function(r){
+          if(!r.ok){F.stage='idle';emit('reject',r.why);return;}
+          fight=r.fight;
+          F.stage='strike';F.t=0;
+          F.progress=0.30;F.strain=0;
+          emit('stage','strike');
+        });
+      }
+      break;
+    case 'strike':
+      /* a short window to set the hook */
+      if(F.t>0.85){F.stage='idle';fight=null;emit('miss');}
+      break;
+    case 'reel':
+      stepFight(dt);
+      break;
+  }
+};
+
+/* Setting the hook. Miss the window and the fish is gone. */
+F.strike=function(){
+  if(F.stage!=='strike')return false;
+  F.stage='reel';F.t=0;
+  emit('stage','reel');
+  return true;
+};
+
+function stepFight(dt){
+  if(!fight)return;
+  /* The fish alternates between running and tiring, on its own clock,
+     so the player has to read it rather than mash. */
+  fight.phase-=dt;
+  if(fight.phase<=0){
+    fight.running=!fight.running;
+    fight.phase=fight.running?(0.5+Math.random()*fight.runLen)
+                             :(0.6+Math.random()*0.9);
+  }
+  var pull=F.pulling?1:0;
+  /* progress moves toward you when you pull and the fish is tired,
+     away when it runs */
+  var gain=pull*(fight.running?-0.16:0.42)+(pull?0:-0.10);
+  F.progress=M.clamp(F.progress+gain*dt*fight.rate,0,1);
+  /* strain builds while pulling against a running fish */
+  var load=pull?(fight.running?1.55:0.42):-1.25;
+  F.strain=M.clamp(F.strain+load*dt*fight.strainRate,0,1);
+
+  if(F.strain>=1){
+    F.stage='idle';fight=null;F.pulling=false;
+    emit('snap');
+    return;
+  }
+  if(F.progress>=1){
+    var f=fight;
+    fight=null;F.pulling=false;F.stage='done';F.t=0;
+    Net.request('land',{token:f.token},function(r){
+      if(r.ok)emit('caught',r);
+      else emit('reject',r.why);
+      F.stage='idle';
+    });
+  }
+}
+
+F.setPull=function(on){F.pulling=!!on;};
+F.cancel=function(){
+  if(F.stage==='idle')return;
+  F.stage='idle';fight=null;F.pulling=false;
+  emit('stage','idle');
+};
+F.active=function(){return F.stage!=='idle';};
+
+LH.Fishing=F;
+})();
+
+/* ============================================================
+   Server handlers for the activities.
+
+   Registered from outside LH.Net rather than written into it, but
+   they run inside the same authority: they go through Net.register
+   and are the only path by which fishing and combat can move a
+   number. The fish is chosen here, at the moment of the bite, and
+   the client is handed a fight and an opaque token — never the
+   species, and never the weight.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,D=LH.Data,Net=LH.Net,E=LH.Enemies;
+
+/* The one hooked fish, held server-side between `hook` and `land`. */
+var hooked=null;
+var tokenSeq=1;
+
+/* Weighted pick: rarity is the weight, so the good ones stay rare no
+   matter how long you stand there. Luck from the rod, the bait and
+   the fishing skill tilts it, but never flattens it. */
+function rollFish(zone,luck){
+  var pool=D.fishIn(zone);
+  if(!pool.length)pool=D.fishIn('harbour');
+  var total=0,w=[];
+  for(var i=0;i<pool.length;i++){
+    /* base weight falls off steeply with rarity; luck lifts the tail */
+    var wt=Math.pow(0.30,pool[i].rarity-1)*(1+luck*(pool[i].rarity-1)*0.9);
+    w.push(wt);total+=wt;
+  }
+  var r=Math.random()*total;
+  for(var j=0;j<pool.length;j++){
+    r-=w[j];
+    if(r<=0)return pool[j];
+  }
+  return pool[0];
+}
+
+/* Weight within the species' range, biased small — a record fish
+   should be a story, not a Tuesday. */
+function rollWeight(it,luck){
+  var w=it.props.w;
+  var t=Math.pow(Math.random(),2.2-luck*0.6);
+  return Math.round((w[0]+(w[1]-w[0])*t)*100)/100;
+}
+
+Net.register('hook',function(p,srv){
+  var st=Net.snapshot();
+  var rod=D.byKey(st.equipped.tool);
+  if(!rod||rod.cat!=='fishing')return {ok:false,why:'You are not holding a rod.'};
+  var bait=null;
+  for(var k in st.inv){
+    var it=D.byKey(k);
+    if(it&&it.props&&it.props.bait&&(!bait||it.props.bait>bait.props.bait))bait=it;
+  }
+  if(!bait)return {ok:false,why:'You have no bait.'};
+
+  /* Bait is consumed on the bite, not on the cast: a cast that never
+     gets a bite should not cost anything. */
+  if(!srv.take(bait.key,1))return {ok:false,why:'You have no bait.'};
+
+  var luck=(rod.props.luck||0)+(bait.props.bait-1)*0.05+
+           st.skills.fishing*0.010+(p.power||0)*0.06;
+  var fish=rollFish(p.zone||'harbour',luck);
+  var weight=rollWeight(fish,luck);
+  hooked={item:fish,weight:weight,token:'t'+(tokenSeq++),zone:p.zone};
+
+  /* Fight difficulty scales with weight and rarity, eased by the rod's
+     power and the angler's skill. */
+  var wr=fish.props.w;
+  var size=M.clamp((weight-wr[0])/Math.max(0.01,wr[1]-wr[0]),0,1);
+  var heft=Math.log(1+weight)/Math.log(260);
+  var pow=rod.props.power||1;
+  var skill=1+st.skills.fishing*0.02;
+
+  return {ok:true,fight:{
+    token:hooked.token,
+    /* how fast the bar moves — a small fish is landed quickly */
+    rate:M.clamp(1.35-heft*0.55,0.45,1.4)*skill,
+    /* how quickly the line loads while pulling against a run */
+    strainRate:M.clamp(0.42+heft*0.85+size*0.30,0.35,1.5)/Math.sqrt(pow),
+    /* how long its runs last */
+    runLen:0.7+heft*1.9,
+    running:true,
+    phase:0.5+Math.random()*0.6,
+    /* a hint, not the answer: enough to tell a monster from a sprat */
+    weightClass:heft>0.62?'heavy':(heft>0.30?'solid':'light')
+  }};
+});
+
+Net.register('land',function(p,srv){
+  if(!hooked||hooked.token!==p.token)
+    return {ok:false,why:'Nothing on the line.'};
+  var fish=hooked.item, weight=hooked.weight;
+  hooked=null;
+  if(!srv.give(fish.key,1))return {ok:false,why:'Your bag is full.'};
+  var value=D.fishValue(fish,weight);
+  srv.xp(Math.min(400,14+fish.rarity*16+Math.round(value*0.04)),'fishing');
+  srv.stat('caught');
+  return {ok:true,key:fish.key,name:fish.name,weight:weight,
+    rarity:fish.rarity,value:value,state:srv.snapshot()};
+});
+
+/* Combat. The client says which enemy it swung at; the server decides
+   whether the swing could have reached, and how much it was worth. */
+Net.register('attack',function(p,srv){
+  var st=Net.snapshot();
+  var wep=D.byKey(st.equipped.tool);
+  var dmg=(wep&&wep.props&&wep.props.damage)||3;
+  var reach=(wep&&wep.props&&wep.props.reach)||2.0;
+  var e=E.byId(p.id);
+  if(!e)return {ok:false,why:'Nothing there.'};
+  if(e.dead)return {ok:false,why:'Already down.'};
+  var d=Math.hypot(e.pos[0]-p.pos[0],e.pos[2]-p.pos[2]);
+  if(d>reach+0.9)return {ok:false,why:'Out of reach.'};
+
+  /* skill and buffs are read from the server's own state */
+  var mult=1+srv.skill('combat')*0.022+(srv.buff('damage')?0.35:0);
+  var roll=dmg*mult*(0.85+Math.random()*0.3);
+  var crit=Math.random()<0.08+srv.skill('combat')*0.004;
+  if(crit)roll*=1.9;
+  roll=Math.round(roll);
+
+  var r=E.damage(e,roll);
+  srv.xp(Math.min(200,Math.round(roll*0.5)),'combat');
+  var loot=null;
+  if(r&&r.killed){
+    loot=[];
+    var tbl=e.S.loot||[];
+    for(var i=0;i<tbl.length;i++){
+      if(Math.random()<=tbl[i][2]){
+        srv.give(tbl[i][0],tbl[i][1]);
+        loot.push([tbl[i][0],tbl[i][1]]);
+      }
+    }
+    srv.coins(Math.round(e.S.xp*1.6));
+    srv.xp(Math.min(500,e.S.xp),'combat');
+    srv.stat('killed');
+  }
+  return {ok:true,damage:roll,crit:crit,killed:!!(r&&r.killed),
+    loot:loot,hp:e.hp,hpMax:e.hpMax,state:srv.snapshot()};
+});
+
+/* Damage taken. The enemy's own table supplies the number, so a
+   client cannot claim it took zero. */
+Net.register('takeDamage',function(p,srv){
+  /* The enemy's own table supplies the number, so a client cannot
+     claim it took zero — or that an enemy that does not exist hit it. */
+  var e=E.byId(p.id);
+  if(!e)return {ok:false,why:'No such attacker.'};
+  var hp=srv.hurt(e.S.dmg);
+  return {ok:true,hp:hp,dead:hp<=0,state:srv.snapshot()};
+});
+
+/* Respawn: everything you were carrying stays, but the walk back is
+   the cost. Losing inventory on death would make a sandbox hostile. */
+Net.register('respawn',function(p,srv){
+  srv.heal(9999);
+  return {ok:true,state:srv.snapshot()};
+});
+
+LH.Activities={rollFish:rollFish};
 })();
 
 /* ============================================================
@@ -9174,6 +10145,7 @@ LH.Sky=S;
 var M=LH.M,GL=LH.GL,R=LH.Render,App=LH.App,Cam=LH.Cam,Geo=LH.Geo;
 var T=LH.Terrain,W=LH.World,P=LH.Props,Act=LH.Actors,I=LH.Input,Pl=LH.Player,Sky=LH.Sky;
 var V=LH.Voxels,D=LH.Data,Net=LH.Net,UI=LH.UI,Icon=LH.Icon;
+var En=LH.Enemies,Fish=LH.Fishing;
 var G={};
 
 G.player=null;
@@ -9240,6 +10212,31 @@ App.stage('Waking the harbour',function(){
     npc.speed=1.5+rng()*0.9;
     G.crowd.push(npc);
   }
+  /* Populate. Species are placed by terrain rather than by hand: crabs
+     on the shore, slimes in the meadows, wisps in the deep woods,
+     rogues on the roads, and one guardian in the quarry. */
+  var erng=M.rng(9001);
+  function scatterEnemy(kind,count,test){
+    var placed=0,tries=0;
+    while(placed<count&&tries<4000){
+      tries++;
+      var ex=(erng()-0.5)*T.SIZE*0.86, ez=(erng()-0.5)*T.SIZE*0.86;
+      var eh=T.heightAt(ex,ez);
+      if(!test(ex,ez,eh))continue;
+      if(T.flatAt(ex,ez)>0.55)continue;                /* not in a district */
+      if(Math.hypot(ex-W.spawn[0],ez-W.spawn[2])<34)continue;  /* not on the doorstep */
+      En.spawn(kind,ex,ez);placed++;
+    }
+    return placed;
+  }
+  scatterEnemy('crab',14,function(x,z,h){return h>0.6&&h<3.2;});
+  scatterEnemy('slime',18,function(x,z,h){return h>3&&h<20;});
+  scatterEnemy('wisp',10,function(x,z,h){return h>14&&z>10;});
+  scatterEnemy('rogue',9,function(x,z,h){return h>4&&h<26;});
+  scatterEnemy('shade',5,function(x,z,h){return h>20;});
+  var qpad=T.pad('quarry');
+  En.spawn('guardian',qpad.x,qpad.z+14,{leash:30});
+
   /* Any saved progress replaces the starting state, and rebuilding the
      voxel chunks it restored has to happen before the first draw. */
   if(Net.load()){
@@ -9359,13 +10356,135 @@ G.interact=function(pt){
         else UI.toast(r.why,'bad');
       });
       break;
-    case 'fish': UI.toast('Fishing opens with the harbour master.','bad');break;
+    case 'fish': startFishing();break;
     case 'vehicles': UI.toast('The garage is still being fitted out.','bad');break;
     case 'arena': UI.toast('The arena is closed for repairs.','bad');break;
     default: UI.toast(pt.label,'good');
   }
 };
 G.onHeldChanged=function(){G.refreshKit();};
+
+/* ---------------- fishing ----------------
+   The rod's animation follows the minigame's stage, so what the
+   character is doing always matches what the bar is asking for. */
+Fish.on(function(ev,data){
+  var p=G.player;
+  if(ev==='stage'){
+    if(data==='cast')p.anim.play('fishCast',true);
+    else if(data==='wait'||data==='sink')p.anim.play('fishWait');
+    else if(data==='strike')p.anim.play('fishReel',true);
+    else if(data==='reel')p.anim.play('fishReel');
+    return;
+  }
+  if(ev==='reject'){UI.toast(data,'bad');p.anim.play('idle');return;}
+  if(ev==='miss'){UI.toast('It got away.','bad');p.anim.play('idle');return;}
+  if(ev==='snap'){UI.toast('The line snapped!','bad');
+    Cam.shake(0.12,0.2);p.anim.play('idle');return;}
+  if(ev==='caught'){
+    UI.sync(data.state);
+    UI.showCatch(data);
+    LH.Audio&&LH.Audio.play('catch');
+    p.anim.play('celebrate',true);
+    setTimeout(function(){if(p.anim.state==='celebrate')p.anim.play('idle');},1500);
+  }
+});
+
+/* Which water you are standing beside decides what lives in it. */
+function fishZoneAt(x,z){
+  if(x<-70&&z>-40&&z<110)return 'river';
+  return Math.hypot(x+4,z+100)<70?'deep':'harbour';
+}
+function startFishing(){
+  var p=G.player;
+  if(Fish.beginCast(fishZoneAt(p.pos[0],p.pos[2])))Pl.aiming=true;
+}
+
+/* ---------------- combat ---------------- */
+function swing(){
+  var p=G.player;
+  var wep=D.byKey(Net.snapshot().equipped.tool);
+  var reach=(wep&&wep.props&&wep.props.reach)||2.0;
+  p.anim.play('attack',true);
+  var e=En.pick(p.pos,p.facing,reach+0.6,1.0);
+  if(!e)return;
+  Net.request('attack',{id:e.id,pos:p.pos},function(r){
+    if(!r.ok)return;
+    UI.sync(r.state);
+    var sp=project(e.pos[0],e.pos[1]+1.2,e.pos[2]);
+    if(sp)UI.damage(sp.x,sp.y,r.damage,r.crit?'crit':'');
+    if(r.crit)Cam.shake(0.08,0.16);
+    if(r.killed){
+      UI.toast(e.S.name+' defeated','good');
+      if(r.loot)for(var i=0;i<r.loot.length;i++)UI.toastItem(r.loot[i][0],r.loot[i][1]);
+    }
+    LH.Audio&&LH.Audio.play('hit');
+  });
+}
+
+/* Project a world point to screen pixels, for damage numbers and
+   nameplates. Returns null behind the camera. */
+var _pm=M.m4();
+function project(x,y,z){
+  M.mul(_pm,Cam.proj,Cam.view);
+  var cx=_pm[0]*x+_pm[4]*y+_pm[8]*z+_pm[12];
+  var cy=_pm[1]*x+_pm[5]*y+_pm[9]*z+_pm[13];
+  var cw=_pm[3]*x+_pm[7]*y+_pm[11]*z+_pm[15];
+  if(cw<=0.001)return null;
+  var r=LH.App.canvas.getBoundingClientRect();
+  return {x:(cx/cw*0.5+0.5)*r.width, y:(0.5-cy/cw*0.5)*r.height};
+}
+G.project=project;
+
+/* Getting hit. The server decides the number from the attacker's own
+   table, so the client cannot claim it took nothing. */
+function onEnemyHit(e,dmg){
+  var p=G.player;
+  if(Math.hypot(e.pos[0]-p.pos[0],e.pos[2]-p.pos[2])>e.S.reach*1.4)return;
+  Net.request('takeDamage',{id:e.id},function(r){
+    if(!r.ok)return;
+    UI.sync(r.state);
+    p.anim.play('hurt',true);
+    Cam.shake(0.10,0.2);
+    var sp=project(p.pos[0],p.pos[1]+1.6,p.pos[2]);
+    if(sp)UI.damage(sp.x,sp.y,e.S.dmg,'hurt');
+    if(r.dead)G.onDeath();
+  });
+}
+G.onDeath=function(){
+  var p=G.player;
+  UI.toast('You were knocked out. Waking up at the harbour…','bad');
+  Fish.cancel();
+  setTimeout(function(){
+    Net.request('respawn',{},function(r){
+      if(r.ok)UI.sync(r.state);
+      p.pos[0]=W.spawn[0];p.pos[2]=W.spawn[2];
+      p.pos[1]=W.groundAt(W.spawn[0],W.spawn[2]);
+      Pl.vel[0]=Pl.vel[1]=Pl.vel[2]=0;
+      p.anim.play('idle',true);
+    });
+  },900);
+};
+
+/* Nameplates for anything living and close. Rebuilt each frame from
+   projected positions; the DOM pool is reused rather than churned. */
+var plateList=[];
+function updatePlates(){
+  plateList.length=0;
+  var live=En.live;
+  for(var i=0;i<live.length;i++){
+    var e=live[i];
+    if(e.dead)continue;
+    if(Math.hypot(e.pos[0]-G.player.pos[0],e.pos[2]-G.player.pos[2])>26)continue;
+    /* only plate something that has noticed you, been hit, or is a boss */
+    if(e.hp>=e.hpMax&&e.state!=='chase'&&e.state!=='attack'&&!e.S.boss)continue;
+    var top=e.pos[1]+(e.S.body==='guardian'?4.2:(e.actor?2.1:1.2));
+    var sp=project(e.pos[0],top,e.pos[2]);
+    if(!sp)continue;
+    plateList.push({x:sp.x,y:sp.y,name:e.S.name,hp:e.hp,hpMax:e.hpMax,
+      boss:!!e.S.boss});
+  }
+  UI.plates(plateList);
+}
 
 /* ---------------- crowd ----------------
    A patrol with pauses. Deliberately simple: they exist to make the
@@ -9430,6 +10549,8 @@ App.onUpdate(function(dt,time){
     G.player.update(dt);
     updateCrowd(dt);
     Cam.update(dt,G.player.pos,camSolid);
+    En.update(dt,G.player.pos,onEnemyHit);
+    UI.plates([]);
     R.updateLight(G.player.pos,44);
     T.extractFrustum(R.vp);
     W.cullProps(Cam.target[0],Cam.target[2],Math.min(1.7,1+Cam.dist*0.030));
@@ -9449,12 +10570,41 @@ App.onUpdate(function(dt,time){
      does not swing the whole view. */
   Cam.update(dt,G.player.pos,camSolid);
 
-  updateAim();
-  if(I.pressed('primary'))actPrimary();
-  if(I.pressed('interact')&&G.aim.mode==='interact')G.interact(G.aim.target);
+  /* --- fishing owns the primary button while it is running --- */
+  if(Fish.active()){
+    Pl.aiming=true;
+    if(Fish.stage==='cast'){
+      if(I.down('primary')||I.pointer.down)Fish.chargeCast(dt);
+      else Fish.release();
+    }else if(Fish.stage==='strike'){
+      if(I.pressed('primary')||I.pressed('interact'))Fish.strike();
+    }else if(Fish.stage==='reel'){
+      Fish.setPull(I.down('primary')||I.pointer.down);
+    }
+    if(I.pressed('menu'))Fish.cancel();
+    Fish.update(dt);
+    UI.fishing(Fish);
+  }else{
+    Pl.aiming=false;
+    UI.fishing(Fish);
+    updateAim();
+    var heldW=UI.heldItem();
+    /* a weapon swings at whatever is in front; everything else builds,
+       breaks or interacts */
+    if(I.pressed('primary')){
+      if(heldW&&heldW.cat==='weapon')swing();
+      else actPrimary();
+    }
+    if(I.pressed('interact')&&G.aim.mode==='interact')G.interact(G.aim.target);
+  }
+
+  En.update(dt,G.player.pos,onEnemyHit);
+  updatePlates();
 
   /* reticle and prompt reflect what the aim found */
-  if(G.aim.mode==='interact'){
+  if(Fish.active()){
+    UI.setReticle('');UI.setPrompt('');
+  }else if(G.aim.mode==='interact'){
     UI.setReticle('act');
     UI.setPrompt(G.aim.target.prompt,'E');
   }else if(G.aim.mode==='place'){
@@ -9512,6 +10662,7 @@ App.onDraw(function(dt,time){
     if(M.dist2(n.pos,G.player.pos)>150)continue;
     Act.submit(n);Act.submitPet(n,time);
   }
+  En.submit(time,G.player.pos);
 
   /* --- shadow --- */
   var dp=R.beginShadow();
@@ -9546,6 +10697,7 @@ App.onDraw(function(dt,time){
   Act.beginFrame();
   Act.submitAura(G.player,time);
   for(var j=0;j<G.crowd.length;j++)Act.submitAura(G.crowd[j],time);
+  En.submitAura(time,G.player.pos);
   var ap=R.beginAdditive();
   Act.flush(ap);
   R.endBlend();
