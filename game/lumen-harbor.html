@@ -102,6 +102,188 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 #rotate .ph{width:74px;height:120px;border:3px solid var(--ink2);border-radius:12px;
   animation:tip 1.8s ease-in-out infinite}
 @keyframes tip{0%,45%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+
+/* ============================================================
+   HUD. Everything is sized in cqw/cqh against the game container, so
+   the interface scales as one piece with the view rather than with
+   the browser window. The default screen carries four things: who you
+   are, what you are holding, what you are looking at, and the clock.
+   Everything else opens on demand.
+   ============================================================ */
+#hud{position:absolute;inset:0;pointer-events:none;z-index:20;
+  font-family:var(--ui);container-type:size}
+#hud .pe{pointer-events:auto}
+
+/* ---- identity ---- */
+.idchip{position:absolute;left:1.4cqw;top:1.4cqw;display:flex;gap:.7cqw;
+  align-items:center;padding:.55cqw .95cqw .55cqw .55cqw;border-radius:12px;
+  background:linear-gradient(135deg,rgba(20,27,42,.90),rgba(12,17,26,.86));
+  border:1px solid var(--line);backdrop-filter:blur(10px);
+  box-shadow:0 8px 26px rgba(0,0,0,.45)}
+.idchip .av{width:3.0cqw;height:3.0cqw;min-width:30px;min-height:30px;
+  border-radius:9px;background:linear-gradient(160deg,#2C3A52,#16202F);
+  border:1px solid var(--line2);display:grid;place-items:center;
+  font-family:var(--disp);font-weight:700;color:var(--acc);
+  font-size:1.35cqw;letter-spacing:.04em}
+.idchip .who{display:flex;flex-direction:column;gap:.22cqw;min-width:9cqw}
+.idchip .nm{font-size:1.05cqw;font-weight:600;letter-spacing:.02em;
+  color:var(--ink);line-height:1;white-space:nowrap}
+.idchip .lv{font-size:.72cqw;color:var(--ink3);letter-spacing:.12em;
+  text-transform:uppercase;line-height:1}
+.xpbar{height:.34cqw;min-height:3px;border-radius:99px;background:rgba(255,255,255,.08);
+  overflow:hidden;margin-top:.12cqw}
+.xpbar>i{display:block;height:100%;background:linear-gradient(90deg,#5B4BE0,var(--xp));
+  box-shadow:0 0 10px rgba(124,107,255,.6);transition:width .4s ease}
+
+.purse{position:absolute;left:1.4cqw;top:6.0cqw;display:flex;gap:.5cqw}
+.coin{display:flex;align-items:center;gap:.34cqw;padding:.34cqw .72cqw;
+  border-radius:9px;background:rgba(14,19,30,.82);border:1px solid var(--line);
+  font-size:.92cqw;font-weight:600;color:var(--ink);backdrop-filter:blur(8px)}
+.coin b{width:.86cqw;height:.86cqw;min-width:9px;min-height:9px;border-radius:50%;
+  display:block}
+.coin.c b{background:linear-gradient(160deg,#FFDE8A,#C9911E);
+  box-shadow:0 0 8px rgba(245,196,81,.55)}
+.coin.s b{background:linear-gradient(160deg,#9FE8FF,#3B8FD0);
+  box-shadow:0 0 8px rgba(90,200,255,.55);border-radius:2px;transform:rotate(45deg)}
+
+/* ---- clock and weather ---- */
+.clock{position:absolute;right:1.4cqw;top:1.4cqw;display:flex;align-items:center;
+  gap:.55cqw;padding:.44cqw .85cqw;border-radius:10px;
+  background:rgba(14,19,30,.82);border:1px solid var(--line);
+  font-size:.92cqw;color:var(--ink2);letter-spacing:.06em;backdrop-filter:blur(8px)}
+.clock .wx{color:var(--ink3);font-size:.80cqw;text-transform:uppercase;
+  letter-spacing:.14em}
+
+/* ---- hotbar ---- */
+.hotbar{position:absolute;left:50%;bottom:1.6cqw;transform:translateX(-50%);
+  display:flex;gap:.42cqw;padding:.42cqw;border-radius:14px;
+  background:rgba(10,14,22,.72);border:1px solid var(--line);
+  backdrop-filter:blur(12px);box-shadow:0 10px 34px rgba(0,0,0,.5)}
+.slot{position:relative;width:3.6cqw;height:3.6cqw;min-width:38px;min-height:38px;
+  border-radius:10px;background:linear-gradient(165deg,rgba(38,48,66,.9),rgba(20,27,40,.9));
+  border:1px solid var(--line);display:grid;place-items:center;cursor:pointer;
+  transition:transform .12s ease,border-color .12s ease,box-shadow .12s ease}
+.slot:hover{transform:translateY(-2px);border-color:var(--line2)}
+.slot.on{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc),
+  0 0 18px rgba(59,224,200,.35);transform:translateY(-3px)}
+.slot .ic{width:76%;height:76%;border-radius:7px;background-size:cover;
+  image-rendering:auto}
+.slot .n{position:absolute;right:.18cqw;bottom:.06cqw;font-size:.68cqw;
+  font-weight:700;color:var(--ink);text-shadow:0 1px 3px #000}
+.slot .k{position:absolute;left:.22cqw;top:.06cqw;font-size:.58cqw;
+  color:var(--ink3);font-weight:600}
+.slot.empty .ic{opacity:.10;background:var(--ink3)}
+
+/* ---- reticle and target ---- */
+.retic{position:absolute;left:50%;top:50%;width:.62cqw;height:.62cqw;
+  min-width:6px;min-height:6px;margin:-.31cqw 0 0 -.31cqw;border-radius:50%;
+  border:1.5px solid rgba(232,239,250,.72);
+  box-shadow:0 0 0 1px rgba(0,0,0,.45);opacity:.85;transition:opacity .2s,transform .2s}
+.retic.act{border-color:var(--acc);transform:scale(1.5);opacity:1}
+.retic.deny{border-color:var(--danger)}
+
+.prompt{position:absolute;left:50%;bottom:9.5cqw;transform:translateX(-50%);
+  display:none;align-items:center;gap:.6cqw;padding:.5cqw 1.0cqw;border-radius:10px;
+  background:rgba(10,14,22,.86);border:1px solid var(--line2);
+  font-size:.95cqw;color:var(--ink);backdrop-filter:blur(10px);white-space:nowrap}
+.prompt.show{display:flex}
+.prompt kbd{display:inline-grid;place-items:center;min-width:1.7cqw;height:1.7cqw;
+  padding:0 .34cqw;border-radius:6px;background:rgba(255,255,255,.10);
+  border:1px solid var(--line2);font-size:.78cqw;font-weight:700;
+  font-family:var(--ui);color:var(--acc)}
+
+/* ---- toasts ---- */
+.toasts{position:absolute;right:1.4cqw;top:5.4cqw;display:flex;
+  flex-direction:column;gap:.42cqw;align-items:flex-end;max-width:26cqw}
+.toast{padding:.5cqw .85cqw;border-radius:10px;font-size:.88cqw;
+  background:rgba(14,19,30,.90);border:1px solid var(--line);color:var(--ink);
+  backdrop-filter:blur(10px);animation:tin .28s ease both;
+  box-shadow:0 8px 22px rgba(0,0,0,.45);display:flex;gap:.45cqw;align-items:center}
+.toast.bad{border-color:rgba(255,90,110,.5);color:#FFC6CE}
+.toast.good{border-color:rgba(59,224,200,.45)}
+.toast .sw{width:.7cqw;height:.7cqw;min-width:7px;min-height:7px;border-radius:3px}
+@keyframes tin{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+.toast.out{animation:tout .3s ease both}
+@keyframes tout{to{opacity:0;transform:translateX(14px)}}
+
+/* ---- panels ---- */
+.scrim{position:absolute;inset:0;background:rgba(4,6,11,.62);
+  backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity .22s}
+.scrim.on{opacity:1;pointer-events:auto}
+.panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-48%) scale(.98);
+  width:min(74cqw,1080px);max-height:82cqh;display:flex;flex-direction:column;
+  background:linear-gradient(180deg,rgba(22,29,44,.97),rgba(12,17,26,.97));
+  border:1px solid var(--line2);border-radius:16px;overflow:hidden;
+  box-shadow:0 30px 80px rgba(0,0,0,.65);opacity:0;pointer-events:none;
+  transition:opacity .22s ease,transform .22s ease}
+.panel.on{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
+.panel .hd{display:flex;align-items:center;gap:1cqw;padding:1.0cqw 1.3cqw;
+  border-bottom:1px solid var(--line)}
+.panel .hd h2{font-family:var(--disp);font-weight:700;letter-spacing:.16em;
+  text-transform:uppercase;font-size:1.15cqw;color:var(--ink)}
+.panel .hd .sp{flex:1}
+.xbtn{width:2.2cqw;height:2.2cqw;min-width:24px;min-height:24px;border-radius:8px;
+  border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink2);
+  display:grid;place-items:center;cursor:pointer;font-size:1.0cqw;line-height:1}
+.xbtn:hover{background:rgba(255,90,110,.16);color:#FFC6CE;border-color:rgba(255,90,110,.4)}
+.tabs{display:flex;gap:.34cqw;flex-wrap:wrap}
+.tab{padding:.38cqw .8cqw;border-radius:8px;font-size:.85cqw;cursor:pointer;
+  color:var(--ink3);border:1px solid transparent;letter-spacing:.04em}
+.tab:hover{color:var(--ink2);background:rgba(255,255,255,.04)}
+.tab.on{color:var(--acc);border-color:var(--line2);background:rgba(59,224,200,.10)}
+.panel .bd{padding:1.1cqw 1.3cqw;overflow:auto;flex:1;min-height:0}
+.panel .bd::-webkit-scrollbar{width:8px}
+.panel .bd::-webkit-scrollbar-thumb{background:rgba(126,160,216,.22);border-radius:8px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(4.6cqw,1fr));
+  gap:.5cqw}
+.cell{position:relative;aspect-ratio:1;border-radius:10px;cursor:pointer;
+  background:linear-gradient(165deg,rgba(38,48,66,.85),rgba(20,27,40,.85));
+  border:1px solid var(--line);display:grid;place-items:center;
+  transition:transform .12s,border-color .12s,box-shadow .12s}
+.cell:hover{transform:translateY(-2px);border-color:var(--line2)}
+.cell.sel{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
+.cell.worn{border-color:var(--r2);box-shadow:0 0 0 1px var(--r2)}
+.cell .ic{width:74%;height:74%;border-radius:7px}
+.cell .n{position:absolute;right:.2cqw;bottom:.1cqw;font-size:.68cqw;font-weight:700;
+  color:var(--ink);text-shadow:0 1px 3px #000}
+.cell .rr{position:absolute;left:0;right:0;top:0;height:2px;border-radius:10px 10px 0 0}
+
+.detail{display:flex;gap:1.1cqw;padding:.9cqw 0 0}
+.detail .big{width:8cqw;height:8cqw;border-radius:12px;border:1px solid var(--line);
+  background:rgba(0,0,0,.28);display:grid;place-items:center;flex:0 0 auto}
+.detail .big .ic{width:78%;height:78%;border-radius:9px}
+.detail .txt{flex:1;min-width:0}
+.detail h3{font-size:1.15cqw;font-weight:700;margin-bottom:.2cqw}
+.detail .rt{font-size:.78cqw;letter-spacing:.16em;text-transform:uppercase;
+  margin-bottom:.5cqw}
+.detail p{font-size:.88cqw;color:var(--ink2);line-height:1.5;margin-bottom:.5cqw}
+.detail .meta{display:flex;gap:1.1cqw;flex-wrap:wrap;font-size:.82cqw;color:var(--ink3)}
+.detail .meta b{color:var(--ink);font-weight:600}
+.acts{display:flex;gap:.5cqw;margin-top:.7cqw;flex-wrap:wrap}
+.btn{padding:.46cqw 1.0cqw;border-radius:9px;font-size:.86cqw;font-weight:600;
+  letter-spacing:.05em;cursor:pointer;border:1px solid var(--line2);
+  background:rgba(255,255,255,.05);color:var(--ink);transition:all .14s}
+.btn:hover{background:rgba(59,224,200,.14);border-color:var(--acc);color:var(--acc)}
+.btn.pri{background:linear-gradient(180deg,rgba(59,224,200,.22),rgba(21,156,137,.22));
+  border-color:var(--acc);color:var(--acc)}
+.btn.dim{color:var(--ink3);border-color:var(--line)}
+.btn.dim:hover{color:var(--ink2);background:rgba(255,255,255,.06);border-color:var(--line2)}
+.btn[disabled]{opacity:.38;pointer-events:none}
+
+.empty-note{padding:2.4cqw;text-align:center;color:var(--ink3);font-size:.95cqw}
+
+/* ---- narrow / touch ---- */
+@container app (max-aspect-ratio: 13/9){
+  .idchip .who{min-width:11cqw}
+  .slot{width:4.4cqw;height:4.4cqw}
+}
+@container app (max-width: 700px){
+  .idchip .nm{font-size:12px}.idchip .lv{font-size:9px}
+  .coin{font-size:11px}.clock{font-size:11px}
+  .prompt{font-size:11px;bottom:15cqw}
+  .panel{width:94cqw}
+}
 </style>
 
 <div id="app">
@@ -1396,15 +1578,23 @@ function tileFbm(x,y,freq,seed,oct){
 /* Paint per-pixel through a callback returning a hex colour. Slower to
    write than gradients but it is the only way to get grain that
    survives mipmapping. */
-function paint(cv,fn){
+function paint(cv,fn,label){
   var ctx=cv.getContext('2d');
   var img=ctx.createImageData(SZ,SZ),d=img.data;
+  var bad=0;
   for(var y=0;y<SZ;y++)for(var x=0;x<SZ;x++){
     var u=x/SZ,v=y/SZ;
     var c=fn(u,v,x,y);
     var i=(y*SZ+x)*4;
+    /* A NaN anywhere in a recipe writes as zero and the material ships
+       black with no error. Catch it at the source and say which one. */
+    if(c[0]!==c[0]||c[1]!==c[1]||c[2]!==c[2]){
+      bad++;c=[255,0,220];
+    }
     d[i]=c[0];d[i+1]=c[1];d[i+2]=c[2];d[i+3]=c.length>3?c[3]:255;
   }
+  if(bad)console.warn('material "'+(label||'?')+'" produced '+bad+
+    ' NaN pixels — shown in magenta');
   ctx.putImageData(img,0,0);
   return cv;
 }
@@ -1464,8 +1654,14 @@ R.sand=function(){
 
 R.stone=function(lo,hi,seed){
   lo=lo||'#4B4E59';hi=hi||'#7C818F';
+  /* Default the seed once, up here. Defaulting it inline at each use
+     with `seed||3` reads as safe but is not: any *arithmetic* on the
+     raw parameter — seed*3+7 — evaluates to NaN when it is undefined,
+     litv clamps NaN to NaN, and the whole material writes out black.
+     Stone and concrete both shipped black for exactly this reason. */
+  seed=seed===undefined?3:seed;
   return function(u,v){
-    var base=mixv(rgb(lo),rgb(hi),tileFbm(u,v,6,seed||3,5));
+    var base=mixv(rgb(lo),rgb(hi),tileFbm(u,v,6,seed,5));
     /* fracture lines: ridged noise thresholded to thin dark seams */
     var r=1-Math.abs(tileFbm(u,v,9,seed*3+7,3)*2-1);
     if(r>0.86)base=litv(base,-40*(r-0.86)*7);
@@ -1592,8 +1788,9 @@ R.tilefloor=function(a,b,grout,cells){
 
 R.concrete=function(lo,hi,seed){
   lo=lo||'#4A5058';hi=hi||'#767E88';
+  seed=seed===undefined?139:seed;
   return function(u,v){
-    var base=mixv(rgb(lo),rgb(hi),tileFbm(u,v,5,seed||139,5));
+    var base=mixv(rgb(lo),rgb(hi),tileFbm(u,v,5,seed,5));
     var pit=M.hash2(u*SZ|0,v*SZ|0,seed*3+1);
     if(pit>0.985)base=litv(base,-40);
     var stain=tileFbm(u,v,2,seed*5+2,3);
@@ -1789,7 +1986,7 @@ Tex.buildAll=function(){
   var canvases=[];
   for(var i=0;i<LAYERS.length;i++){
     Tex.NAME[LAYERS[i][0]]=i;
-    canvases.push(paint(make(),LAYERS[i][1]));
+    canvases.push(paint(make(),LAYERS[i][1],LAYERS[i][0]));
   }
   Tex.count=LAYERS.length;
   Tex.array=LH.GL.texArrayFromCanvases(canvases,SZ);
@@ -6484,6 +6681,8 @@ var BIND={
   Space:'jump',ShiftLeft:'run',ShiftRight:'run',
   KeyE:'interact',KeyF:'interact',
   KeyQ:'tool',KeyR:'reload',KeyC:'crouch',
+  Digit1:'slot1',Digit2:'slot2',Digit3:'slot3',Digit4:'slot4',Digit5:'slot5',
+  Digit6:'slot6',Digit7:'slot7',Digit8:'slot8',Digit9:'slot9',Digit0:'slot0',
   Tab:'inventory',KeyI:'inventory',KeyM:'map',KeyJ:'missions',
   KeyP:'profile',KeyT:'chat',KeyB:'build',KeyG:'worlds',
   Escape:'menu',KeyV:'emote',KeyH:'help'
@@ -6678,6 +6877,46 @@ Pl.init=function(actor){
 
 var _f=M.v3(),_r=M.v3(),_want=M.v3(),_tmp=M.v3();
 
+/* Placed blocks are collision too. Only the cells around the player
+   are tested — a sparse grid makes that a handful of map lookups. */
+function resolveVoxels(pos){
+  var V=LH.Voxels;
+  if(!V||!V.count())return;
+  var r=Pl.radius;
+  var x0=Math.floor(pos[0]-r-1), x1=Math.floor(pos[0]+r+1);
+  var z0=Math.floor(pos[2]-r-1), z1=Math.floor(pos[2]+r+1);
+  var y0=Math.floor(pos[1]+0.15), y1=Math.floor(pos[1]+Pl.height-0.15);
+  for(var pass=0;pass<2;pass++)
+  for(var y=y0;y<=y1;y++)for(var z=z0;z<=z1;z++)for(var x=x0;x<=x1;x++){
+    if(!V.solid(x,y,z))continue;
+    var cx=M.clamp(pos[0],x,x+1), cz=M.clamp(pos[2],z,z+1);
+    var dx=pos[0]-cx, dz=pos[2]-cz;
+    var d2=dx*dx+dz*dz;
+    if(d2>r*r)continue;
+    if(d2>1e-8){
+      var d=Math.sqrt(d2);
+      pos[0]+=dx/d*(r-d);pos[2]+=dz/d*(r-d);
+    }else{
+      /* dead centre of a cell — push along whichever axis is shallower */
+      var px=(x+0.5)-pos[0], pz=(z+0.5)-pos[2];
+      if(Math.abs(px)<Math.abs(pz))pos[0]-=Math.sign(px||1)*r;
+      else pos[2]-=Math.sign(pz||1)*r;
+    }
+  }
+}
+/* The top of the highest placed block directly under the player, so
+   you can stand on what you build. */
+function voxelFloor(x,y,z){
+  var V=LH.Voxels;
+  if(!V||!V.count())return -1e9;
+  var cx=Math.floor(x), cz=Math.floor(z);
+  var top=-1e9;
+  for(var cy=Math.floor(y+0.4);cy>=Math.floor(y)-2;cy--){
+    if(V.solid(cx,cy,cz)){top=cy+1;break;}
+  }
+  return top;
+}
+
 Pl.update=function(dt){
   var a=Pl.actor;
   if(!a)return;
@@ -6736,8 +6975,10 @@ Pl.update=function(dt){
   a.pos[2]=M.clamp(a.pos[2],-lim,lim);
 
   W.resolve(a.pos,Pl.radius,a.pos[1]);
+  resolveVoxels(a.pos);
 
   var ground=W.groundAt(a.pos[0],a.pos[2]);
+  ground=Math.max(ground,voxelFloor(a.pos[0],a.pos[1],a.pos[2]));
   if(a.pos[1]<=ground+0.001){
     /* Landing. The impact animation only fires from a real fall, not
        from walking down a kerb. */
@@ -6804,6 +7045,2006 @@ Pl.surfaceMat=function(){
 };
 
 LH.Player=Pl;
+})();
+
+/* ============================================================
+   LH.Data — the item table.
+
+   Every item in the game is one row. Nothing switches on a key name:
+   behaviour comes from `cat` and `shape`, prices from `value`, and
+   the world renderer reads `mat`/`col`/`emis` the same way for a
+   block of stone as for a legendary crown. That is what lets the
+   table grow to a thousand rows without touching gameplay code.
+
+   Rarity runs 1..6 — common, uncommon, rare, epic, legendary,
+   mythic — carried over from the 2D build along with its colour ramp,
+   because players already read those tiers at a glance.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,D={};
+
+var ITEMS=[], ID={}, BY_CAT={};
+
+/* Categories are the inventory's tabs and the shop's aisles. */
+var CAT=['block','material','tool','weapon','fishing','furniture',
+         'cosmetic','collectible','seed','consumable','quest'];
+D.CAT=CAT;
+D.RARITY=['','Common','Uncommon','Rare','Epic','Legendary','Mythic'];
+D.RARITY_COL=['','#9AA8BE','#57D07A','#489BFF','#B269FF','#F5A03C','#FF4F7A'];
+
+/* Shapes a placeable item can take in the world. The voxel mesher
+   switches on this and nothing else. */
+D.SHAPES=['cube','slab','pillar','pane','plant','lamp','fence'];
+
+function It(key,name,o){
+  o=o||{};
+  var r=o.r===undefined?1:o.r;
+  var it={
+    id:ITEMS.length,
+    key:key,
+    name:name,
+    desc:o.desc||'',
+    cat:o.cat||'block',
+    rarity:r,
+    /* Value is in soft currency and everything else derives from it:
+       the shop marks up, the vendor marks down, and the trade window
+       totals with it. One number, so prices cannot drift apart. */
+    value:o.value===undefined?Math.round(4*Math.pow(2.35,r-1)):o.value,
+    stack:o.stack===undefined?(o.cat==='tool'||o.cat==='weapon'||
+      o.cat==='fishing'||o.cat==='cosmetic'?1:999):o.stack,
+    tradeable:o.tradeable!==false,
+    placeable:o.placeable!==undefined?o.placeable:(o.cat||'block')==='block'
+      ||o.cat==='furniture',
+    consumable:!!o.consumable,
+    craftable:!!o.recipe,
+    recipe:o.recipe||null,
+    /* world appearance */
+    shape:o.shape||'cube',
+    mat:o.mat||'stone',
+    col:o.col||'#FFFFFF',
+    emis:o.emis||0,
+    /* mining */
+    hard:o.hard===undefined?Math.max(1,Math.round(1+r*1.4)):o.hard,
+    tool:o.tool||null,
+    drops:o.drops||null,
+    /* activity-specific payloads: fish weight ranges, tool power,
+       weapon damage, cosmetic slot */
+    props:o.props||null
+  };
+  ID[key]=it.id;
+  ITEMS.push(it);
+  (BY_CAT[it.cat]||(BY_CAT[it.cat]=[])).push(it);
+  return it;
+}
+D.It=It;
+
+/* ---------------- blocks: the building set ----------------
+   The colour column is a *modulation*, not the block's colour. The
+   material texture already carries the hue — stone is grey, brick is
+   red, foliage is green — so a mid-grey tint on a mid-grey texture
+   multiplies out to about a tenth of the albedo it should have, and
+   the block renders near-black in anything but direct sun. White
+   means "as the material comes"; anything else is a deliberate
+   variant of it. */
+function B(key,name,mat,col,r,o){
+  o=o||{};o.cat='block';o.mat=mat;o.col=col;o.r=r;
+  return It(key,name,o);
+}
+B('stone',      'Stone',           'stone',   '#FFFFFF',1);
+B('cobble',     'Cobblestone',     'gravel',  '#FFFFFF',1);
+B('dirt',       'Packed Dirt',     'dirt',    '#FFFFFF',1);
+B('sand',       'Sand Block',      'sand',    '#FFFFFF',1);
+B('grassblock', 'Turf',            'grass',   '#FFFFFF',1);
+B('plank',      'Oak Plank',       'planks',  '#FFFFFF',1);
+B('darkplank',  'Ash Plank',       'planks',  '#8E7A66',2);
+B('log',        'Timber',          'bark',    '#FFFFFF',1);
+B('brick',      'Red Brick',       'brick',   '#FFFFFF',1);
+B('palebrick',  'Sandstone Brick', 'brickpale','#FFFFFF',2);
+B('concrete',   'Concrete',        'concrete','#FFFFFF',1);
+B('panel',      'Steel Panel',     'panel',   '#FFFFFF',2);
+B('whitepanel', 'White Panel',     'panelw',  '#FFFFFF',2);
+B('marble',     'Marble',          'tilepale','#FFFFFF',3);
+B('tilefloor',  'Slate Tile',      'tile',    '#FFFFFF',2);
+B('roofblock',  'Roof Tile',       'roof',    '#FFFFFF',2);
+B('glassblock', 'Glass',           'glass',   '#DCEAF4',2);
+B('snowblock',  'Packed Snow',     'snow',    '#FFFFFF',2);
+B('goldblock',  'Gold Block',      'gold',    '#FFFFFF',4,{value:520});
+B('crystalblock','Crystal Block',  'crystal', '#DFF6FF',4,{emis:0.28,value:640});
+B('voidblock',  'Void Stone',      'stone',   '#4E5464',5,{value:1500});
+B('emberblock', 'Ember Block',     'stone',   '#FFB88A',5,{emis:0.5,value:1750});
+B('aurorablock','Aurora Block',    'crystal', '#D6B4FF',6,{emis:0.6,value:5200});
+
+/* the same set as slabs, pillars and panes — a builder needs shapes,
+   not just colours */
+B('stoneslab',  'Stone Slab',      'stone',   '#FFFFFF',1,{shape:'slab'});
+B('plankslab',  'Plank Slab',      'planks',  '#FFFFFF',1,{shape:'slab'});
+B('panelslab',  'Panel Slab',      'panel',   '#FFFFFF',2,{shape:'slab'});
+B('marbleslab', 'Marble Slab',     'tilepale','#FFFFFF',3,{shape:'slab'});
+B('stonepillar','Stone Pillar',    'stone',   '#FFFFFF',2,{shape:'pillar'});
+B('woodpillar', 'Wooden Post',     'bark',    '#FFFFFF',1,{shape:'pillar'});
+B('goldpillar', 'Gilded Column',   'gold',    '#FFFFFF',4,{shape:'pillar',value:600});
+B('glasspane',  'Glass Pane',      'glass',   '#DCEAF4',2,{shape:'pane'});
+B('panelpane',  'Steel Screen',    'panel',   '#C8D0DC',2,{shape:'pane'});
+B('woodfence',  'Wooden Fence',    'planks',  '#E4CCA8',1,{shape:'fence'});
+B('ironfence',  'Iron Railing',    'panel',   '#AEB6C2',2,{shape:'fence'});
+
+/* light sources — the thing every builder runs out of first */
+B('lantern',    'Lantern',         'neon',    '#FFD9A0',2,{shape:'lamp',emis:1,value:60});
+B('neonlamp',   'Neon Strip',      'neon',    '#3BE0C8',3,{shape:'lamp',emis:1,value:150});
+B('roselamp',   'Rose Lamp',       'neon',    '#FF6E9C',3,{shape:'lamp',emis:1,value:150});
+B('violetlamp', 'Violet Lamp',     'neon',    '#B269FF',3,{shape:'lamp',emis:1,value:150});
+B('sunlamp',    'Sun Lamp',        'neon',    '#FFC24A',4,{shape:'lamp',emis:1,value:420});
+
+/* plants */
+B('fern',       'Fern',            'foliage', '#FFFFFF',1,{shape:'plant',placeable:true});
+B('bloom',      'Pink Bloom',      'foliagep','#FFFFFF',2,{shape:'plant'});
+B('reed',       'Harbour Reed',    'foliage', '#E4F0B8',1,{shape:'plant'});
+B('glowmoss',   'Glowmoss',        'foliage', '#BFF8DC',3,{shape:'plant',emis:0.5,value:180});
+
+/* ---------------- raw materials ---------------- */
+var MAT_COL={
+  wood:'#A8794E',fibre:'#9CBE6A',stonechunk:'#8E939C',sandpile:'#E4CC96',
+  clay:'#C08064',coal:'#3A3E46',copper:'#C07A46',iron:'#B0B6C0',
+  silver:'#DCE4EE',gold:'#F5C451',crystal:'#7FE8FF',mythril:'#8ED8C4',
+  voidshard:'#8A6ACC',starcore:'#FFE9A8',plank_m:'#C6A47A',
+  ingot_cu:'#D08A50',ingot_fe:'#C2C8D2',ingot_ag:'#E8EEF6',ingot_au:'#FFD469',
+  glass_m:'#BFDCEA',rope:'#C4A878',cloth:'#D8CCBA'
+};
+function Mt(key,name,r,o){
+  o=o||{};o.cat='material';o.r=r;o.placeable=false;
+  o.col=o.col||MAT_COL[key]||'#B0B6C0';
+  return It(key,name,o);
+}
+Mt('wood',      'Timber',      1,{desc:'Cut from any tree.'});
+Mt('fibre',     'Plant Fibre', 1);
+Mt('stonechunk','Stone Chunk', 1);
+Mt('sandpile',  'Sand',        1);
+Mt('clay',      'Clay',        1);
+Mt('coal',      'Coal',        2);
+Mt('copper',    'Copper Ore',  2);
+Mt('iron',      'Iron Ore',    2);
+Mt('silver',    'Silver Ore',  3);
+Mt('gold',      'Gold Ore',    3);
+Mt('crystal',   'Raw Crystal', 4);
+Mt('mythril',   'Mythril',     5,{value:900});
+Mt('voidshard', 'Void Shard',  5,{value:1200});
+Mt('starcore',  'Star Core',   6,{value:4800,desc:'Nobody agrees where these come from.'});
+Mt('plank_m',   'Cut Plank',   1,{recipe:[['wood',2]]});
+Mt('ingot_cu',  'Copper Ingot',2,{recipe:[['copper',2],['coal',1]]});
+Mt('ingot_fe',  'Iron Ingot',  2,{recipe:[['iron',2],['coal',1]]});
+Mt('ingot_ag',  'Silver Ingot',3,{recipe:[['silver',2],['coal',1]]});
+Mt('ingot_au',  'Gold Ingot',  3,{recipe:[['gold',2],['coal',1]]});
+Mt('glass_m',   'Glass Pane',  2,{recipe:[['sandpile',3],['coal',1]]});
+Mt('rope',      'Rope',        1,{recipe:[['fibre',3]]});
+Mt('cloth',     'Cloth',       2,{recipe:[['fibre',4]]});
+
+/* ---------------- tools ----------------
+   `power` is how fast a block yields; `tier` gates which materials the
+   tool can break at all. Both live in props so the mining code never
+   reads a key name. */
+function Tl(key,name,r,power,tier,o){
+  o=o||{};o.cat='tool';o.r=r;
+  o.props={power:power,tier:tier,style:o.style||'pickaxe'};
+  return It(key,name,o);
+}
+Tl('pick_stone', 'Stone Pick',   1,1.0,1,{recipe:[['stonechunk',3],['wood',2]]});
+Tl('pick_copper','Copper Pick',  2,1.6,2,{recipe:[['ingot_cu',3],['wood',2]]});
+Tl('pick_iron',  'Iron Pick',    3,2.4,3,{recipe:[['ingot_fe',3],['wood',2]]});
+Tl('pick_silver','Silver Pick',  4,3.4,4,{recipe:[['ingot_ag',3],['wood',2]]});
+Tl('pick_mythril','Mythril Pick',5,5.0,5,{recipe:[['mythril',3],['ingot_au',2]]});
+Tl('axe_stone',  'Stone Axe',    1,1.0,1,{style:'axe',recipe:[['stonechunk',3],['wood',2]]});
+Tl('axe_iron',   'Iron Axe',     3,2.4,3,{style:'axe',recipe:[['ingot_fe',3],['wood',2]]});
+Tl('wrench',     'Wrench',       2,1.0,1,{style:'wrench',
+  desc:'Configures doors, signs and anything else with a setting.'});
+Tl('torch_t',    'Torch',        1,1.0,1,{style:'torch',recipe:[['wood',1],['coal',1]]});
+
+/* ---------------- weapons ---------------- */
+function Wp(key,name,r,dmg,o){
+  o=o||{};o.cat='weapon';o.r=r;
+  o.props={damage:dmg,reach:o.reach||2.4,swing:o.swing||0.58,style:o.style||'sword'};
+  return It(key,name,o);
+}
+Wp('sword_stone','Chipped Blade', 1,6);
+Wp('sword_copper','Copper Sword', 2,10,{recipe:[['ingot_cu',3],['wood',1]]});
+Wp('sword_iron', 'Iron Sword',    3,16,{recipe:[['ingot_fe',3],['wood',1]]});
+Wp('sword_silver','Silver Sabre', 4,24,{recipe:[['ingot_ag',3],['ingot_fe',1]]});
+Wp('sword_mythril','Mythril Edge',5,38,{recipe:[['mythril',3],['starcore',1]]});
+Wp('axe_war',    'War Axe',       4,30,{style:'axe',swing:0.78,reach:2.7});
+
+/* ---------------- fishing ---------------- */
+function Rd(key,name,r,power,o){
+  o=o||{};o.cat='fishing';o.r=r;
+  o.props={power:power,style:'rod',luck:o.luck||0};
+  return It(key,name,o);
+}
+Rd('rod_cane',   'Cane Rod',    1,1.0);
+Rd('rod_oak',    'Oak Rod',     2,1.5,{luck:0.06,recipe:[['plank_m',3],['rope',2]]});
+Rd('rod_steel',  'Steel Rod',   3,2.2,{luck:0.14,recipe:[['ingot_fe',2],['rope',2]]});
+Rd('rod_crystal','Crystal Rod', 4,3.2,{luck:0.26,recipe:[['crystal',2],['ingot_ag',2]]});
+Rd('rod_star',   'Starlight Rod',6,5.0,{luck:0.45,recipe:[['starcore',1],['mythril',2]]});
+It('bait_worm', 'Worms',      {cat:'fishing',r:1,stack:99,value:3,consumable:true,
+  props:{bait:1}});
+It('bait_shrimp','Shrimp',    {cat:'fishing',r:2,stack:99,value:9,consumable:true,
+  props:{bait:2}});
+It('bait_lure', 'Glow Lure',  {cat:'fishing',r:4,stack:99,value:48,consumable:true,
+  props:{bait:4},recipe:[['glowmoss',1],['fibre',2]]});
+
+/* ---------------- fish ----------------
+   `zone` names the water they live in and `w` is the weight range, so
+   a catch's value scales with its size the way an angler expects. */
+function Fh(key,name,r,zone,w0,w1,o){
+  o=o||{};o.cat='collectible';o.r=r;o.placeable=false;
+  o.props={fish:true,zone:zone,w:[w0,w1]};
+  return It(key,name,o);
+}
+Fh('f_sprat',   'Harbour Sprat',  1,'harbour',0.1,0.5);
+Fh('f_mackerel','Mackerel',       1,'harbour',0.4,2.0);
+Fh('f_bass',    'Sea Bass',       2,'harbour',1.0,6.0);
+Fh('f_cod',     'Cod',            2,'harbour',2.0,9.0);
+Fh('f_tuna',    'Bluefin Tuna',   3,'harbour',20,120);
+Fh('f_sword',   'Swordfish',      4,'harbour',40,190);
+Fh('f_trout',   'River Trout',    1,'river',0.3,2.4);
+Fh('f_carp',    'Mirror Carp',    2,'river',1.5,12);
+Fh('f_eel',     'Silver Eel',     3,'river',1.0,7.0);
+Fh('f_pike',    'Pike',           3,'river',3.0,18);
+Fh('f_glow',    'Glowfish',       4,'deep',0.5,4.0);
+Fh('f_koi',     'Crystal Koi',    5,'deep',2.0,14);
+Fh('f_void',    'Void Eel',       5,'deep',6.0,40);
+Fh('f_lumen',   'Lumen Angler',   6,'deep',30,260,{value:6800,
+  desc:'Fishermen argue about whether it is a fish at all.'});
+Fh('f_boot',    'Old Boot',       1,'harbour',0.4,1.2,{value:1});
+Fh('f_can',     'Rusted Can',     1,'harbour',0.1,0.4,{value:1});
+
+/* ---------------- furniture ---------------- */
+function Fn(key,name,r,mat,col,o){
+  o=o||{};o.cat='furniture';o.r=r;o.mat=mat;o.col=col;o.shape=o.shape||'cube';
+  return It(key,name,o);
+}
+Fn('chair',     'Chair',        1,'planks','#E8CCA6');
+Fn('table',     'Table',        1,'planks','#FFFFFF',{shape:'slab'});
+Fn('crate_f',   'Crate',        1,'planks','#FFE6C0');
+Fn('barrel_f',  'Barrel',       1,'planks','#DCB488',{shape:'pillar'});
+Fn('rug',       'Woven Rug',    2,'fabric','#FFB0BE',{shape:'slab'});
+Fn('bookshelf', 'Bookshelf',    2,'planks','#B49A7E');
+Fn('anvil',     'Anvil',        3,'panel','#96A0AE',{shape:'slab'});
+Fn('bench_f',   'Workbench',    2,'planks','#D8BA96',
+  {recipe:[['plank_m',4],['stonechunk',2]]});
+Fn('sign',      'Sign',         1,'planks','#FFE8C8',{shape:'pane'});
+Fn('door',      'Door',         1,'planks','#C8A47E',{shape:'pane'});
+Fn('statue',    'Marble Statue',4,'tilepale','#FFFFFF',{shape:'pillar',value:900});
+Fn('trophy',    'Trophy',       5,'gold','#FFFFFF',{shape:'pillar',value:2600});
+
+/* ---------------- cosmetics ----------------
+   `slot` and `style` map straight onto the character kit. */
+function Cs(key,name,r,slot,style,o){
+  o=o||{};o.cat='cosmetic';o.r=r;o.placeable=false;
+  o.props={slot:slot,style:style,col:o.col2||'#FFFFFF',emis:o.cemis||0};
+  return It(key,name,o);
+}
+Cs('h_crop',   'Cropped Hair',   1,'hair','crop');
+Cs('h_swept',  'Swept Hair',     1,'hair','swept');
+Cs('h_long',   'Long Hair',      1,'hair','long');
+Cs('h_bun',    'Top Knot',       2,'hair','bun');
+Cs('h_spike',  'Spiked Hair',    2,'hair','spiked');
+Cs('h_braid',  'Braids',         2,'hair','braids');
+Cs('t_tee',    'Plain Tee',      1,'shirt','tee');
+Cs('t_jacket', 'Field Jacket',   2,'shirt','jacket');
+Cs('t_hoodie', 'Harbour Hoodie', 2,'shirt','hoodie');
+Cs('t_crop',   'Cropped Top',    2,'shirt','crop');
+Cs('hat_cap',  'Dock Cap',       1,'hat','cap');
+Cs('hat_beanie','Knit Beanie',   1,'hat','beanie');
+Cs('hat_brim', 'Wide Brim',      2,'hat','brim');
+Cs('hat_visor','Neon Visor',     4,'hat','visor',{cemis:0.7});
+Cs('hat_crown','Gilded Crown',   5,'hat','crown',{value:4200});
+Cs('hat_halo', 'Halo',           6,'hat','halo',{cemis:1,value:9000});
+Cs('w_feather','Feathered Wings',3,'wings','feathered');
+Cs('w_bat',    'Nightwing',      3,'wings','bat');
+Cs('w_mech',   'Mechwing',       4,'wings','mech',{cemis:0.3});
+Cs('w_crystal','Crystal Wings',  5,'wings','crystal',{cemis:0.4,value:5200});
+Cs('w_angel',  'Seraph Wings',   6,'wings','angelic',{cemis:0.5,value:11000});
+Cs('w_ember',  'Ember Wings',    6,'wings','ember',{cemis:1,value:12500});
+Cs('c_plain',  'Traveller Cape', 2,'cape','plain');
+Cs('c_royal',  'Royal Cape',     5,'cape','royal',{value:4600});
+Cs('b_satchel','Satchel',        1,'back','satchel');
+Cs('p_cat',    'Harbour Cat',    3,'pet','cat');
+Cs('p_drone',  'Survey Drone',   4,'pet','drone',{cemis:0.4});
+Cs('p_sprite', 'Lumen Sprite',   6,'pet','sprite',{cemis:1,value:9600});
+Cs('a_ring',   'Ground Ring',    4,'aura','ring',{cemis:1});
+Cs('a_motes',  'Drifting Motes', 5,'aura','motes',{cemis:1,value:5400});
+Cs('a_pillar', 'Pillar of Light',6,'aura','pillar',{cemis:1,value:14000});
+
+/* ---------------- consumables ---------------- */
+It('food_bread',  'Harbour Loaf', {cat:'consumable',r:1,consumable:true,value:12,
+  props:{heal:20},recipe:[['fibre',2]]});
+It('food_stew',   'Fish Stew',    {cat:'consumable',r:2,consumable:true,value:38,
+  props:{heal:55},recipe:[['f_cod',1],['fibre',2]]});
+It('food_feast',  'Angler Feast', {cat:'consumable',r:4,consumable:true,value:220,
+  props:{heal:100,buff:'luck'},recipe:[['f_tuna',1],['food_stew',1]]});
+It('tonic_swift', 'Swift Tonic',  {cat:'consumable',r:3,consumable:true,value:120,
+  props:{buff:'speed',dur:60}});
+It('tonic_might', 'Might Tonic',  {cat:'consumable',r:3,consumable:true,value:120,
+  props:{buff:'damage',dur:60}});
+
+/* ---------------- keys and quest items ---------------- */
+It('key_plot',   'Plot Deed',    {cat:'quest',r:3,tradeable:false,value:0,
+  desc:'Claims one building plot as your own.'});
+It('key_vault',  'Vault Key',    {cat:'quest',r:4,tradeable:false,value:0});
+It('lens_old',   'Clouded Lens', {cat:'quest',r:3,tradeable:false,value:0,
+  desc:'Found in the old facility. Someone was looking for something.'});
+
+/* ---------------- lookup ---------------- */
+D.ITEMS=ITEMS;D.ID=ID;D.BY_CAT=BY_CAT;
+D.byKey=function(k){var i=ID[k];return i===undefined?null:ITEMS[i];};
+D.byId=function(i){return ITEMS[i]||null;};
+D.count=function(){return ITEMS.length;};
+D.inCat=function(c){return BY_CAT[c]||[];};
+D.rarityCol=function(r){return D.RARITY_COL[M.clamp(r|0,1,6)];};
+
+/* Fish are looked up by the water they were caught in, weighted so the
+   good ones stay rare no matter how long you stand there. */
+D.fishIn=function(zone){
+  var out=[];
+  var col=BY_CAT.collectible||[];
+  for(var i=0;i<col.length;i++){
+    var it=col[i];
+    if(it.props&&it.props.fish&&it.props.zone===zone)out.push(it);
+  }
+  return out;
+};
+
+/* What a block yields when broken. Defaults to itself, which is what
+   a sandbox wants: what you place, you get back. */
+D.dropsOf=function(it){
+  if(it.drops)return it.drops;
+  return [[it.key,1]];
+};
+
+/* Sale and purchase both derive from `value`, so a shop can never
+   drift out of step with the trade window. */
+D.buyPrice=function(it){return Math.max(1,Math.round(it.value*1.35));};
+D.sellPrice=function(it){return Math.max(1,Math.round(it.value*0.55));};
+/* A fish is worth what it weighs, which is why anglers care. */
+D.fishValue=function(it,weight){
+  var w=it.props&&it.props.w;
+  if(!w)return it.value;
+  var t=M.clamp((weight-w[0])/Math.max(0.001,w[1]-w[0]),0,1);
+  return Math.max(1,Math.round(it.value*(0.55+t*1.30)));
+};
+
+LH.Data=D;
+})();
+
+/* ============================================================
+   LH.Voxels — the build layer.
+
+   The sandbox DNA from the 2D game, moved into three dimensions: a
+   sparse grid of one-metre cells that players place into and break
+   out of. Sparse rather than a dense array because the world is
+   352 x 128 x 352 cells and all but a few thousand of them are air —
+   a dense array would be six million entries to hold a shed.
+
+   Cells are meshed per 16-cube chunk with interior faces culled, and
+   only the chunks a change touched are rebuilt.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,GL=LH.GL,Geo=LH.Geo,D=LH.Data,T=LH.Terrain;
+var V={};
+
+/* Bounds chosen so the key packs into 26 bits and stays a small int:
+   9 bits each of X and Z, 8 of Y. Strings as keys would be correct and
+   about thirty times slower on the meshing path. */
+var OX=176, OZ=176, OY=16;
+var MAXX=352, MAXZ=352, MAXY=128;
+var CS=16;                       /* chunk edge, in cells */
+V.CS=CS;
+
+function key(x,y,z){
+  return (x+OX)|((z+OZ)<<9)|((y+OY)<<18);
+}
+V.key=key;
+V.inRange=function(x,y,z){
+  return x>=-OX&&x<MAXX-OX&&z>=-OZ&&z<MAXZ-OZ&&y>=-OY&&y<MAXY-OY;
+};
+
+var cells=new Map();             /* key -> {id, rot, owner} */
+var chunks=new Map();            /* chunkKey -> {mesh, dirty, n} */
+V.cells=cells;
+
+function chunkKey(cx,cy,cz){return (cx+16)|((cz+16)<<7)|((cy+8)<<14);}
+function chunkOf(x,y,z){
+  return chunkKey(Math.floor((x+OX)/CS),Math.floor((y+OY)/CS),
+                  Math.floor((z+OZ)/CS));
+}
+
+function touch(x,y,z){
+  /* A cell on a chunk boundary changes its neighbour's face culling,
+     so mark every chunk within one cell. */
+  for(var dx=-1;dx<=1;dx++)for(var dy=-1;dy<=1;dy++)for(var dz=-1;dz<=1;dz++){
+    var ck=chunkOf(x+dx,y+dy,z+dz);
+    var c=chunks.get(ck);
+    if(c)c.dirty=true;
+    else chunks.set(ck,{mesh:null,dirty:true,
+      cx:Math.floor((x+dx+OX)/CS),cy:Math.floor((y+dy+OY)/CS),
+      cz:Math.floor((z+dz+OZ)/CS),n:0});
+  }
+}
+
+V.get=function(x,y,z){return cells.get(key(x,y,z))||null;};
+V.itemAt=function(x,y,z){
+  var c=cells.get(key(x,y,z));
+  return c?D.byId(c.id):null;
+};
+V.set=function(x,y,z,itemKey,rot,owner){
+  if(!V.inRange(x,y,z))return false;
+  var it=D.byKey(itemKey);
+  if(!it||!it.placeable)return false;
+  cells.set(key(x,y,z),{id:it.id,rot:rot||0,owner:owner||null});
+  touch(x,y,z);
+  return true;
+};
+V.clear=function(x,y,z){
+  var k=key(x,y,z);
+  if(!cells.has(k))return null;
+  var c=cells.get(k);
+  cells.delete(k);
+  touch(x,y,z);
+  return D.byId(c.id);
+};
+V.count=function(){return cells.size;};
+
+/* Is this cell something you collide with? Panes, plants and fences
+   are placeable but not solid, and a build layer that blocked
+   movement on decoration would be miserable. */
+var NONSOLID={pane:1,plant:1,fence:0};
+V.solid=function(x,y,z){
+  var c=cells.get(key(x,y,z));
+  if(!c)return false;
+  var it=D.byId(c.id);
+  return !(it&&NONSOLID[it.shape]);
+};
+/* Does this cell hide its neighbour's face? Glass and decoration do
+   not, or a glass wall would be a black box. */
+function opaque(x,y,z){
+  var c=cells.get(key(x,y,z));
+  if(!c)return false;
+  var it=D.byId(c.id);
+  if(!it)return false;
+  if(it.shape!=='cube')return false;
+  return it.mat!=='glass';
+}
+
+/* ---------------- shape meshing ----------------
+   Each shape writes its own geometry into the chunk builder. Faces of
+   a full cube are emitted individually so an interior face — one with
+   an opaque neighbour — can be skipped. In a solid build that removes
+   the large majority of the triangles. */
+var FACES=[
+  /* dir,      nx ny nz,  corners as (x,y,z) offsets */
+  [[ 1,0,0],[1,0,0],[[1,0,1],[1,0,0],[1,1,0],[1,1,1]]],
+  [[-1,0,0],[-1,0,0],[[0,0,0],[0,0,1],[0,1,1],[0,1,0]]],
+  [[0, 1,0],[0,1,0],[[0,1,1],[1,1,1],[1,1,0],[0,1,0]]],
+  [[0,-1,0],[0,-1,0],[[0,0,0],[1,0,0],[1,0,1],[0,0,1]]],
+  [[0,0, 1],[0,0,1],[[0,0,1],[1,0,1],[1,1,1],[0,1,1]]],
+  [[0,0,-1],[0,0,-1],[[1,0,0],[0,0,0],[0,1,0],[1,1,0]]]
+];
+
+function emitCube(b,x,y,z,it,h,inset){
+  h=h===undefined?1:h;
+  inset=inset||0;
+  var col=Geo.col3(it.col);
+  for(var f=0;f<6;f++){
+    var F=FACES[f],d=F[0];
+    /* only cull against a neighbour for a full-size cube */
+    if(h===1&&!inset&&opaque(x+d[0],y+d[1],z+d[2]))continue;
+    var n=F[1],c=F[2];
+    var ids=[];
+    for(var i=0;i<4;i++){
+      var p=c[i];
+      var px=x+(p[0]?1-inset:inset);
+      var py=y+(p[1]?h:0);
+      var pz=z+(p[2]?1-inset:inset);
+      /* UVs in world units so a wall of the same block tiles across
+         its cells instead of restarting at every seam */
+      var u,v;
+      if(n[0]){u=pz;v=py;}
+      else if(n[1]){u=px;v=pz;}
+      else {u=px;v=py;}
+      ids.push(b.vert(px,py,pz,n[0],n[1],n[2],u,v,col));
+    }
+    b.quad(ids[0],ids[1],ids[2],ids[3]);
+  }
+}
+
+function emitShape(b,x,y,z,cell){
+  var it=D.byId(cell.id);
+  if(!it)return;
+  b.layer=LH.Tex.layer(it.mat);
+  b.layer2=b.layer;b.blend=0;
+  b.emis=it.emis||0;
+  switch(it.shape){
+    case 'slab':   emitCube(b,x,y,z,it,0.5); break;
+    case 'pillar': emitCube(b,x,y,z,it,1,0.25); break;
+    case 'pane':
+      b.push();b.translate(x+0.5,y+0.5,z+0.5);
+      b.rotate(0,(cell.rot||0)*Math.PI/2,0);
+      b.chamfer(0,0,0,1,1,0.12,it.col,0.02,{noBand:true});
+      b.pop();
+      break;
+    case 'fence':
+      b.push();b.translate(x+0.5,y,z+0.5);
+      b.chamfer(0,0.5,0,0.16,1.0,0.16,it.col,0.03);
+      b.chamfer(0,0.78,0,1.0,0.10,0.10,it.col,0.02);
+      b.chamfer(0,0.42,0,1.0,0.10,0.10,it.col,0.02);
+      b.pop();
+      break;
+    case 'lamp':
+      b.push();b.translate(x+0.5,y+0.5,z+0.5);
+      b.chamfer(0,0,0,0.62,0.62,0.62,it.col,0.12);
+      b.pop();
+      break;
+    case 'plant':
+      /* two crossed cards — the cheapest thing that reads as a plant
+         from every angle */
+      b.push();b.translate(x+0.5,y+0.46,z+0.5);
+      b.card(0,0,0,0.92,0.92,it.col);
+      b.rotate(0,Math.PI/2,0);
+      b.card(0,0,0,0.92,0.92,it.col);
+      b.pop();
+      break;
+    default: emitCube(b,x,y,z,it,1); break;
+  }
+}
+
+/* ---------------- chunk rebuild ---------------- */
+function rebuild(c){
+  if(c.mesh){GL.freeMesh(c.mesh);c.mesh=null;}
+  var x0=c.cx*CS-OX, y0=c.cy*CS-OY, z0=c.cz*CS-OZ;
+  var b=Geo.build();
+  var n=0;
+  for(var y=y0;y<y0+CS;y++)for(var z=z0;z<z0+CS;z++)for(var x=x0;x<x0+CS;x++){
+    var cell=cells.get(key(x,y,z));
+    if(!cell)continue;
+    emitShape(b,x,y,z,cell);
+    n++;
+  }
+  c.n=n;
+  c.dirty=false;
+  if(!n)return;
+  c.mesh=b.upload();
+  c.mesh.cx=x0+CS/2;c.mesh.cy=y0+CS/2;c.mesh.cz=z0+CS/2;
+  c.mesh.rad=CS*0.87;
+}
+
+/* Rebuilds are budgeted: a player dragging a wall into place dirties a
+   chunk every frame, and rebuilding all of them in one frame is a
+   visible hitch. */
+V.update=function(budget){
+  budget=budget||2;
+  var done=0;
+  chunks.forEach(function(c){
+    if(done>=budget||!c.dirty)return;
+    rebuild(c);done++;
+  });
+  return done;
+};
+
+V.draw=function(cull){
+  var n=0;
+  chunks.forEach(function(c){
+    if(!c.mesh)return;
+    if(cull&&!T.sphereVisible(c.mesh.cx,c.mesh.cy,c.mesh.cz,c.mesh.rad))return;
+    GL.draw(c.mesh);n++;
+  });
+  return n;
+};
+V.drawNear=function(fx,fz,radius){
+  chunks.forEach(function(c){
+    if(!c.mesh)return;
+    if(Math.hypot(c.mesh.cx-fx,c.mesh.cz-fz)>radius+c.mesh.rad)return;
+    GL.draw(c.mesh);
+  });
+};
+
+/* ---------------- raycast ----------------
+   Amanatides-Woo grid traversal: step to whichever axis boundary is
+   nearest and test that cell. Exact, and it visits each cell once,
+   which a fixed-step march does not.
+
+   Returns the cell hit plus the face normal, because placing needs to
+   know which side you were looking at. */
+var _hit={hit:false,x:0,y:0,z:0,nx:0,ny:0,nz:0,dist:0,item:null,ground:false};
+V.raycast=function(ox,oy,oz,dx,dy,dz,maxD){
+  maxD=maxD||6;
+  var x=Math.floor(ox),y=Math.floor(oy),z=Math.floor(oz);
+  var sx=dx>0?1:-1, sy=dy>0?1:-1, sz=dz>0?1:-1;
+  var tdx=dx!==0?Math.abs(1/dx):1e9;
+  var tdy=dy!==0?Math.abs(1/dy):1e9;
+  var tdz=dz!==0?Math.abs(1/dz):1e9;
+  var tmx=dx!==0?((dx>0?(x+1-ox):(ox-x))*tdx):1e9;
+  var tmy=dy!==0?((dy>0?(y+1-oy):(oy-y))*tdy):1e9;
+  var tmz=dz!==0?((dz>0?(z+1-oz):(oz-z))*tdz):1e9;
+  var nx=0,ny=0,nz=0,t=0;
+
+  _hit.hit=false;_hit.ground=false;_hit.item=null;
+
+  for(var i=0;i<256&&t<=maxD;i++){
+    if(cells.has(key(x,y,z))){
+      _hit.hit=true;_hit.x=x;_hit.y=y;_hit.z=z;
+      _hit.nx=nx;_hit.ny=ny;_hit.nz=nz;_hit.dist=t;
+      _hit.item=V.itemAt(x,y,z);
+      return _hit;
+    }
+    /* The ground counts as a surface you can build on, so a player
+       standing in an empty field can still place their first block. */
+    var px=ox+dx*t, pz=oz+dz*t, py=oy+dy*t;
+    if(py<=T.heightAt(px,pz)&&t>0.05){
+      _hit.hit=true;_hit.ground=true;
+      _hit.x=Math.floor(px);_hit.y=Math.floor(py);_hit.z=Math.floor(pz);
+      _hit.nx=0;_hit.ny=1;_hit.nz=0;_hit.dist=t;
+      return _hit;
+    }
+    if(tmx<tmy&&tmx<tmz){x+=sx;t=tmx;tmx+=tdx;nx=-sx;ny=0;nz=0;}
+    else if(tmy<tmz){y+=sy;t=tmy;tmy+=tdy;nx=0;ny=-sy;nz=0;}
+    else {z+=sz;t=tmz;tmz+=tdz;nx=0;ny=0;nz=-sz;}
+  }
+  return _hit;
+};
+
+/* Where a new block goes given a hit: the neighbouring cell on the
+   side that was struck. */
+V.placeTarget=function(hit){
+  if(!hit.hit)return null;
+  if(hit.ground)return {x:hit.x,y:Math.floor(hit.y)+1,z:hit.z};
+  return {x:hit.x+hit.nx,y:hit.y+hit.ny,z:hit.z+hit.nz};
+};
+
+/* Refuse to place a block inside the player. Nothing else in the game
+   can trap you, and a build system that can is worse than one that
+   occasionally refuses. */
+V.blockedBy=function(x,y,z,actorPos,radius,height){
+  radius=radius||0.4;height=height||1.8;
+  var cx=x+0.5, cz=z+0.5;
+  if(Math.abs(actorPos[0]-cx)>0.5+radius)return false;
+  if(Math.abs(actorPos[2]-cz)>0.5+radius)return false;
+  if(actorPos[1]>y+1||actorPos[1]+height<y)return false;
+  return true;
+};
+
+V.reset=function(){
+  chunks.forEach(function(c){if(c.mesh)GL.freeMesh(c.mesh);});
+  chunks.clear();cells.clear();
+};
+
+/* Serialise for persistence. Runs of the same block are collapsed
+   because a wall is hundreds of identical cells and the save has to
+   fit in localStorage. */
+V.serialise=function(){
+  var out=[];
+  cells.forEach(function(c,k){out.push(k,c.id,c.rot||0);});
+  return out;
+};
+V.deserialise=function(arr){
+  V.reset();
+  for(var i=0;i<arr.length;i+=3){
+    var k=arr[i];
+    var x=(k&511)-OX, z=((k>>9)&511)-OZ, y=((k>>18)&255)-OY;
+    cells.set(k,{id:arr[i+1],rot:arr[i+2],owner:null});
+    touch(x,y,z);
+  }
+};
+
+LH.Voxels=V;
+})();
+
+/* ============================================================
+   LH.Net — the authority boundary.
+
+   This module owns every number that matters: inventory, currency,
+   XP, skills, cosmetics, world ownership, mission progress. The rest
+   of the game cannot reach that state. It sends a request and gets a
+   result, and a rejected request changes nothing.
+
+   Being honest about what this is: there is no server behind it yet,
+   so it runs in this page. What it is not is a pretence — the
+   boundary is real. `state` is closed over and unreachable from
+   outside; every action re-derives its inputs from the server's own
+   copy rather than trusting anything in the payload; and quantities,
+   distances and ownership are all checked here rather than at the
+   call site. Replacing the dispatcher with a WebSocket is a transport
+   change, not a rewrite, which is the whole reason to build it this
+   way before there is anything to connect to.
+
+   The corollary, stated once: the other people in the harbour are
+   simulated. Until there is a server, their trades and their presence
+   are local fiction. The systems are real; the multiplayer is not.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,D=LH.Data,V=LH.Voxels,W=LH.World,T=LH.Terrain;
+var Net={};
+
+/* ---------------- server-side state ----------------
+   Closed over deliberately. Nothing outside this IIFE holds a
+   reference, so no amount of poking at LH.* from the console or from
+   a mis-wired UI can move a number without going through a handler. */
+var state={
+  name:'Traveller',
+  created:Date.now(),
+  coins:120,            /* soft currency — dug up, fished up, earned  */
+  shards:0,             /* premium currency — cosmetics only          */
+  xp:0,
+  level:1,
+  skills:{building:0,mining:0,fishing:0,combat:0,exploration:0,social:0},
+  skillXp:{building:0,mining:0,fishing:0,combat:0,exploration:0,social:0},
+  hp:100,hpMax:100,
+  inv:{},               /* key -> count */
+  equipped:{},          /* slot -> item key */
+  plots:[],             /* claimed plot ids */
+  worlds:{},            /* worldId -> {name, cells, perms} */
+  missions:{},          /* id -> {progress, done, claimed} */
+  collections:{fish:{},blocks:{},cosmetics:{}},
+  achievements:{},
+  stats:{placed:0,broken:0,caught:0,killed:0,walked:0,visits:0},
+  buffs:{}
+};
+
+/* Starting kit. The 2D build let players begin dressed and armed; this
+   one gives you a rod, a stone pick and the clothes you stand in, and
+   everything after that is something you found. */
+function grantStarter(){
+  state.inv={pick_stone:1,rod_cane:1,bait_worm:12,plank:24,stone:24,
+             lantern:4,food_bread:3};
+  state.equipped={hair:'h_crop',shirt:'t_tee',hat:null,wings:null,
+                  cape:null,back:null,pet:null,aura:null,tool:'pick_stone'};
+}
+grantStarter();
+
+/* ---------------- helpers on the server side ---------------- */
+function has(key,n){return (state.inv[key]||0)>=(n||1);}
+function give(key,n){
+  n=n||1;
+  var it=D.byKey(key);
+  if(!it)return false;
+  state.inv[key]=(state.inv[key]||0)+n;
+  /* collections tick the first time you ever hold something */
+  if(it.props&&it.props.fish){
+    if(!state.collections.fish[key]){state.collections.fish[key]=0;}
+    state.collections.fish[key]++;
+  }else if(it.cat==='block'&&!state.collections.blocks[key])
+    state.collections.blocks[key]=1;
+  else if(it.cat==='cosmetic'&&!state.collections.cosmetics[key])
+    state.collections.cosmetics[key]=1;
+  return true;
+}
+function take(key,n){
+  n=n||1;
+  if(!has(key,n))return false;
+  state.inv[key]-=n;
+  if(state.inv[key]<=0)delete state.inv[key];
+  return true;
+}
+
+/* XP curve: each level costs a little more than the last, without the
+   wall that makes late levels feel like a second job. */
+function xpFor(level){return Math.round(90*Math.pow(level,1.42));}
+Net.xpFor=xpFor;
+
+function addXp(amount,skill){
+  state.xp+=amount;
+  var levelled=0;
+  while(state.level<80&&state.xp>=xpFor(state.level)){
+    state.xp-=xpFor(state.level);
+    state.level++;levelled++;
+  }
+  if(skill&&state.skillXp[skill]!==undefined){
+    state.skillXp[skill]+=amount;
+    /* Skills level on their own curve so a dedicated angler out-ranks
+       a generalist at fishing without out-levelling them overall. */
+    while(state.skills[skill]<40&&
+          state.skillXp[skill]>=Math.round(60*Math.pow(state.skills[skill]+1,1.35))){
+      state.skillXp[skill]-=Math.round(60*Math.pow(state.skills[skill]+1,1.35));
+      state.skills[skill]++;
+    }
+  }
+  return levelled;
+}
+
+/* A read-only snapshot for the UI. Copied, not shared: handing out a
+   live reference would let the client mutate the server's own state,
+   which is the exact thing this module exists to prevent. */
+function snapshot(){
+  return {
+    name:state.name,coins:state.coins,shards:state.shards,
+    xp:state.xp,level:state.level,xpNext:xpFor(state.level),
+    hp:state.hp,hpMax:state.hpMax,
+    skills:Object.assign({},state.skills),
+    inv:Object.assign({},state.inv),
+    equipped:Object.assign({},state.equipped),
+    plots:state.plots.slice(),
+    stats:Object.assign({},state.stats),
+    collections:{
+      fish:Object.assign({},state.collections.fish),
+      blocks:Object.assign({},state.collections.blocks),
+      cosmetics:Object.assign({},state.collections.cosmetics)
+    },
+    missions:JSON.parse(JSON.stringify(state.missions)),
+    buffs:Object.assign({},state.buffs)
+  };
+}
+Net.snapshot=snapshot;
+
+/* ---------------- authority checks ---------------- */
+/* Can this player modify the world at this point? Public ground is
+   read-only; your own plot and your own world are not. */
+function canBuild(x,y,z){
+  for(var i=0;i<W.points.length;i++){
+    var p=W.points[i];
+    if(p.kind!=='plot')continue;
+    if(Math.hypot(p.x-(x+0.5),p.z-(z+0.5))>p.r)continue;
+    return state.plots.indexOf(p.data.plot)>=0;
+  }
+  return false;
+}
+Net.canBuild=canBuild;
+
+/* Distance is checked here, not by the caller. A client that says it
+   is standing next to a block is not evidence that it is. */
+var REACH=6.5;
+function inReach(pos,x,y,z){
+  return Math.hypot(pos[0]-(x+0.5),pos[1]-(y+0.5),pos[2]-(z+0.5))<=REACH;
+}
+
+/* ---------------- handlers ----------------
+   Each returns {ok:true,...} or {ok:false,why:'...'}. `why` is meant
+   to be shown to the player, so it says what went wrong in words. */
+var H={};
+
+H.place=function(p){
+  var x=p.x|0,y=p.y|0,z=p.z|0;
+  if(!V.inRange(x,y,z))return {ok:false,why:'Outside the world.'};
+  if(!inReach(p.pos,x,y,z))return {ok:false,why:'Too far away.'};
+  if(!canBuild(x,y,z))return {ok:false,why:'You cannot build here. Claim a plot first.'};
+  if(V.get(x,y,z))return {ok:false,why:'Something is already there.'};
+  var it=D.byKey(p.key);
+  if(!it||!it.placeable)return {ok:false,why:'That cannot be placed.'};
+  if(!has(p.key,1))return {ok:false,why:'You do not have one.'};
+  if(V.blockedBy(x,y,z,p.pos,0.4,1.8))return {ok:false,why:'You are standing there.'};
+  take(p.key,1);
+  V.set(x,y,z,p.key,p.rot|0,state.name);
+  state.stats.placed++;
+  addXp(2+it.rarity,'building');
+  return {ok:true,state:snapshot()};
+};
+
+H.break=function(p){
+  var x=p.x|0,y=p.y|0,z=p.z|0;
+  if(!inReach(p.pos,x,y,z))return {ok:false,why:'Too far away.'};
+  if(!canBuild(x,y,z))return {ok:false,why:'This is not yours to break.'};
+  var it=V.itemAt(x,y,z);
+  if(!it)return {ok:false,why:'Nothing there.'};
+  V.clear(x,y,z);
+  var drops=D.dropsOf(it);
+  for(var i=0;i<drops.length;i++)give(drops[i][0],drops[i][1]);
+  state.stats.broken++;
+  addXp(1+it.rarity,'building');
+  return {ok:true,drops:drops,state:snapshot()};
+};
+
+/* Mining a natural resource. The server picks what comes out — a
+   client that chose its own drops would choose star cores. */
+H.mine=function(p){
+  var tool=D.byKey(state.equipped.tool);
+  var tier=(tool&&tool.props&&tool.props.tier)||0;
+  if(tier<1)return {ok:false,why:'You need a pick.'};
+  var node=p.node||'stone';
+  var TABLE={
+    stone:  [['stonechunk',1,0.70],['coal',1,0.20],['copper',1,0.10]],
+    ore:    [['stonechunk',1,0.30],['coal',1,0.20],['copper',1,0.20],
+             ['iron',1,0.18],['silver',1,0.08],['gold',1,0.04]],
+    deep:   [['iron',1,0.26],['silver',1,0.22],['gold',1,0.18],
+             ['crystal',1,0.16],['mythril',1,0.10],['voidshard',1,0.06],
+             ['starcore',1,0.02]]
+  };
+  var tbl=TABLE[node]||TABLE.stone;
+  /* Tool tier gates the good rows rather than multiplying everything,
+     so a better pick opens new materials instead of just more rock. */
+  var roll=Math.random(), acc=0, got=null;
+  var lucky=1+state.skills.mining*0.012;
+  for(var i=0;i<tbl.length;i++){
+    var need=D.byKey(tbl[i][0]);
+    var rowTier=need?Math.max(1,need.rarity-1):1;
+    if(rowTier>tier)continue;
+    acc+=tbl[i][2]*(rowTier>1?lucky:1);
+    if(roll<=acc){got=tbl[i];break;}
+  }
+  if(!got)got=['stonechunk',1,1];
+  give(got[0],got[1]);
+  state.stats.broken++;
+  var lv=addXp(4+ (D.byKey(got[0]).rarity*3),'mining');
+  return {ok:true,got:got[0],n:got[1],levelled:lv,state:snapshot()};
+};
+
+H.craft=function(p){
+  var it=D.byKey(p.key);
+  if(!it||!it.recipe)return {ok:false,why:'No recipe for that.'};
+  var n=Math.max(1,p.n|0||1);
+  for(var i=0;i<it.recipe.length;i++){
+    if(!has(it.recipe[i][0],it.recipe[i][1]*n)){
+      var need=D.byKey(it.recipe[i][0]);
+      return {ok:false,why:'Not enough '+(need?need.name:it.recipe[i][0])+'.'};
+    }
+  }
+  for(var j=0;j<it.recipe.length;j++)take(it.recipe[j][0],it.recipe[j][1]*n);
+  give(p.key,n);
+  addXp(6*it.rarity*n,'building');
+  return {ok:true,state:snapshot()};
+};
+
+H.equip=function(p){
+  var it=D.byKey(p.key);
+  if(!it)return {ok:false,why:'No such item.'};
+  if(it.cat==='cosmetic'){
+    if(!has(p.key,1))return {ok:false,why:'You do not own that.'};
+    state.equipped[it.props.slot]=p.key;
+    return {ok:true,state:snapshot()};
+  }
+  if(it.cat==='tool'||it.cat==='weapon'||it.cat==='fishing'){
+    if(!has(p.key,1))return {ok:false,why:'You do not own that.'};
+    state.equipped.tool=p.key;
+    return {ok:true,state:snapshot()};
+  }
+  return {ok:false,why:'That is not something you can wear or hold.'};
+};
+H.unequip=function(p){
+  if(state.equipped[p.slot]===undefined)return {ok:false,why:'Nothing there.'};
+  state.equipped[p.slot]=null;
+  return {ok:true,state:snapshot()};
+};
+
+H.use=function(p){
+  var it=D.byKey(p.key);
+  if(!it||!it.consumable)return {ok:false,why:'You cannot use that.'};
+  if(!has(p.key,1))return {ok:false,why:'You do not have one.'};
+  take(p.key,1);
+  var pr=it.props||{};
+  if(pr.heal)state.hp=Math.min(state.hpMax,state.hp+pr.heal);
+  if(pr.buff)state.buffs[pr.buff]={until:Date.now()+(pr.dur||60)*1000};
+  return {ok:true,state:snapshot()};
+};
+
+/* Shops price from D.buyPrice / D.sellPrice, which both derive from
+   one `value` per item, so a shop can never drift out of step with
+   the trade window. */
+H.buy=function(p){
+  var it=D.byKey(p.key);
+  if(!it)return {ok:false,why:'No such item.'};
+  var n=Math.max(1,p.n|0||1);
+  var cost=D.buyPrice(it)*n;
+  var premium=(it.cat==='cosmetic'&&it.rarity>=5);
+  if(premium){
+    if(state.shards<Math.ceil(cost/40))
+      return {ok:false,why:'Not enough shards.'};
+    state.shards-=Math.ceil(cost/40);
+  }else{
+    if(state.coins<cost)return {ok:false,why:'Not enough coins.'};
+    state.coins-=cost;
+  }
+  give(p.key,n);
+  return {ok:true,spent:cost,state:snapshot()};
+};
+H.sell=function(p){
+  var it=D.byKey(p.key);
+  if(!it)return {ok:false,why:'No such item.'};
+  var n=Math.max(1,p.n|0||1);
+  if(!has(p.key,n))return {ok:false,why:'You do not have that many.'};
+  if(!it.tradeable)return {ok:false,why:'That cannot be sold.'};
+  take(p.key,n);
+  var each=(p.weight&&it.props&&it.props.fish)
+    ? Math.round(D.fishValue(it,p.weight)*0.55)
+    : D.sellPrice(it);
+  state.coins+=each*n;
+  return {ok:true,earned:each*n,state:snapshot()};
+};
+
+H.claimPlot=function(p){
+  var id=p.plot|0;
+  if(state.plots.indexOf(id)>=0)return {ok:false,why:'You already own this plot.'};
+  if(state.plots.length>=3)return {ok:false,why:'You already hold three plots.'};
+  var cost=state.plots.length===0?0:400*state.plots.length;
+  if(state.coins<cost)return {ok:false,why:'You need '+cost+' coins for another plot.'};
+  state.coins-=cost;
+  state.plots.push(id);
+  addXp(120,'building');
+  return {ok:true,state:snapshot()};
+};
+
+H.setName=function(p){
+  var n=String(p.name||'').trim().slice(0,16);
+  if(!/^[A-Za-z0-9 _-]{2,16}$/.test(n))
+    return {ok:false,why:'Two to sixteen letters, numbers, spaces, - or _.'};
+  state.name=n;
+  return {ok:true,state:snapshot()};
+};
+
+H.addXp=function(p){
+  /* Only ever called by other server handlers and by world events; the
+     amount is clamped so a stray call cannot hand out a level. */
+  var amt=M.clamp(p.amount|0,0,500);
+  var lv=addXp(amt,p.skill);
+  return {ok:true,levelled:lv,state:snapshot()};
+};
+
+/* ---------------- dispatch ----------------
+   Deliberately the only way in. Async by shape even though it resolves
+   immediately, so no caller can come to depend on a synchronous
+   return that a real socket would not provide. */
+var log=[];
+Net.request=function(action,payload,cb){
+  var h=H[action];
+  var res;
+  if(!h)res={ok:false,why:'Unknown action: '+action};
+  else{
+    try{res=h(payload||{});}
+    catch(e){res={ok:false,why:'Server error.'};console.error(action,e);}
+  }
+  log.push({t:Date.now(),action:action,ok:res.ok});
+  if(log.length>200)log.shift();
+  if(cb)cb(res);
+  return res;
+};
+Net.handlers=function(){return Object.keys(H);};
+Net.register=function(name,fn){H[name]=fn;};
+Net.log=function(){return log.slice(-40);};
+
+/* Persistence is the server's job too. */
+Net.save=function(){
+  try{
+    localStorage.setItem('lumen.save',JSON.stringify({
+      v:1,state:state,cells:V.serialise()
+    }));
+    return true;
+  }catch(e){return false;}
+};
+Net.load=function(){
+  try{
+    var raw=localStorage.getItem('lumen.save');
+    if(!raw)return false;
+    var o=JSON.parse(raw);
+    if(!o||o.v!==1)return false;
+    for(var k in o.state)if(state[k]!==undefined)state[k]=o.state[k];
+    if(o.cells)V.deserialise(o.cells);
+    return true;
+  }catch(e){return false;}
+};
+Net.wipe=function(){
+  try{localStorage.removeItem('lumen.save');}catch(e){}
+};
+
+LH.Net=Net;
+})();
+
+/* ============================================================
+   LH.Icon — inventory icons, drawn not downloaded.
+
+   Every icon is generated from the same row that describes the item
+   in the world, so a block's icon and its surface can never drift
+   apart: both read `mat` and `col`. Blocks get an isometric cube cut
+   from the real material texture; tools, weapons and cosmetics get a
+   drawn silhouette; fish get a body shaped by their weight class.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,D=LH.Data,Tex=LH.Tex;
+var I={},cache={};
+var S=72;                       /* icon side, in pixels */
+
+function mk(){
+  var cv=document.createElement('canvas');
+  cv.width=cv.height=S;
+  return cv;
+}
+function hexOf(c){return c&&c.charAt(0)==='#'?c:'#CCCCCC';}
+function shade(c,amt){return LH.Geo.shade(hexOf(c),amt);}
+
+/* Pull the item's own material out of the texture atlas so the icon is
+   literally made of the surface it will have in the world. */
+function matPattern(ctx,matName,tint,size){
+  var idx=Tex.NAME[matName];
+  var src=(idx!==undefined&&Tex.canvases)?Tex.canvases[idx]:null;
+  if(!src)return null;
+  var tmp=document.createElement('canvas');
+  tmp.width=tmp.height=size;
+  var c=tmp.getContext('2d');
+  c.drawImage(src,0,0,Tex.SIZE*0.6,Tex.SIZE*0.6,0,0,size,size);
+  if(tint&&tint!=='#FFFFFF'){
+    c.globalCompositeOperation='multiply';
+    c.fillStyle=tint;c.fillRect(0,0,size,size);
+    c.globalCompositeOperation='destination-in';
+    c.drawImage(tmp,0,0);
+    c.globalCompositeOperation='source-over';
+  }
+  return tmp;
+}
+
+/* An isometric cube: three faces from the same material at three
+   brightnesses. Cheap, and it reads as a block instantly. */
+function cube(ctx,mat,col,shapeName){
+  var w=S*0.62,h=w*0.5;
+  var cx=S/2, cy=S*0.56;
+  var tex=matPattern(ctx,mat,col,64);
+  var low=shapeName==='slab'?0.5:1;
+  var lift=h*low;
+
+  function face(pts,bright){
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0],pts[0][1]);
+    for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i][0],pts[i][1]);
+    ctx.closePath();
+    ctx.clip();
+    if(tex){
+      ctx.globalAlpha=1;
+      ctx.drawImage(tex,cx-w,cy-h*2.2,w*2,h*4.4);
+    }else{
+      ctx.fillStyle=hexOf(col);ctx.fillRect(0,0,S,S);
+    }
+    ctx.fillStyle=bright>0?'rgba(255,255,255,'+bright+')'
+                          :'rgba(0,0,0,'+(-bright)+')';
+    ctx.fillRect(0,0,S,S);
+    ctx.restore();
+  }
+  var topY=cy-lift;
+  /* top */
+  face([[cx,topY-h/2],[cx+w/2,topY],[cx,topY+h/2],[cx-w/2,topY]],0.16);
+  /* left */
+  face([[cx-w/2,topY],[cx,topY+h/2],[cx,cy+h/2],[cx-w/2,cy]],-0.10);
+  /* right */
+  face([[cx+w/2,topY],[cx,topY+h/2],[cx,cy+h/2],[cx+w/2,cy]],-0.28);
+  /* edge highlight */
+  ctx.strokeStyle='rgba(255,255,255,.20)';ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(cx-w/2,topY);ctx.lineTo(cx,topY-h/2);ctx.lineTo(cx+w/2,topY);
+  ctx.stroke();
+}
+
+function stroke(ctx,pts,col,width,cap){
+  ctx.strokeStyle=col;ctx.lineWidth=width;
+  ctx.lineCap=cap||'round';ctx.lineJoin='round';
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0],pts[0][1]);
+  for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i][0],pts[i][1]);
+  ctx.stroke();
+}
+function poly(ctx,pts,col){
+  ctx.fillStyle=col;ctx.beginPath();
+  ctx.moveTo(pts[0][0],pts[0][1]);
+  for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i][0],pts[i][1]);
+  ctx.closePath();ctx.fill();
+}
+
+var DRAW={};
+
+DRAW.pickaxe=function(ctx,c){
+  stroke(ctx,[[22,58],[48,20]],'#7A5636',7);
+  stroke(ctx,[[22,58],[48,20]],'#A8794E',4);
+  ctx.save();ctx.translate(48,20);ctx.rotate(-0.72);
+  poly(ctx,[[-24,-3],[24,-3],[20,5],[-20,5]],c);
+  poly(ctx,[[-24,-3],[24,-3],[22,0],[-22,0]],shade(c,26));
+  ctx.restore();
+};
+DRAW.axe=function(ctx,c){
+  stroke(ctx,[[24,58],[46,20]],'#7A5636',7);
+  stroke(ctx,[[24,58],[46,20]],'#A8794E',4);
+  ctx.save();ctx.translate(46,22);ctx.rotate(-0.5);
+  poly(ctx,[[-4,-14],[16,-20],[24,0],[16,20],[-4,14]],c);
+  poly(ctx,[[-4,-14],[10,-17],[14,0],[10,17],[-4,14]],shade(c,22));
+  ctx.restore();
+};
+DRAW.sword=function(ctx,c){
+  poly(ctx,[[36,10],[42,18],[42,46],[36,54],[30,46],[30,18]],c);
+  poly(ctx,[[36,10],[39,18],[39,46],[36,50],[33,46],[33,18]],shade(c,30));
+  stroke(ctx,[[22,50],[50,50]],'#C9A24E',6);
+  stroke(ctx,[[36,50],[36,62]],'#6E5236',6);
+  ctx.fillStyle='#C9A24E';ctx.beginPath();ctx.arc(36,64,4,0,6.283);ctx.fill();
+};
+DRAW.rod=function(ctx,c){
+  stroke(ctx,[[16,60],[54,14]],'#8A6A44',5);
+  stroke(ctx,[[40,30],[54,14]],c,3);
+  ctx.strokeStyle='rgba(232,239,250,.6)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(54,14);
+  ctx.quadraticCurveTo(48,34,40,52);ctx.stroke();
+  ctx.fillStyle='#E8EFFA';ctx.beginPath();ctx.arc(40,54,3.4,0,6.283);ctx.fill();
+  ctx.fillStyle='#C4485E';ctx.beginPath();ctx.arc(40,54,3.4,3.14,6.283);ctx.fill();
+  ctx.fillStyle='#5E6672';ctx.beginPath();ctx.arc(26,50,5,0,6.283);ctx.fill();
+};
+DRAW.wrench=function(ctx,c){
+  ctx.save();ctx.translate(36,36);ctx.rotate(-0.7);
+  stroke(ctx,[[0,18],[0,-8]],c,8);
+  ctx.lineWidth=7;ctx.strokeStyle=c;
+  ctx.beginPath();ctx.arc(0,-14,8,0.6,2.54,true);ctx.stroke();
+  ctx.beginPath();ctx.arc(0,22,7,3.74,5.68,true);ctx.stroke();
+  ctx.restore();
+};
+DRAW.torch=function(ctx,c){
+  stroke(ctx,[[36,60],[36,32]],'#8A6A44',6);
+  var g=ctx.createRadialGradient(36,24,1,36,24,16);
+  g.addColorStop(0,'#FFF0C0');g.addColorStop(0.5,'#FFB13C');
+  g.addColorStop(1,'rgba(255,120,40,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(36,24,16,0,6.283);ctx.fill();
+};
+DRAW.fish=function(ctx,c,it){
+  var w=it.props&&it.props.w?it.props.w[1]:1;
+  var big=M.clamp(Math.log(1+w)/Math.log(260),0,1);
+  var L=20+big*14, H=8+big*9;
+  ctx.save();ctx.translate(38,38);
+  poly(ctx,[[-L,0],[-L*0.4,-H],[L*0.55,-H*0.8],[L,0],[L*0.55,H*0.8],[-L*0.4,H]],c);
+  poly(ctx,[[-L,0],[-L*0.4,-H*0.5],[L*0.3,-H*0.3],[L*0.6,0]],shade(c,24));
+  /* tail */
+  poly(ctx,[[-L,0],[-L-11,-9],[-L-7,0],[-L-11,9]],shade(c,-18));
+  /* fin */
+  poly(ctx,[[-2,-H*0.9],[10,-H-8],[14,-H*0.7]],shade(c,-12));
+  ctx.fillStyle='#0E1219';ctx.beginPath();ctx.arc(L*0.6,-2,2.6,0,6.283);ctx.fill();
+  ctx.fillStyle='#FFFFFF';ctx.beginPath();ctx.arc(L*0.6+0.9,-2.8,1,0,6.283);ctx.fill();
+  ctx.restore();
+};
+DRAW.wings=function(ctx,c){
+  for(var s=-1;s<=1;s+=2){
+    ctx.save();ctx.translate(36,38);ctx.scale(s,1);
+    for(var i=0;i<4;i++){
+      var t=i/3;
+      poly(ctx,[[2,4-t*4],[10+t*16,-6-t*14],[12+t*18,-2-t*12],[3,8-t*3]],
+        i%2?c:shade(c,-14));
+    }
+    ctx.restore();
+  }
+};
+DRAW.hat=function(ctx,c){
+  poly(ctx,[[16,44],[56,44],[52,38],[20,38]],shade(c,-16));
+  ctx.fillStyle=c;ctx.beginPath();
+  ctx.ellipse(36,34,15,13,0,3.14,6.283);ctx.fill();
+  ctx.fillStyle=shade(c,18);ctx.beginPath();
+  ctx.ellipse(32,30,7,5,0,3.14,6.283);ctx.fill();
+};
+DRAW.crown=function(ctx,c){
+  poly(ctx,[[16,46],[56,46],[56,38],[16,38]],shade(c,-10));
+  poly(ctx,[[16,38],[24,20],[30,34],[36,16],[42,34],[48,20],[56,38]],c);
+  var J=['#E8354E','#3E7BE0','#D94BC8','#4FD06A'];
+  for(var i=0;i<4;i++){
+    ctx.fillStyle=J[i];ctx.beginPath();
+    ctx.arc(21+i*10,42,3,0,6.283);ctx.fill();
+  }
+};
+DRAW.shirt=function(ctx,c){
+  poly(ctx,[[24,20],[48,20],[56,28],[50,34],[48,56],[24,56],[22,34],[16,28]],c);
+  poly(ctx,[[24,20],[36,20],[36,56],[24,56]],shade(c,10));
+  poly(ctx,[[30,20],[42,20],[36,28]],shade(c,-24));
+};
+DRAW.hair=function(ctx,c){
+  ctx.fillStyle=c;ctx.beginPath();
+  ctx.ellipse(36,32,17,16,0,3.14,6.283);ctx.fill();
+  ctx.fillRect(19,32,34,10);
+  ctx.fillStyle=shade(c,16);ctx.beginPath();
+  ctx.ellipse(30,26,8,5,-0.4,0,6.283);ctx.fill();
+};
+DRAW.pet=function(ctx,c){
+  ctx.fillStyle=c;
+  ctx.beginPath();ctx.ellipse(32,44,15,10,0,0,6.283);ctx.fill();
+  ctx.beginPath();ctx.arc(48,36,9,0,6.283);ctx.fill();
+  poly(ctx,[[43,29],[46,20],[50,29]],shade(c,-14));
+  poly(ctx,[[50,29],[54,21],[56,30]],shade(c,-14));
+  stroke(ctx,[[18,42],[10,30]],c,4);
+  ctx.fillStyle='#0E1219';ctx.beginPath();ctx.arc(51,35,1.8,0,6.283);ctx.fill();
+};
+DRAW.aura=function(ctx,c){
+  for(var i=0;i<3;i++){
+    ctx.strokeStyle=c;ctx.globalAlpha=0.75-i*0.2;ctx.lineWidth=3-i*0.6;
+    ctx.beginPath();ctx.ellipse(36,42,14+i*8,5+i*3,0,0,6.283);ctx.stroke();
+  }
+  ctx.globalAlpha=1;
+  var g=ctx.createRadialGradient(36,34,1,36,34,20);
+  g.addColorStop(0,c);g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.globalAlpha=0.5;ctx.fillStyle=g;
+  ctx.beginPath();ctx.arc(36,34,20,0,6.283);ctx.fill();
+  ctx.globalAlpha=1;
+};
+DRAW.cape=function(ctx,c){
+  poly(ctx,[[26,18],[46,18],[54,58],[44,52],[36,58],[28,52],[18,58]],c);
+  poly(ctx,[[26,18],[36,18],[36,58],[28,52]],shade(c,12));
+  poly(ctx,[[26,18],[46,18],[44,24],[28,24]],shade(c,-22));
+};
+DRAW.material=function(ctx,c,it){
+  /* a small heap of nuggets — reads as "raw stuff" at any size */
+  var pts=[[28,48,10],[44,46,9],[36,38,8],[46,54,6],[26,56,6]];
+  for(var i=0;i<pts.length;i++){
+    ctx.fillStyle=i%2?c:shade(c,-16);
+    ctx.beginPath();ctx.arc(pts[i][0],pts[i][1],pts[i][2],0,6.283);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.22)';
+    ctx.beginPath();ctx.arc(pts[i][0]-pts[i][2]*0.3,pts[i][1]-pts[i][2]*0.4,
+      pts[i][2]*0.32,0,6.283);ctx.fill();
+  }
+};
+DRAW.food=function(ctx,c){
+  ctx.fillStyle=c;ctx.beginPath();
+  ctx.ellipse(36,40,19,13,0,0,6.283);ctx.fill();
+  ctx.fillStyle=shade(c,18);ctx.beginPath();
+  ctx.ellipse(32,36,10,6,-0.3,0,6.283);ctx.fill();
+  ctx.strokeStyle=shade(c,-26);ctx.lineWidth=2;
+  for(var i=-1;i<=1;i++){
+    ctx.beginPath();ctx.moveTo(30+i*7,32);ctx.lineTo(34+i*7,28);ctx.stroke();
+  }
+};
+DRAW.tonic=function(ctx,c){
+  ctx.fillStyle='rgba(255,255,255,.14)';
+  poly(ctx,[[30,18],[42,18],[42,26],[48,36],[48,56],[24,56],[24,36],[30,26]]);
+  ctx.fillStyle=c;
+  poly(ctx,[[26,38],[46,38],[46,54],[26,54]],c);
+  ctx.fillStyle='rgba(255,255,255,.28)';
+  poly(ctx,[[28,38],[33,38],[33,54],[28,54]]);
+  ctx.fillStyle='#6E5236';ctx.fillRect(29,14,14,6);
+};
+DRAW.quest=function(ctx,c){
+  poly(ctx,[[36,14],[54,26],[48,54],[24,54],[18,26]],c);
+  poly(ctx,[[36,14],[45,20],[42,50],[30,50],[27,20]],shade(c,20));
+  ctx.fillStyle='rgba(0,0,0,.45)';ctx.font='bold 20px sans-serif';
+  ctx.textAlign='center';ctx.fillText('!',36,44);
+};
+
+/* Which drawer an item gets. Everything routes through `cat`, `shape`
+   and `props`, never through the item's key. */
+function drawerFor(it){
+  if(it.props&&it.props.fish)return DRAW.fish;
+  if(it.cat==='block'||it.cat==='furniture')return null;   /* cube path */
+  if(it.cat==='material')return DRAW.material;
+  if(it.cat==='quest')return DRAW.quest;
+  if(it.cat==='consumable')
+    return (it.props&&it.props.buff&&!it.props.heal)?DRAW.tonic:DRAW.food;
+  var st=it.props&&it.props.style;
+  if(it.cat==='cosmetic'){
+    var slot=it.props.slot;
+    if(slot==='wings')return DRAW.wings;
+    if(slot==='hat')return st==='crown'||st==='halo'?DRAW.crown:DRAW.hat;
+    if(slot==='hair')return DRAW.hair;
+    if(slot==='shirt')return DRAW.shirt;
+    if(slot==='cape')return DRAW.cape;
+    if(slot==='pet')return DRAW.pet;
+    if(slot==='aura')return DRAW.aura;
+    return DRAW.shirt;
+  }
+  if(st&&DRAW[st])return DRAW[st];
+  if(it.cat==='weapon')return DRAW.sword;
+  if(it.cat==='fishing')return DRAW.rod;
+  return DRAW.pickaxe;
+}
+
+/* Rarity ring behind everything: the tier has to be readable from the
+   hotbar at a glance, the way it was in the 2D build. */
+function backdrop(ctx,it){
+  var col=D.rarityCol(it.rarity);
+  var g=ctx.createRadialGradient(S/2,S*0.52,2,S/2,S*0.52,S*0.56);
+  g.addColorStop(0,'rgba(0,0,0,0)');
+  g.addColorStop(0.68,'rgba(0,0,0,0)');
+  g.addColorStop(1,col);
+  ctx.globalAlpha=it.rarity>=3?0.32:0.18;
+  ctx.fillStyle=g;ctx.fillRect(0,0,S,S);
+  ctx.globalAlpha=1;
+  if(it.rarity>=4){
+    /* a couple of sparks on the good stuff */
+    ctx.fillStyle=col;
+    var sp=[[12,16,2],[60,22,1.6],[54,58,1.8],[16,56,1.4]];
+    for(var i=0;i<sp.length;i++){
+      ctx.globalAlpha=0.85;
+      ctx.beginPath();ctx.arc(sp[i][0],sp[i][1],sp[i][2],0,6.283);ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+}
+
+I.of=function(key){
+  var hit=cache[key];
+  if(hit)return hit;
+  var it=D.byKey(key);
+  if(!it)return null;
+  var cv=mk(),ctx=cv.getContext('2d');
+  backdrop(ctx,it);
+  var fn=drawerFor(it);
+  if(fn)fn(ctx,hexOf(it.col),it);
+  else cube(ctx,it.mat,it.col,it.shape);
+  if(it.emis>0.2){
+    /* emissive items get a bloom in the icon too, so a lamp looks lit
+       in the inventory as well as in the world */
+    ctx.globalCompositeOperation='lighter';
+    var g=ctx.createRadialGradient(S/2,S*0.5,2,S/2,S*0.5,S*0.5);
+    g.addColorStop(0,hexOf(it.col));g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.globalAlpha=0.35*it.emis;ctx.fillStyle=g;ctx.fillRect(0,0,S,S);
+    ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
+  }
+  var url=cv.toDataURL();
+  cache[key]=url;
+  return url;
+};
+I.clear=function(){cache={};};
+
+LH.Icon=I;
+})();
+
+/* ============================================================
+   LH.UI — the interface.
+
+   DOM rather than in-world geometry, because text has to be crisp at
+   any resolution and a canvas-drawn panel never is. Everything is
+   sized in cqw/cqh against the game container so the HUD scales as
+   one piece with the view.
+
+   The default screen carries four things — who you are, what you are
+   holding, what you are looking at, and the clock. Every other
+   function opens on demand and closes on Escape.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,D=LH.Data,Net=LH.Net,Icon=LH.Icon;
+var U={};
+
+var hud=null,els={},panels={},openPanel=null;
+var snap=null;                  /* last state snapshot from the server */
+var hotbar=['pick_stone','rod_cane','plank','stone','lantern',
+            null,null,null,null,null];
+var hotIndex=0;
+U.hotbar=hotbar;
+
+function el(tag,cls,html){
+  var e=document.createElement(tag);
+  if(cls)e.className=cls;
+  if(html!==undefined)e.innerHTML=html;
+  return e;
+}
+function clear(e){while(e.firstChild)e.removeChild(e.firstChild);}
+
+/* ---------------- toasts ---------------- */
+var toastWrap=null;
+U.toast=function(msg,kind){
+  if(!toastWrap)return;
+  var t=el('div','toast'+(kind?' '+kind:''));
+  if(kind==='item'){
+    t.className='toast good';
+  }
+  t.innerHTML=msg;
+  toastWrap.appendChild(t);
+  /* cap the stack: a burst of pickups should not fill the screen */
+  while(toastWrap.children.length>5)toastWrap.removeChild(toastWrap.firstChild);
+  setTimeout(function(){
+    t.classList.add('out');
+    setTimeout(function(){t.parentNode&&t.parentNode.removeChild(t);},320);
+  },2600);
+};
+/* An item pickup shows its own icon and rarity colour. */
+U.toastItem=function(key,n){
+  var it=D.byKey(key);if(!it)return;
+  U.toast('<span class="sw" style="background:'+D.rarityCol(it.rarity)+'"></span>'+
+    '<b>+'+(n||1)+'</b>&nbsp;'+it.name,'good');
+};
+
+/* ---------------- build ---------------- */
+U.init=function(){
+  hud=document.getElementById('hud');
+  clear(hud);
+
+  /* identity */
+  var id=el('div','idchip');
+  id.innerHTML=
+    '<div class="av" id="uiav">T</div>'+
+    '<div class="who">'+
+      '<div class="nm" id="uiname">Traveller</div>'+
+      '<div class="lv" id="uilv">Level 1</div>'+
+      '<div class="xpbar"><i id="uixp" style="width:0%"></i></div>'+
+    '</div>';
+  hud.appendChild(id);
+  els.av=id.querySelector('#uiav');
+  els.name=id.querySelector('#uiname');
+  els.lv=id.querySelector('#uilv');
+  els.xp=id.querySelector('#uixp');
+
+  var purse=el('div','purse');
+  purse.innerHTML=
+    '<div class="coin c"><b></b><span id="uicoins">0</span></div>'+
+    '<div class="coin s"><b></b><span id="uishards">0</span></div>';
+  hud.appendChild(purse);
+  els.coins=purse.querySelector('#uicoins');
+  els.shards=purse.querySelector('#uishards');
+
+  var clock=el('div','clock');
+  clock.innerHTML='<span id="uiclock">09:00</span><span class="wx" id="uiwx">CLEAR</span>';
+  hud.appendChild(clock);
+  els.clock=clock.querySelector('#uiclock');
+  els.wx=clock.querySelector('#uiwx');
+
+  /* reticle and prompt */
+  els.retic=el('div','retic');
+  hud.appendChild(els.retic);
+  els.prompt=el('div','prompt');
+  hud.appendChild(els.prompt);
+
+  /* hotbar */
+  els.hot=el('div','hotbar pe');
+  hud.appendChild(els.hot);
+  buildHotbar();
+
+  toastWrap=el('div','toasts');
+  hud.appendChild(toastWrap);
+
+  /* panels */
+  els.scrim=el('div','scrim pe');
+  els.scrim.addEventListener('click',function(){U.close();});
+  hud.appendChild(els.scrim);
+
+  makePanel('inv','Backpack',['All','Blocks','Materials','Gear','Cosmetics',
+    'Fishing','Food','Collection']);
+  makePanel('craft','Workbench',['Available','All']);
+  makePanel('map','Lumen Harbor',null);
+  makePanel('profile','Profile',['Overview','Skills','Collections','Achievements']);
+  makePanel('missions','Missions',['Daily','Story','Weekly']);
+  makePanel('shop','Store',['Seeds','Blocks','Gear','Style','Bundles']);
+  makePanel('menu','Menu',null);
+
+  U.sync(Net.snapshot());
+  return U;
+};
+
+function makePanel(id,title,tabs){
+  var p=el('div','panel pe');
+  var hd=el('div','hd');
+  hd.innerHTML='<h2>'+title+'</h2>';
+  var sp=el('div','sp');hd.appendChild(sp);
+  if(tabs){
+    var tw=el('div','tabs');
+    tabs.forEach(function(t,i){
+      var b=el('div','tab'+(i===0?' on':''),t);
+      b.addEventListener('click',function(){
+        tw.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on');});
+        b.classList.add('on');
+        p.dataset.tab=t;
+        render(id);
+      });
+      tw.appendChild(b);
+    });
+    hd.insertBefore(tw,sp.nextSibling);
+    p.dataset.tab=tabs[0];
+  }
+  var x=el('button','xbtn','✕');
+  x.addEventListener('click',function(){U.close();});
+  hd.appendChild(x);
+  p.appendChild(hd);
+  var bd=el('div','bd');
+  p.appendChild(bd);
+  hud.appendChild(p);
+  panels[id]={root:p,body:bd,title:title};
+}
+
+/* ---------------- hotbar ---------------- */
+function buildHotbar(){
+  clear(els.hot);
+  for(var i=0;i<10;i++){
+    (function(i){
+      var s=el('div','slot'+(i===hotIndex?' on':''));
+      s.innerHTML='<div class="ic"></div><span class="k">'+((i+1)%10)+'</span>'+
+                  '<span class="n"></span>';
+      s.addEventListener('click',function(){U.selectSlot(i);});
+      els.hot.appendChild(s);
+    })(i);
+  }
+  refreshHotbar();
+}
+function refreshHotbar(){
+  if(!els.hot||!snap)return;
+  var slots=els.hot.children;
+  for(var i=0;i<slots.length;i++){
+    var key=hotbar[i];
+    var s=slots[i];
+    var ic=s.querySelector('.ic'), n=s.querySelector('.n');
+    s.classList.toggle('on',i===hotIndex);
+    if(!key||!D.byKey(key)){
+      s.classList.add('empty');ic.style.backgroundImage='';n.textContent='';
+      s.style.removeProperty('--rr');
+      continue;
+    }
+    s.classList.remove('empty');
+    var it=D.byKey(key);
+    var url=Icon.of(key);
+    ic.style.backgroundImage='url('+url+')';
+    ic.style.backgroundSize='cover';
+    var count=snap.inv[key]||0;
+    n.textContent=(it.stack>1&&count>0)?count:'';
+    /* a held tool you no longer own reads as unavailable rather than
+       silently doing nothing when you click */
+    s.style.opacity=count>0?'1':'0.42';
+  }
+}
+U.selectSlot=function(i){
+  hotIndex=M.clamp(i|0,0,9);
+  refreshHotbar();
+  var key=hotbar[hotIndex];
+  var it=key?D.byKey(key):null;
+  /* Equipping the held tool is the server's business, not the HUD's. */
+  if(it&&(it.cat==='tool'||it.cat==='weapon'||it.cat==='fishing')){
+    Net.request('equip',{key:key},function(r){if(r.ok)U.sync(r.state);});
+  }
+  if(LH.Game&&LH.Game.onHeldChanged)LH.Game.onHeldChanged(key);
+};
+U.held=function(){return hotbar[hotIndex];};
+U.heldItem=function(){var k=hotbar[hotIndex];return k?D.byKey(k):null;};
+U.setSlot=function(i,key){hotbar[i]=key;refreshHotbar();};
+
+/* ---------------- state sync ----------------
+   The HUD never computes a number. It renders whatever the last
+   server snapshot said, which is why a rejected request cannot leave
+   the display out of step with the truth. */
+U.sync=function(s){
+  if(!s)return;
+  snap=s;
+  if(!hud)return;
+  els.name.textContent=s.name;
+  els.av.textContent=(s.name[0]||'T').toUpperCase();
+  els.lv.textContent='Level '+s.level;
+  els.xp.style.width=Math.round(100*s.xp/Math.max(1,s.xpNext))+'%';
+  els.coins.textContent=s.coins.toLocaleString();
+  els.shards.textContent=s.shards.toLocaleString();
+  refreshHotbar();
+  if(openPanel)render(openPanel);
+};
+U.state=function(){return snap;};
+
+/* ---------------- reticle + interaction prompt ---------------- */
+U.setReticle=function(mode){
+  if(!els.retic)return;
+  els.retic.className='retic'+(mode==='act'?' act':(mode==='deny'?' deny':''));
+};
+U.setPrompt=function(text,keyName){
+  if(!els.prompt)return;
+  if(!text){els.prompt.classList.remove('show');return;}
+  els.prompt.innerHTML='<kbd>'+(keyName||'E')+'</kbd><span>'+text+'</span>';
+  els.prompt.classList.add('show');
+};
+U.setClock=function(hours,weather){
+  if(!els.clock)return;
+  var h=Math.floor(hours)%24, m=Math.floor((hours%1)*60);
+  els.clock.textContent=(h<10?'0':'')+h+':'+(m<10?'0':'')+m;
+  els.wx.textContent=String(weather||'clear').toUpperCase();
+};
+
+/* ---------------- panels ---------------- */
+U.open=function(id){
+  if(openPanel===id){U.close();return;}
+  if(openPanel)panels[openPanel].root.classList.remove('on');
+  openPanel=id;
+  if(!panels[id])return;
+  panels[id].root.classList.add('on');
+  els.scrim.classList.add('on');
+  render(id);
+  if(LH.Input.releaseLock)LH.Input.releaseLock();
+};
+U.close=function(){
+  if(openPanel&&panels[openPanel])panels[openPanel].root.classList.remove('on');
+  openPanel=null;
+  els.scrim.classList.remove('on');
+};
+U.isOpen=function(){return !!openPanel;};
+U.openId=function(){return openPanel;};
+
+var selected=null;
+
+function itemCell(key,count,opts){
+  opts=opts||{};
+  var it=D.byKey(key);
+  if(!it)return null;
+  var c=el('div','cell'+(selected===key?' sel':'')+(opts.worn?' worn':''));
+  var rr=el('div','rr');
+  rr.style.background=D.rarityCol(it.rarity);
+  c.appendChild(rr);
+  var ic=el('div','ic');
+  ic.style.backgroundImage='url('+Icon.of(key)+')';
+  ic.style.backgroundSize='cover';
+  c.appendChild(ic);
+  if(count>1||opts.showCount){
+    var n=el('span','n',String(count));
+    c.appendChild(n);
+  }
+  c.title=it.name;
+  c.addEventListener('click',function(){
+    selected=key;
+    render(openPanel);
+  });
+  return c;
+}
+
+var CAT_TAB={
+  'Blocks':['block','furniture'],'Materials':['material'],
+  'Gear':['tool','weapon'],'Cosmetics':['cosmetic'],
+  'Fishing':['fishing'],'Food':['consumable'],
+  'Collection':['collectible'],'All':null
+};
+
+function render(id){
+  var P=panels[id];
+  if(!P||!snap)return;
+  var bd=P.body;
+  clear(bd);
+  if(id==='inv')return renderInv(bd,P.root.dataset.tab);
+  if(id==='craft')return renderCraft(bd,P.root.dataset.tab);
+  if(id==='profile')return renderProfile(bd,P.root.dataset.tab);
+  if(id==='shop')return renderShop(bd,P.root.dataset.tab);
+  if(id==='missions')return renderMissions(bd,P.root.dataset.tab);
+  if(id==='map')return renderMap(bd);
+  if(id==='menu')return renderMenu(bd);
+}
+
+function renderInv(bd,tab){
+  var cats=CAT_TAB[tab];
+  var keys=Object.keys(snap.inv).filter(function(k){
+    var it=D.byKey(k);
+    if(!it)return false;
+    return !cats||cats.indexOf(it.cat)>=0;
+  });
+  /* Rarity first, then name: the good stuff should never be buried. */
+  keys.sort(function(a,b){
+    var A=D.byKey(a),B=D.byKey(b);
+    return (B.rarity-A.rarity)||A.name.localeCompare(B.name);
+  });
+  if(!keys.length){
+    bd.appendChild(el('div','empty-note','Nothing here yet.'));
+    return;
+  }
+  var g=el('div','grid');
+  var worn={};
+  for(var sl in snap.equipped)if(snap.equipped[sl])worn[snap.equipped[sl]]=1;
+  keys.forEach(function(k){
+    var c=itemCell(k,snap.inv[k],{worn:!!worn[k]});
+    if(c)g.appendChild(c);
+  });
+  bd.appendChild(g);
+  if(selected&&snap.inv[selected])bd.appendChild(detailFor(selected,'inv'));
+}
+
+function detailFor(key,ctx){
+  var it=D.byKey(key);
+  var d=el('div','detail');
+  var big=el('div','big');
+  var ic=el('div','ic');
+  ic.style.backgroundImage='url('+Icon.of(key)+')';
+  ic.style.backgroundSize='cover';
+  big.appendChild(ic);
+  d.appendChild(big);
+  var t=el('div','txt');
+  t.appendChild(el('h3',null,it.name));
+  var rt=el('div','rt',D.RARITY[it.rarity]+' · '+it.cat);
+  rt.style.color=D.rarityCol(it.rarity);
+  t.appendChild(rt);
+  if(it.desc)t.appendChild(el('p',null,it.desc));
+  var meta=el('div','meta');
+  meta.innerHTML=
+    '<span>Value <b>'+it.value.toLocaleString()+'</b></span>'+
+    '<span>Stack <b>'+it.stack+'</b></span>'+
+    (it.placeable?'<span><b>Placeable</b></span>':'')+
+    (it.tradeable?'':'<span><b>Bound</b></span>')+
+    (it.props&&it.props.damage?'<span>Damage <b>'+it.props.damage+'</b></span>':'')+
+    (it.props&&it.props.power?'<span>Power <b>'+it.props.power+'</b></span>':'');
+  t.appendChild(meta);
+
+  var acts=el('div','acts');
+  function act(label,cls,fn){
+    var b=el('button','btn'+(cls?' '+cls:''),label);
+    b.addEventListener('click',fn);
+    acts.appendChild(b);
+    return b;
+  }
+  if(ctx==='inv'){
+    if(it.cat==='cosmetic'||it.cat==='tool'||it.cat==='weapon'||it.cat==='fishing'){
+      act('Equip','pri',function(){
+        Net.request('equip',{key:key},function(r){
+          if(r.ok){U.sync(r.state);U.toast('Equipped '+it.name,'good');
+            if(LH.Game&&LH.Game.refreshKit)LH.Game.refreshKit();}
+          else U.toast(r.why,'bad');
+        });
+      });
+    }
+    if(it.placeable){
+      act('To hotbar',null,function(){
+        U.setSlot(hotIndex,key);
+        U.toast(it.name+' to slot '+((hotIndex+1)%10),'good');
+      });
+    }
+    if(it.consumable){
+      act('Use','pri',function(){
+        Net.request('use',{key:key},function(r){
+          if(r.ok){U.sync(r.state);U.toast('Used '+it.name,'good');}
+          else U.toast(r.why,'bad');
+        });
+      });
+    }
+    if(it.tradeable){
+      act('Sell ('+D.sellPrice(it)+')','dim',function(){
+        Net.request('sell',{key:key,n:1},function(r){
+          if(r.ok){U.sync(r.state);U.toast('Sold for '+r.earned+' coins','good');}
+          else U.toast(r.why,'bad');
+        });
+      });
+    }
+  }
+  t.appendChild(acts);
+  d.appendChild(t);
+  return d;
+}
+
+function renderCraft(bd,tab){
+  var list=D.ITEMS.filter(function(it){return !!it.recipe;});
+  if(tab==='Available'){
+    list=list.filter(function(it){
+      return it.recipe.every(function(r){return (snap.inv[r[0]]||0)>=r[1];});
+    });
+  }
+  if(!list.length){
+    bd.appendChild(el('div','empty-note',
+      'Nothing you can make yet. Gather materials and come back.'));
+    return;
+  }
+  var g=el('div','grid');
+  list.forEach(function(it){
+    var c=itemCell(it.key,1,{});
+    if(!c)return;
+    var can=it.recipe.every(function(r){return (snap.inv[r[0]]||0)>=r[1];});
+    c.style.opacity=can?'1':'0.42';
+    g.appendChild(c);
+  });
+  bd.appendChild(g);
+  if(selected){
+    var it=D.byKey(selected);
+    if(it&&it.recipe){
+      var d=detailFor(selected,'craft');
+      var need=el('div','meta');
+      need.style.marginTop='.5cqw';
+      need.innerHTML=it.recipe.map(function(r){
+        var m=D.byKey(r[0]);
+        var have=snap.inv[r[0]]||0;
+        var ok=have>=r[1];
+        return '<span style="color:'+(ok?'var(--r2)':'var(--danger)')+'">'+
+          (m?m.name:r[0])+' <b>'+have+'/'+r[1]+'</b></span>';
+      }).join('');
+      d.querySelector('.txt').appendChild(need);
+      var acts=el('div','acts');
+      var b=el('button','btn pri','Craft');
+      b.addEventListener('click',function(){
+        Net.request('craft',{key:selected,n:1},function(r){
+          if(r.ok){U.sync(r.state);U.toastItem(selected,1);}
+          else U.toast(r.why,'bad');
+        });
+      });
+      acts.appendChild(b);
+      d.querySelector('.txt').appendChild(acts);
+      bd.appendChild(d);
+    }
+  }
+}
+
+function renderProfile(bd,tab){
+  if(tab==='Skills'){
+    var wrap=el('div');
+    for(var k in snap.skills){
+      var row=el('div');
+      row.style.cssText='display:flex;align-items:center;gap:1cqw;margin-bottom:.7cqw';
+      row.innerHTML='<div style="width:9cqw;font-size:.92cqw;text-transform:capitalize">'+
+        k+'</div><div class="xpbar" style="flex:1;height:.5cqw"><i style="width:'+
+        Math.min(100,snap.skills[k]/40*100)+'%"></i></div>'+
+        '<b style="font-size:.92cqw;width:3cqw;text-align:right">'+snap.skills[k]+'</b>';
+      wrap.appendChild(row);
+    }
+    bd.appendChild(wrap);
+    return;
+  }
+  if(tab==='Collections'){
+    var fishAll=D.inCat('collectible').filter(function(i){return i.props&&i.props.fish;});
+    var got=Object.keys(snap.collections.fish).length;
+    bd.appendChild(el('div','rt','Fish  '+got+' / '+fishAll.length));
+    var g=el('div','grid');
+    fishAll.forEach(function(it){
+      var c=itemCell(it.key,snap.collections.fish[it.key]||0,{showCount:true});
+      if(!c)return;
+      if(!snap.collections.fish[it.key])c.style.filter='grayscale(1) brightness(.45)';
+      g.appendChild(c);
+    });
+    bd.appendChild(g);
+    return;
+  }
+  if(tab==='Achievements'){
+    bd.appendChild(el('div','empty-note','Achievements arrive with the mission board.'));
+    return;
+  }
+  var s=snap;
+  var o=el('div');
+  o.innerHTML=
+    '<div class="detail"><div class="big" style="font-family:var(--disp);'+
+      'font-size:2.6cqw;color:var(--acc)">'+s.level+'</div>'+
+    '<div class="txt"><h3>'+s.name+'</h3>'+
+    '<div class="rt" style="color:var(--acc2)">Level '+s.level+'</div>'+
+    '<div class="meta">'+
+      '<span>Coins <b>'+s.coins.toLocaleString()+'</b></span>'+
+      '<span>Shards <b>'+s.shards+'</b></span>'+
+      '<span>Blocks placed <b>'+s.stats.placed+'</b></span>'+
+      '<span>Blocks broken <b>'+s.stats.broken+'</b></span>'+
+      '<span>Fish caught <b>'+s.stats.caught+'</b></span>'+
+      '<span>Plots owned <b>'+s.plots.length+'</b></span>'+
+    '</div></div></div>';
+  bd.appendChild(o);
+}
+
+var SHOP_TAB={
+  'Seeds':['seed'],'Blocks':['block','furniture'],
+  'Gear':['tool','weapon','fishing'],'Style':['cosmetic'],
+  'Bundles':['consumable']
+};
+function renderShop(bd,tab){
+  var cats=SHOP_TAB[tab]||['block'];
+  var list=D.ITEMS.filter(function(it){
+    return cats.indexOf(it.cat)>=0&&it.value>0;
+  }).sort(function(a,b){return a.value-b.value;});
+  if(!list.length){
+    bd.appendChild(el('div','empty-note','This aisle is empty for now.'));
+    return;
+  }
+  var g=el('div','grid');
+  list.forEach(function(it){
+    var c=itemCell(it.key,1,{});
+    if(c)g.appendChild(c);
+  });
+  bd.appendChild(g);
+  if(selected){
+    var it2=D.byKey(selected);
+    if(!it2)return;
+    var d=detailFor(selected,'shop');
+    var acts=el('div','acts');
+    var premium=(it2.cat==='cosmetic'&&it2.rarity>=5);
+    var price=premium?Math.ceil(D.buyPrice(it2)/40)+' shards'
+                     :D.buyPrice(it2).toLocaleString()+' coins';
+    var b=el('button','btn pri','Buy — '+price);
+    b.addEventListener('click',function(){
+      Net.request('buy',{key:selected,n:1},function(r){
+        if(r.ok){U.sync(r.state);U.toastItem(selected,1);}
+        else U.toast(r.why,'bad');
+      });
+    });
+    acts.appendChild(b);
+    d.querySelector('.txt').appendChild(acts);
+    bd.appendChild(d);
+  }
+}
+
+function renderMissions(bd,tab){
+  bd.appendChild(el('div','empty-note',
+    'The mission board is not open yet. Visit the Mission District.'));
+}
+
+function renderMap(bd){
+  bd.appendChild(el('div','empty-note','The harbour map is being drawn.'));
+}
+
+function renderMenu(bd){
+  var wrap=el('div');
+  wrap.style.cssText='display:flex;flex-direction:column;gap:.55cqw;max-width:26cqw';
+  [['Backpack','inv'],['Workbench','craft'],['Missions','missions'],
+   ['Store','shop'],['Profile','profile'],['Map','map']].forEach(function(r){
+    var b=el('button','btn',r[0]);
+    b.addEventListener('click',function(){U.open(r[1]);});
+    wrap.appendChild(b);
+  });
+  var save=el('button','btn pri','Save Progress');
+  save.addEventListener('click',function(){
+    U.toast(Net.save()?'Progress saved.':'Could not save.',
+      Net.save()?'good':'bad');
+  });
+  wrap.appendChild(save);
+  bd.appendChild(wrap);
+}
+
+LH.UI=U;
 })();
 
 /* ============================================================
@@ -6932,11 +9173,13 @@ LH.Sky=S;
 'use strict';
 var M=LH.M,GL=LH.GL,R=LH.Render,App=LH.App,Cam=LH.Cam,Geo=LH.Geo;
 var T=LH.Terrain,W=LH.World,P=LH.Props,Act=LH.Actors,I=LH.Input,Pl=LH.Player,Sky=LH.Sky;
+var V=LH.Voxels,D=LH.Data,Net=LH.Net,UI=LH.UI,Icon=LH.Icon;
 var G={};
 
 G.player=null;
 G.crowd=[];
 G.ready=false;
+G.aim={hit:false,x:0,y:0,z:0,mode:'none',target:null};
 
 /* ---------------- boot ---------------- */
 App.stage('Painting surfaces',function(){
@@ -6950,6 +9193,13 @@ App.stage('Cutting the coastline',function(){
 });
 App.stage('Building Lumen Harbor',function(){
   W.build();
+});
+App.stage('Opening the interface',function(){
+  UI.init();
+  /* Warm the icon cache for everything the player starts with, so the
+     first frame of the hotbar is not a set of empty squares. */
+  var st=Net.snapshot();
+  for(var k in st.inv)Icon.of(k);
 });
 App.stage('Waking the harbour',function(){
   var spawn=W.spawn;
@@ -6990,8 +9240,132 @@ App.stage('Waking the harbour',function(){
     npc.speed=1.5+rng()*0.9;
     G.crowd.push(npc);
   }
+  /* Any saved progress replaces the starting state, and rebuilding the
+     voxel chunks it restored has to happen before the first draw. */
+  if(Net.load()){
+    UI.sync(Net.snapshot());
+    for(var g=0;g<64;g++)V.update(8);
+  }
+  G.refreshKit();
   G.ready=true;
 });
+
+/* The character's appearance is a projection of the server's equipped
+   map. Nothing writes to the kit directly, so a rejected equip cannot
+   leave you visibly wearing something you do not own. */
+G.refreshKit=function(){
+  if(!G.player)return;
+  var eq=Net.snapshot().equipped;
+  var k=G.player.kit;
+  function slot(name,dflt){
+    var key=eq[name];
+    var it=key?D.byKey(key):null;
+    if(it&&it.props&&it.props.style){
+      k[name].style=it.props.style;
+      if(it.props.emis!==undefined)k[name].emis=it.props.emis;
+    }else if(dflt!==undefined)k[name].style=dflt;
+  }
+  slot('hair','crop');slot('shirt','tee');slot('hat','none');
+  slot('wings','none');slot('cape','none');slot('back','none');
+  slot('pet','none');slot('aura','none');
+  /* the held object follows the equipped tool */
+  var tool=eq.tool?D.byKey(eq.tool):null;
+  k.tool.style=(tool&&tool.props&&tool.props.style)||'none';
+};
+
+/* What the player is looking at: a placed block, a spot to build on,
+   or an interaction point. The reticle and the prompt both read this. */
+var _ro=M.v3(),_rd=M.v3();
+function updateAim(){
+  var a=G.aim;
+  a.hit=false;a.mode='none';a.target=null;
+  if(!G.player)return;
+  /* Cast from the camera through the screen centre — what the reticle
+     covers is what you act on, which is the only rule that stays
+     honest across mouse, touch and pad. */
+  Cam.ray(0.5,0.5,_ro,_rd);
+  var hit=V.raycast(_ro[0],_ro[1],_ro[2],_rd[0],_rd[1],_rd[2],7.5);
+
+  /* an interaction point beats a block: talking to a shop matters
+     more than mining the ground under it */
+  var pt=W.nearestPoint(G.player.pos[0],G.player.pos[2],4.0);
+  if(pt){a.mode='interact';a.target=pt;a.hit=true;return;}
+
+  if(!hit.hit)return;
+  a.hit=true;a.x=hit.x;a.y=hit.y;a.z=hit.z;
+  a.ground=hit.ground;
+  a.item=hit.item;
+  a.place=V.placeTarget(hit);
+  var held=UI.heldItem();
+  if(held&&held.placeable)a.mode='place';
+  else if(!hit.ground)a.mode='break';
+  else a.mode='none';
+}
+
+function actPrimary(){
+  var a=G.aim;
+  var p=G.player;
+  if(!p)return;
+  if(a.mode==='interact'){G.interact(a.target);return;}
+  var held=UI.heldItem();
+
+  if(held&&held.placeable&&a.place){
+    p.anim.play('build');
+    Net.request('place',{x:a.place.x,y:a.place.y,z:a.place.z,
+      key:held.key,rot:0,pos:p.pos},function(r){
+      if(r.ok){UI.sync(r.state);LH.Audio&&LH.Audio.play('place');}
+      else UI.toast(r.why,'bad');
+    });
+    return;
+  }
+  if(a.hit&&!a.ground){
+    p.anim.play('mine');
+    Net.request('break',{x:a.x,y:a.y,z:a.z,pos:p.pos},function(r){
+      if(r.ok){
+        UI.sync(r.state);
+        for(var i=0;i<r.drops.length;i++)UI.toastItem(r.drops[i][0],r.drops[i][1]);
+        LH.Audio&&LH.Audio.play('break');
+      }else UI.toast(r.why,'bad');
+    });
+    return;
+  }
+  /* Nothing to build on and nothing to break: swing anyway. A tool
+     that does nothing when you click feels broken even when the
+     refusal is correct. */
+  p.anim.play(held&&held.cat==='weapon'?'attack':'mine');
+}
+
+G.interact=function(pt){
+  if(!pt)return;
+  var p=G.player;
+  switch(pt.kind){
+    case 'shop': UI.open('shop');break;
+    case 'missions': UI.open('missions');break;
+    case 'portal':
+      UI.toast('Your world is not built yet — claim a plot first.','bad');
+      break;
+    case 'plot':
+      Net.request('claimPlot',{plot:pt.data.plot},function(r){
+        if(r.ok){UI.sync(r.state);
+          UI.toast('Plot claimed. Build anything you like here.','good');}
+        else UI.toast(r.why,'bad');
+      });
+      break;
+    case 'mine':
+      p.anim.play('mine');
+      Net.request('mine',{node:'ore'},function(r){
+        if(r.ok){UI.sync(r.state);UI.toastItem(r.got,r.n);
+          if(r.levelled)UI.toast('Level up!','good');}
+        else UI.toast(r.why,'bad');
+      });
+      break;
+    case 'fish': UI.toast('Fishing opens with the harbour master.','bad');break;
+    case 'vehicles': UI.toast('The garage is still being fitted out.','bad');break;
+    case 'arena': UI.toast('The arena is closed for repairs.','bad');break;
+    default: UI.toast(pt.label,'good');
+  }
+};
+G.onHeldChanged=function(){G.refreshKit();};
 
 /* ---------------- crowd ----------------
    A patrol with pauses. Deliberately simple: they exist to make the
@@ -7033,6 +9407,35 @@ App.onUpdate(function(dt,time){
   I.begin();
 
   Sky.update(dt);
+  UI.setClock(Sky.time,Sky.weather);
+
+  /* --- panel and hotbar input --- */
+  for(var n=0;n<10;n++){
+    if(I.pressed('slot'+n))UI.selectSlot(n===0?9:n-1);
+  }
+  if(I.pressed('inventory'))UI.open('inv');
+  if(I.pressed('build'))UI.open('craft');
+  if(I.pressed('missions'))UI.open('missions');
+  if(I.pressed('profile'))UI.open('profile');
+  if(I.pressed('map'))UI.open('map');
+  if(I.pressed('menu')){if(UI.isOpen())UI.close();else UI.open('menu');}
+  if(I.pressed('emote'))G.player.anim.play('wave',true);
+
+  /* A panel takes the input: movement and world actions stop, which is
+     what stops a click on a shop button also punching the ground. */
+  if(UI.isOpen()){
+    I.move.x=0;I.move.y=0;
+    I.end();
+    Pl.update(dt);
+    G.player.update(dt);
+    updateCrowd(dt);
+    Cam.update(dt,G.player.pos,camSolid);
+    R.updateLight(G.player.pos,44);
+    T.extractFrustum(R.vp);
+    W.cullProps(Cam.target[0],Cam.target[2],Math.min(1.7,1+Cam.dist*0.030));
+    V.update(2);
+    return;
+  }
 
   /* camera first, so movement is relative to what you can see */
   if(I.look.x||I.look.y)Cam.orbit(I.look.x,I.look.y);
@@ -7044,10 +9447,33 @@ App.onUpdate(function(dt,time){
 
   /* The camera follows the player's chest, not their feet, so a jump
      does not swing the whole view. */
-  Cam.update(dt,G.player.pos,function(x,y,z){
-    if(y<T.heightAt(x,z)+0.35)return true;
-    return W.solidAt(x,y,z);
-  });
+  Cam.update(dt,G.player.pos,camSolid);
+
+  updateAim();
+  if(I.pressed('primary'))actPrimary();
+  if(I.pressed('interact')&&G.aim.mode==='interact')G.interact(G.aim.target);
+
+  /* reticle and prompt reflect what the aim found */
+  if(G.aim.mode==='interact'){
+    UI.setReticle('act');
+    UI.setPrompt(G.aim.target.prompt,'E');
+  }else if(G.aim.mode==='place'){
+    var ok=G.aim.place&&Net.canBuild(G.aim.place.x,G.aim.place.y,G.aim.place.z);
+    UI.setReticle(ok?'act':'deny');
+    UI.setPrompt(ok?'Place '+UI.heldItem().name:'You cannot build here','LMB');
+  }else if(G.aim.mode==='break'){
+    var okb=Net.canBuild(G.aim.x,G.aim.y,G.aim.z);
+    UI.setReticle(okb?'act':'deny');
+    UI.setPrompt(okb?'Break '+(G.aim.item?G.aim.item.name:'block'):'Not yours','LMB');
+  }else{
+    UI.setReticle('');
+    UI.setPrompt('');
+  }
+
+  /* Rebuild at most a couple of voxel chunks per frame: a player
+     dragging a wall into place dirties one every frame and doing them
+     all at once is a visible hitch. */
+  V.update(2);
 
   /* Shadows are fitted to a box around the player rather than the
      island: at 2048 across 224 m the character's own shadow would be
@@ -7064,6 +9490,12 @@ App.onUpdate(function(dt,time){
 
   I.end();
 });
+
+function camSolid(x,y,z){
+  if(y<T.heightAt(x,z)+0.35)return true;
+  if(V.solid(Math.floor(x),Math.floor(y),Math.floor(z)))return true;
+  return W.solidAt(x,y,z);
+}
 
 /* ---------------- draw ---------------- */
 var _id=M.m4();
@@ -7087,6 +9519,7 @@ App.onDraw(function(dt,time){
   GL.uM4(dp,'uModel',_id);
   T.drawChunksNear(G.player.pos[0],G.player.pos[2],48);
   W.drawStatics();
+  V.drawNear(G.player.pos[0],G.player.pos[2],48);
   GL.u1i(dp,'uInstanced',1);
   W.drawProps(dp);
   Act.flushShadow(dp);
@@ -7099,6 +9532,7 @@ App.onDraw(function(dt,time){
   GL.u1f(p,'uSpec',0.18+LH.Sky.wet*0.55);
   T.drawChunks(true);
   W.drawStatics();
+  V.draw(true);
   W.drawProps(p);
   Act.flush(p);
 
