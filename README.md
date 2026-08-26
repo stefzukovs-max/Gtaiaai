@@ -1,9 +1,106 @@
-# Pixel Realms
+# Pixel Realms → Lumen Harbor
 
-A 2D sandbox MMO in the Growtopia lineage: every player is handed an empty
+A sandbox MMO in the Growtopia lineage: every player is handed an empty
 world and one question — *what will you build that makes people stay?*
 
-This repository holds two deliverables.
+It started in 2D. It is now a 3D social sandbox, built by evolving the
+mechanical DNA rather than restarting — the data-driven item table, the
+rarity tiers, the splice-and-build loop and the economy all crossed over.
+
+This repository holds three deliverables.
+
+## `game/lumen-harbor.html` — the 3D build
+
+**Lumen Harbor** is Pixel Realms rebuilt as a 3D social sandbox: a 352 m
+island with nine districts, a private world of your own, fishing, mining,
+combat, missions, crafting, trading and an economy — in one self-contained
+HTML file with no engine, no dependencies and no downloaded assets. Every
+mesh, texture, animation and sound is generated when the page loads.
+
+### Why it is not Unity
+
+The brief said Unity 6 unless the project already indicated an engine. It
+did: this project's delivery path is a link you open and play. A Unity
+build here would be uncompilable, unverifiable and unopenable, which fails
+the brief's own *playable over perfect* rule at step one. So the renderer
+is WebGL2, written from scratch, and the architecture is deliberately
+portable if that decision ever changes.
+
+### The engine
+
+| Module | What it does |
+| --- | --- |
+| `LH.M` | Column-major mat4 and vec3 that write into an out-argument — the renderer's hot path cannot allocate — plus the deterministic noise the world generator needs |
+| `LH.GL` | WebGL2 device: program introspection at build time, VAOs, instancing, hardware-compare shadow maps, sRGB 2D array textures |
+| `LH.Geo` | Procedural geometry behind a transform stack — boxes, chamfers, lofts, limbs, extrusions, discs — so a prop is written the way you'd describe it out loud |
+| `LH.Tex` | Thirty-one materials painted per-pixel into one texture array, so the whole world draws with a single texture bound |
+| `LH.Render` | Forward renderer: shadow pass, analytic sky with clouds and stars, wrapped-diffuse sun, hemisphere ambient, height fog, animated water with a depth-tinted shoreline, bloom, filmic tonemap |
+| `LH.Rig` | Nineteen bones and seventeen animation clips, written as functions of phase rather than keyframe tables |
+| `LH.Voxels` | Sparse one-metre build layer, meshed per 16-cube chunk with interior faces culled |
+| `LH.Net` | The authority boundary |
+
+### The world
+
+Terrain is a heightmap with district **pads** stamped into it — a pad
+levels a disc of ground and forces its own surface, which is what lets a
+plaza be genuinely flat while the land around it stays organic. Roads use
+the same machinery along a polyline and ramp between their endpoints, so
+they climb hills instead of cutting through them. The same heightmap
+answers every ground query: collision, prop placement, camera clearance.
+
+Nine districts — plaza, market, harbour, jetty, garage, plots, quarry,
+arena, mission district — connected by nine roads, with wilderness between
+them. Around five thousand props are placed by terrain rather than by hand
+and refilled each frame with only what is near enough to matter.
+
+Sky drives everything from one clock: sun colour, gradient, fog, ambient
+and exposure interpolate through nine keyframes around the day, with five
+weather states riding on top as multipliers.
+
+### Systems
+
+| System | Behaviour |
+| --- | --- |
+| Building | Sparse voxel layer, exact grid-traversal raycast for placement, seven block shapes, and the face normal decides which side you build on |
+| Ownership | Public ground is read-only; your claimed plots and your own worlds are not. Checked server-side, per place |
+| Private worlds | Six themes, up to three per player, persisted, with the same generator, chunking and lighting as the public island |
+| Items | 155 rows carrying behaviour, rarity, value, recipe and world appearance. Nothing switches on a key name |
+| Fishing | Charge the cast, wait, strike inside a window, then fight a fish that runs and tires against a line with a breaking strain |
+| Mining | Tool tier gates which materials the rock will yield, rather than just how fast |
+| Combat | Six species, one AI state machine, humanoids reusing the player's rig, attacks that wind up before they land |
+| Missions | Eighteen across story, daily and weekly, plus nine achievements, all fed by one event tracker |
+| Trading | Two nine-slot grids, live totals, lock and confirm, and edits refused on a locked offer |
+| Progression | XP from every activity, six skills on their own curves, so a dedicated angler out-ranks a generalist at fishing without out-levelling them |
+| Interface | Dark premium HUD sized in container units, reusable panels, procedurally drawn item icons cut from the material each item will have in the world |
+| Onboarding | Title, character creation over the live world, and a seven-step checklist that completes when you act, not when you click |
+| Audio | Synthesised — an effect library and a generative score whose scale follows the time of day |
+| Input | One abstraction over keyboard, mouse, touch and gamepad; nothing downstream knows which was used |
+
+### The authority boundary
+
+`LH.Net` owns inventory, currency, XP, skills, cosmetics, plots, worlds and
+mission progress. The rest of the game cannot reach that state: it is
+closed over, and snapshots are copies rather than live references. Every
+handler re-derives its inputs from the server's own copy — reach,
+ownership, quantity and occupancy are checked there, not at the call site.
+Handlers registered from outside receive a private context as their second
+argument, created inside the closure and never returned, so nothing that
+can call `Net.request` can grant itself an item.
+
+**There is no server behind it yet, and the game says so in its own second
+line.** Other people in the harbour are simulated; their chatter and their
+trades are local fiction. What is real is the boundary — swapping the
+dispatcher for a WebSocket is a transport change, not a rewrite.
+
+### Running it
+
+Open `game/lumen-harbor.html` directly, or serve the folder. Needs WebGL2.
+The game is landscape-only; in portrait it keeps the landscape layout and
+asks you to turn the device.
+
+---
+
+The two 2D deliverables that preceded it:
 
 ## `concept/pixel-realms.html` — the concept art bible
 
