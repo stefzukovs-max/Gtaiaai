@@ -273,6 +273,42 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 
 .empty-note{padding:2.4cqw;text-align:center;color:var(--ink3);font-size:.95cqw}
 
+/* ---- worlds ---- */
+.wcard{display:flex;gap:1.0cqw;align-items:center;padding:.85cqw 1.0cqw;
+  border-radius:12px;border:1px solid var(--line);margin-bottom:.6cqw;
+  background:rgba(255,255,255,.03);cursor:pointer;transition:all .14s}
+.wcard:hover{border-color:var(--line2);background:rgba(255,255,255,.06)}
+.wcard .badge{width:3.6cqw;height:3.6cqw;min-width:38px;min-height:38px;
+  border-radius:10px;flex:0 0 auto;display:grid;place-items:center;
+  font-family:var(--disp);font-size:1.1cqw;color:#0B1018;font-weight:700}
+.wcard .wi{flex:1;min-width:0}
+.wcard h4{font-size:1.02cqw;font-weight:600}
+.wcard .sub{font-size:.8cqw;color:var(--ink3);letter-spacing:.04em}
+.wcard .perm{font-size:.7cqw;letter-spacing:.14em;text-transform:uppercase;
+  padding:.16cqw .55cqw;border-radius:6px;border:1px solid var(--line);
+  color:var(--ink2)}
+.themes{display:grid;grid-template-columns:repeat(auto-fill,minmax(8cqw,1fr));
+  gap:.5cqw;margin:.6cqw 0}
+.theme{padding:.7cqw;border-radius:10px;border:1px solid var(--line);
+  cursor:pointer;text-align:center;font-size:.86cqw;transition:all .14s}
+.theme:hover{border-color:var(--line2)}
+.theme.on{border-color:var(--acc);background:rgba(59,224,200,.10);color:var(--acc)}
+.theme .sw{height:.7cqw;border-radius:99px;margin-bottom:.34cqw}
+.field{display:flex;gap:.5cqw;align-items:center;margin:.5cqw 0}
+.field input{flex:1;background:rgba(6,9,14,.7);border:1px solid var(--line);
+  border-radius:9px;color:var(--ink);font-family:var(--ui);font-size:.92cqw;
+  padding:.5cqw .8cqw;outline:0}
+.field input:focus{border-color:var(--acc)}
+
+/* travel fade: entering a world regenerates the terrain, and the cut
+   is hidden behind this rather than shown */
+#travel{position:absolute;inset:0;z-index:60;background:#05070C;opacity:0;
+  pointer-events:none;transition:opacity .34s ease;display:grid;
+  place-items:center}
+#travel.on{opacity:1;pointer-events:auto}
+#travel .lbl{font-family:var(--disp);letter-spacing:.24em;font-size:1.2cqw;
+  text-transform:uppercase;color:var(--ink3)}
+
 /* ---- missions ---- */
 .mrow{display:flex;gap:.9cqw;align-items:center;padding:.7cqw .9cqw;
   border-radius:11px;border:1px solid var(--line);margin-bottom:.5cqw;
@@ -5125,6 +5161,15 @@ T.SIZE=SIZE;T.HALF=HALF;T.CHUNK=CHUNK;T.SEA=SEA;
 
 var heights=null, mats=null, chunks=[];
 
+/* Which place this terrain currently is. Lumen Harbor is one profile;
+   a player's own world is another. Keeping them as profiles of the
+   same generator means a private world gets the same chunking,
+   lighting, collision and material blending for free, rather than
+   being a second, thinner renderer. */
+var profile={kind:'harbor'};
+T.profile=function(){return profile;};
+T.setProfile=function(p){profile=p||{kind:'harbor'};};
+
 /* ---------------- district pads ----------------
    Ordered: later pads win where they overlap, so a jetty can cut into
    the beach it sits on. */
@@ -5159,7 +5204,28 @@ T.pad=function(n){return PAD[n];};
 /* ---------------- the height function ----------------
    Deterministic: the island must come back identical on every load,
    so nothing here may touch Math.random(). */
+/* A private world: a broad, level plateau ringed by a soft shoulder
+   into the sea. Deliberately not dramatic — this is a canvas, and
+   scenery you did not put there is scenery in your way. The theme
+   only tilts the relief and the surface. */
+function realmHeight(x,z){
+  var P=profile;
+  var R=P.radius||64;
+  var d=Math.hypot(x,z);
+  var seed=P.seed||1;
+  var coast=M.fbm(x*0.010,z*0.010,seed,3)*0.16-0.08;
+  var land=M.clamp(1-((d/R)+coast-0.80)/0.26,0,1);
+  land=M.smooth(land);
+  var relief=P.relief===undefined?1:P.relief;
+  var roll=(M.fbm(x*0.020,z*0.020,seed+11,4)-0.5)*3.2*relief;
+  /* The middle stays flat whatever the theme does at the edges. */
+  var flat=M.smooth(M.clamp(1-(d/R)/0.62,0,1));
+  roll*=1-flat*0.88;
+  return -7+land*(13+roll);
+}
+
 function baseHeight(x,z){
+  if(profile.kind==='realm')return realmHeight(x,z);
   var d=Math.hypot(x,z)/HALF;
 
   /* Island falloff. The shore is pushed outward by low-frequency noise
@@ -5235,6 +5301,12 @@ var _res={y:0,mat:-1,matW:0,flat:0};
 function stamped(x,z){
   var h=baseHeight(x,z);
   var mat=-1,matW=0,flat=0;
+  /* Districts and roads belong to Lumen Harbor. A private world is
+     bare ground and whatever its owner has put on it. */
+  if(profile.kind==='realm'){
+    _res.y=h;_res.mat=-1;_res.matW=0;_res.flat=0;
+    return _res;
+  }
   for(var i=0;i<PADS.length;i++){
     var P=PADS[i];
     /* Perturb the radius with angle so the district is not a perfect
@@ -5293,8 +5365,22 @@ var BANDS=[
   {upTo:44.0, mat:'stone'},
   {upTo:1e9,  mat:'snow' }
 ];
+/* A realm's theme swaps the ground band it is mostly made of. */
+var THEME_BANDS={
+  meadow:'grass', dunes:'sand', tundra:'snow', basalt:'stone',
+  garden:'grass', works:'concrete'
+};
+T.THEMES=Object.keys(THEME_BANDS);
 var _sm={a:0,b:0,w:0};
 function naturalMat(y,slope){
+  if(profile.kind==='realm'){
+    var main=LH.Tex.layer(THEME_BANDS[profile.theme]||'grass');
+    if(y<1.0){_sm.a=LH.Tex.layer('sand');_sm.b=main;
+      _sm.w=M.smooth(M.clamp((y-0.2)/0.8,0,1));return _sm;}
+    var rw=M.smooth(M.clamp((slope-0.44)/0.30,0,1));
+    _sm.a=main;_sm.b=LH.Tex.layer('cliff');_sm.w=rw;
+    return _sm;
+  }
   var rockW=M.smooth(M.clamp((slope-0.40)/0.30,0,1));
 
   /* which height band, and how far into the boundary above it */
@@ -5388,6 +5474,10 @@ T.inBounds=function(x,z){return x>-HALF&&x<HALF&&z>-HALF&&z<HALF;};
 
 /* ---------------- meshing ---------------- */
 T.buildChunks=function(){
+  /* Regeneration is a real operation now — entering a private world
+     rebuilds the whole surface — so the previous chunks have to be
+     released rather than leaked. */
+  for(var f=0;f<chunks.length;f++)GL.freeMesh(chunks[f]);
   chunks.length=0;
   var per=CHUNK/RES;
   var cn=SIZE/CHUNK;
@@ -6343,6 +6433,9 @@ function commitProps(){
   pending={};
   W.groups=groups;
 }
+/* Realms build their own props, so the commit step has to be callable
+   from outside the initial world build. */
+W.commitProps=commitProps;
 
 /* Refill the instance buffers with what is near enough to matter. The
    island carries about five thousand props; drawing all of them every
@@ -8017,6 +8110,12 @@ Net.snapshot=snapshot;
 /* Can this player modify the world at this point? Public ground is
    read-only; your own plot and your own world are not. */
 function canBuild(x,y,z){
+  /* In your own world, everything is yours. In Lumen Harbor, only the
+     plots you have claimed are — the public island stays public. */
+  var R=LH.Realm;
+  if(R&&R.inRealm()){
+    return !!state.worlds[R.current.id];
+  }
   for(var i=0;i<W.points.length;i++){
     var p=W.points[i];
     if(p.kind!=='plot')continue;
@@ -8268,6 +8367,21 @@ var SRV={
     if(state.titles.indexOf(t)<0)state.titles.push(t);
     if(!state.title)state.title=t;
   },
+  worlds:function(){
+    /* copied, minus the cell payload — a listing does not need to
+       carry every block in every world you own */
+    var out=[];
+    for(var id in state.worlds){
+      var w=state.worlds[id];
+      out.push({id:w.id,name:w.name,theme:w.theme,seed:w.seed,
+        radius:w.radius,relief:w.relief,perm:w.perm,
+        blocks:(w.cells||[]).length/3,created:w.created});
+    }
+    return out;
+  },
+  /* The live row, for entering and saving. Inside the boundary. */
+  world:function(id){return state.worlds[id]||null;},
+  addWorld:function(w){state.worlds[w.id]=w;return w;},
   meet:function(id){state.met[id]=(state.met[id]||0)+1;},
   metCount:function(id){return state.met[id]||0;},
   visit:function(id){
@@ -8843,7 +8957,13 @@ U.init=function(){
   makePanel('profile','Profile',['Overview','Skills','Collections','Achievements']);
   makePanel('missions','Missions',['Daily','Story','Weekly']);
   makePanel('shop','Store',['Seeds','Blocks','Gear','Style','Bundles']);
+  makePanel('worlds','Worlds',['My Worlds','New World']);
   makePanel('menu','Menu',null);
+
+  els.travel=el('div');
+  els.travel.id='travel';
+  els.travel.innerHTML='<div class="lbl" id="utravel">Travelling…</div>';
+  hud.appendChild(els.travel);
 
   U.sync(Net.snapshot());
   return U;
@@ -9036,6 +9156,7 @@ function render(id){
   if(id==='profile')return renderProfile(bd,P.root.dataset.tab);
   if(id==='shop')return renderShop(bd,P.root.dataset.tab);
   if(id==='missions')return renderMissions(bd,P.root.dataset.tab);
+  if(id==='worlds')return renderWorlds(bd,P.root.dataset.tab);
   if(id==='map')return renderMap(bd);
   if(id==='menu')return renderMenu(bd);
 }
@@ -9346,6 +9467,81 @@ function renderMissions(bd,tab){
 }
 U.refreshMissions=function(){missionCache=null;};
 
+var newWorld={name:'',theme:'meadow'};
+function renderWorlds(bd,tab){
+  var R=LH.Realm;
+  if(tab==='New World'){
+    var wrap=el('div');
+    wrap.appendChild(el('p',null,
+      'A world of your own: bare ground, no rules, and it keeps what you '+
+      'build. Your first is free.'));
+    var f=el('div','field');
+    var inp=el('input');
+    inp.placeholder='World name';inp.value=newWorld.name;inp.maxLength=20;
+    inp.addEventListener('input',function(){newWorld.name=inp.value;});
+    inp.addEventListener('keydown',function(e){e.stopPropagation();});
+    f.appendChild(inp);
+    wrap.appendChild(f);
+    var th=el('div','themes');
+    R.themeList().forEach(function(k){
+      var T2=R.THEMES[k];
+      var t=el('div','theme'+(newWorld.theme===k?' on':''));
+      t.innerHTML='<div class="sw" style="background:'+T2.tint+'"></div>'+T2.name;
+      t.addEventListener('click',function(){newWorld.theme=k;render('worlds');});
+      th.appendChild(t);
+    });
+    wrap.appendChild(th);
+    var acts=el('div','acts');
+    var b=el('button','btn pri','Create');
+    b.addEventListener('click',function(){
+      Net.request('createWorld',{name:newWorld.name,theme:newWorld.theme},
+        function(r){
+          if(!r.ok){U.toast(r.why,'bad');return;}
+          U.sync(r.state);
+          U.toast('“'+r.world.name+'” is yours.','good');
+          newWorld.name='';
+          panels.worlds.root.dataset.tab='My Worlds';
+          panels.worlds.root.querySelectorAll('.tab').forEach(function(x,i){
+            x.classList.toggle('on',i===0);});
+          render('worlds');
+        });
+    });
+    acts.appendChild(b);
+    wrap.appendChild(acts);
+    bd.appendChild(wrap);
+    return;
+  }
+
+  Net.request('myWorlds',{},function(r){
+    if(!r.ok)return;
+    if(!r.worlds.length){
+      bd.appendChild(el('div','empty-note',
+        'You do not own a world yet. Make one — the first is free.'));
+      return;
+    }
+    r.worlds.forEach(function(w){
+      var Th=R.THEMES[w.theme]||R.THEMES.meadow;
+      var card=el('div','wcard');
+      card.innerHTML=
+        '<div class="badge" style="background:'+Th.tint+'">'+
+          (w.name[0]||'W').toUpperCase()+'</div>'+
+        '<div class="wi"><h4>'+w.name+'</h4>'+
+        '<div class="sub">'+Th.name+' · '+w.blocks+' blocks placed</div></div>'+
+        '<div class="perm">'+w.perm+'</div>';
+      card.addEventListener('click',function(){
+        U.close();
+        if(LH.Game&&LH.Game.travelTo)LH.Game.travelTo(w);
+      });
+      bd.appendChild(card);
+    });
+    /* permissions live on the same card rather than behind a submenu */
+    var note=el('div','empty-note');
+    note.style.fontSize='.82cqw';
+    note.textContent='Click a world to travel there.';
+    bd.appendChild(note);
+  });
+}
+
 function renderMap(bd){
   bd.appendChild(el('div','empty-note','The harbour map is being drawn.'));
 }
@@ -9354,7 +9550,8 @@ function renderMenu(bd){
   var wrap=el('div');
   wrap.style.cssText='display:flex;flex-direction:column;gap:.55cqw;max-width:26cqw';
   [['Backpack','inv'],['Workbench','craft'],['Missions','missions'],
-   ['Store','shop'],['Profile','profile'],['Map','map']].forEach(function(r){
+   ['Worlds','worlds'],['Store','shop'],['Profile','profile'],
+   ['Map','map']].forEach(function(r){
     var b=el('button','btn',r[0]);
     b.addEventListener('click',function(){U.open(r[1]);});
     wrap.appendChild(b);
@@ -9498,6 +9695,12 @@ U.focusChat=function(){
   els.chatIn.focus();
 };
 U.chatFocused=function(){return document.activeElement===els.chatIn;};
+
+U.travelFade=function(on,label){
+  if(!els.travel)return;
+  els.travel.querySelector('#utravel').textContent=label||'Travelling…';
+  els.travel.classList.toggle('on',!!on);
+};
 
 LH.UI=U;
 })();
@@ -10615,6 +10818,290 @@ LH.QuestNet=true;
 })();
 
 /* ============================================================
+   LH.Realm — private worlds.
+
+   The promise the whole game is making: somewhere that is yours,
+   that persists, that you can build in without asking, and that you
+   can let other people into on your terms.
+
+   A realm is a terrain profile plus a voxel layer plus a permission
+   row. It reuses the same generator, chunking, lighting, collision
+   and material blending as Lumen Harbor rather than being a second,
+   thinner renderer — which is why a private world does not look
+   like a lesser place than the public one.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,GL=LH.GL,Geo=LH.Geo,T=LH.Terrain,V=LH.Voxels,W=LH.World;
+var Net=LH.Net,D=LH.Data,En=LH.Enemies;
+var R={};
+
+R.current=null;          /* null means Lumen Harbor */
+R.busy=false;
+
+/* Themes decide the ground, the sky's mood and what grows there.
+   Deliberately few: a long list of themes is a long list of worlds
+   that all feel the same. */
+var THEMES={
+  meadow:{name:'Meadow',   band:'grass',    tree:'broadleaf',density:0.9,
+          tint:'#8FD36A'},
+  garden:{name:'Blossom Garden',band:'grass',tree:'blossom',density:1.2,
+          tint:'#FFC0DA'},
+  dunes:{ name:'Dunes',    band:'sand',     tree:'palm',    density:0.5,
+          tint:'#EBD6A4'},
+  tundra:{name:'Tundra',   band:'snow',     tree:'pine',    density:0.7,
+          tint:'#DDEAF6'},
+  basalt:{name:'Basalt',   band:'stone',    tree:'dead',    density:0.4,
+          tint:'#8A8F98'},
+  works:{ name:'Old Works',band:'concrete', tree:'dead',    density:0.3,
+          tint:'#7E868F'}
+};
+R.THEMES=THEMES;
+R.themeList=function(){return Object.keys(THEMES);};
+
+/* Props placed in a realm belong to the realm, so they are rebuilt
+   on entry and dropped on exit rather than accumulating. */
+var realmProps=[];
+
+function dressRealm(seed,theme){
+  var Th=THEMES[theme]||THEMES.meadow;
+  var rng=M.rng((seed||1)*7919+13);
+  var P=LH.Props;
+  var radius=(R.current&&R.current.radius)||64;
+  var n=Math.round(90*Th.density);
+  for(var i=0;i<n;i++){
+    var a=rng()*M.TAU, rr=Math.sqrt(rng())*radius*0.94;
+    var x=Math.cos(a)*rr, z=Math.sin(a)*rr;
+    var h=T.heightAt(x,z);
+    if(h<0.9)continue;
+    /* leave the middle clear: it is the part people build on */
+    if(rr<radius*0.30&&rng()<0.85)continue;
+    var k=rng();
+    if(k<0.34)W.place(P.tree(Th.tree,(rng()*4)|0),x,h-0.2,z,rng()*6.28,
+      0.8+rng()*0.5,'#FFFFFF');
+    else if(k<0.58)W.place(P.bush((rng()*3)|0),x,h,z,rng()*6.28,
+      0.7+rng()*0.6,'#FFFFFF');
+    else if(k<0.86)W.place(P.grassTuft((rng()*3)|0),x,h,z,rng()*6.28,
+      0.7+rng()*0.6,'#FFFFFF');
+    else W.place(P.rock((rng()*4)|0),x,h-0.3,z,rng()*6.28,
+      0.4+rng()*0.9,'#FFFFFF');
+  }
+}
+
+/* The way home. Every realm has one, in the same place, so nobody
+   ever has to work out how to leave. */
+function realmGate(){
+  var b=Geo.build();
+  var y=T.heightAt(0,-14);
+  b.push();b.translate(0,y,-14);
+  b.mat('panel');
+  b.loft([
+    {y:0,   pts:Geo.roundRect(4.6,2.6,0.5,14)},
+    {y:0.5, pts:Geo.roundRect(4.2,2.2,0.45,14)},
+    {y:0.7, pts:Geo.roundRect(3.9,1.9,0.4,14)}
+  ],'#3E4756',{uvScale:1.2});
+  for(var i=0;i<=16;i++){
+    var a=Math.PI*(i/16);
+    b.push();
+    b.translate(Math.cos(a)*2.3,0.9+Math.sin(a)*2.3,0);
+    b.rotate(0,0,a-Math.PI/2);
+    b.mat('panel');
+    b.chamfer(0,0,0,0.46,0.40,0.66,i%2?'#6E7A8C':'#5A6576',0.06);
+    b.pop();
+  }
+  b.mat('neon',0.85);
+  b.push();b.translate(0,0.9,0);
+  b.loft([
+    {y:-0.9,pts:Geo.circle(1.85,18,1,0.10)},
+    {y: 0.0,pts:Geo.circle(2.02,18,1,0.10)},
+    {y: 1.9,pts:Geo.circle(1.20,18,1,0.10)}
+  ],'#F5A03C',{openTop:true,openBottom:true});
+  b.pop();
+  b.pop();
+  W.statics.push(b.upload());
+  W.point('gate','gate',0,-11.5,{y:y,r:4.0,
+    label:'Way Home',prompt:'Return to Lumen Harbor'});
+}
+
+/* ---------------- entering and leaving ----------------
+   The public island's own statics, props, points and collision are
+   kept aside rather than rebuilt, because regenerating Lumen Harbor
+   on every trip home would take a second and a half. */
+var harbourCache=null;
+
+function stash(){
+  harbourCache={
+    statics:W.statics.slice(),
+    boxes:W.boxes.slice(),
+    points:W.points.slice(),
+    groups:(W.groups||[]).slice(),
+    instanced:W.instanced.slice(),
+    spawn:M.v3(W.spawn[0],W.spawn[1],W.spawn[2]),
+    cells:V.serialise(),
+    enemies:En.live.slice()
+  };
+}
+function restore(){
+  if(!harbourCache)return;
+  /* release only what the realm made; the harbour's meshes are the
+     same objects that were set aside */
+  for(var i=0;i<W.statics.length;i++){
+    if(harbourCache.statics.indexOf(W.statics[i])<0)GL.freeMesh(W.statics[i]);
+  }
+  W.statics.length=0;
+  Array.prototype.push.apply(W.statics,harbourCache.statics);
+  W.boxes.length=0;
+  Array.prototype.push.apply(W.boxes,harbourCache.boxes);
+  W.points.length=0;
+  Array.prototype.push.apply(W.points,harbourCache.points);
+  W.groups=harbourCache.groups;
+  W.instanced.length=0;
+  Array.prototype.push.apply(W.instanced,harbourCache.instanced);
+  M.copy3(W.spawn,harbourCache.spawn);
+  En.live.length=0;
+  Array.prototype.push.apply(En.live,harbourCache.enemies);
+  V.deserialise(harbourCache.cells);
+}
+
+/* Build a realm's surface and contents. Synchronous: it is about a
+   fifth of a second and it happens behind a fade. */
+function buildRealm(realm){
+  W.statics.length=0;
+  W.boxes.length=0;
+  W.points.length=0;
+  W.instanced.length=0;
+  W.groups=[];
+  En.live.length=0;
+
+  T.setProfile({kind:'realm',seed:realm.seed,theme:realm.theme,
+    radius:realm.radius,relief:realm.relief});
+  T.generate();
+  T.buildChunks();
+
+  dressRealm(realm.seed,realm.theme);
+  W.commitProps();
+  realmGate();
+
+  V.deserialise(realm.cells||[]);
+  M.set3(W.spawn,0,T.heightAt(0,-6),-6);
+}
+
+R.enter=function(realm,done){
+  if(R.busy)return false;
+  R.busy=true;
+  if(!R.current)stash();
+  R.current=realm;
+  buildRealm(realm);
+  R.busy=false;
+  if(done)done();
+  return true;
+};
+
+R.leave=function(done){
+  if(!R.current||R.busy)return false;
+  R.busy=true;
+  /* hand the realm's current cells back to the server before leaving */
+  Net.request('saveRealm',{id:R.current.id,cells:V.serialise()});
+  R.current=null;
+  T.setProfile({kind:'harbor'});
+  T.generate();
+  T.buildChunks();
+  restore();
+  R.busy=false;
+  if(done)done();
+  return true;
+};
+
+R.inRealm=function(){return !!R.current;};
+
+LH.Realm=R;
+})();
+
+/* ============================================================
+   Realm handlers, inside the authority.
+   ============================================================ */
+(function(){
+'use strict';
+var M=LH.M,Net=LH.Net,R=LH.Realm,D=LH.Data;
+
+var PERMS=['private','friends','invite','public'];
+
+Net.register('myWorlds',function(p,srv){
+  return {ok:true,worlds:srv.worlds()};
+});
+
+Net.register('createWorld',function(p,srv){
+  var list=srv.worlds();
+  if(list.length>=3)return {ok:false,why:'You already hold three worlds.'};
+  var cost=list.length===0?0:1500*list.length;
+  var s=srv.snapshot();
+  if(s.coins<cost)return {ok:false,why:'A second world costs '+cost+' coins.'};
+  var name=String(p.name||'').trim().slice(0,20);
+  if(!/^[A-Za-z0-9 '_-]{2,20}$/.test(name))
+    return {ok:false,why:'Two to twenty letters, numbers, spaces, - or _.'};
+  if(!R.THEMES[p.theme])return {ok:false,why:'Pick a theme.'};
+  srv.coins(-cost);
+  var w=srv.addWorld({
+    id:'w'+Date.now().toString(36)+Math.floor(Math.random()*999).toString(36),
+    name:name,theme:p.theme,
+    seed:(Math.random()*1e9)|0,
+    radius:64,relief:1,
+    perm:'friends',
+    cells:[],
+    visits:0,
+    created:Date.now()
+  });
+  srv.xp(200,'building');
+  return {ok:true,world:w,state:srv.snapshot()};
+});
+
+Net.register('saveRealm',function(p,srv){
+  var w=srv.world(p.id);
+  if(!w)return {ok:false,why:'No such world.'};
+  /* Ownership is checked here rather than trusted: a client may only
+     ever write to a world the server already has under its name.
+     A call with no cells is a no-op rather than an erase — otherwise
+     any stray save would empty the world it was meant to protect. */
+  if(Array.isArray(p.cells))w.cells=p.cells;
+  return {ok:true};
+});
+
+Net.register('realmCells',function(p,srv){
+  var w=srv.world(p.id);
+  if(!w)return {ok:false,why:'No such world.'};
+  return {ok:true,cells:(w.cells||[]).slice()};
+});
+
+Net.register('setPerm',function(p,srv){
+  var w=srv.world(p.id);
+  if(!w)return {ok:false,why:'No such world.'};
+  if(PERMS.indexOf(p.perm)<0)return {ok:false,why:'Unknown permission.'};
+  w.perm=p.perm;
+  return {ok:true,world:w,state:srv.snapshot()};
+});
+
+Net.register('renameWorld',function(p,srv){
+  var w=srv.world(p.id);
+  if(!w)return {ok:false,why:'No such world.'};
+  var name=String(p.name||'').trim().slice(0,20);
+  if(!/^[A-Za-z0-9 '_-]{2,20}$/.test(name))
+    return {ok:false,why:'Two to twenty letters, numbers, spaces, - or _.'};
+  w.name=name;
+  return {ok:true,world:w,state:srv.snapshot()};
+});
+
+/* Building permission is per-place. In Lumen Harbor it is your plots;
+   in a realm it is whether the realm is yours. */
+Net.register('canBuildHere',function(p,srv){
+  if(!R.inRealm())return {ok:true,can:Net.canBuild(p.x,p.y,p.z)};
+  var w=srv.world(R.current.id);
+  return {ok:true,can:!!w};
+});
+
+LH.RealmNet=true;
+})();
+
+/* ============================================================
    LH.Sky — time of day and weather.
 
    The sun's colour, the sky gradient, the fog and the ambient are all
@@ -10741,7 +11228,7 @@ LH.Sky=S;
 var M=LH.M,GL=LH.GL,R=LH.Render,App=LH.App,Cam=LH.Cam,Geo=LH.Geo;
 var T=LH.Terrain,W=LH.World,P=LH.Props,Act=LH.Actors,I=LH.Input,Pl=LH.Player,Sky=LH.Sky;
 var V=LH.Voxels,D=LH.Data,Net=LH.Net,UI=LH.UI,Icon=LH.Icon;
-var En=LH.Enemies,Fish=LH.Fishing,Quests=LH.Quests;
+var En=LH.Enemies,Fish=LH.Fishing,Quests=LH.Quests,Realm=LH.Realm;
 var G={};
 
 G.player=null;
@@ -10976,9 +11463,8 @@ G.interact=function(pt){
       break;
     case 'shop': UI.open('shop');break;
     case 'missions': UI.refreshMissions();UI.open('missions');break;
-    case 'portal':
-      UI.toast('Your world is not built yet — claim a plot first.','bad');
-      break;
+    case 'portal': UI.open('worlds');break;
+    case 'gate': G.travelHome();break;
     case 'plot':
       Net.request('claimPlot',{plot:pt.data.plot},function(r){
         if(r.ok){UI.sync(r.state);
@@ -11001,6 +11487,60 @@ G.interact=function(pt){
   }
 };
 G.onHeldChanged=function(){G.refreshKit();};
+
+/* ---------------- travel ----------------
+   Regenerating the surface takes about a fifth of a second, which is
+   long enough to see. It happens behind a fade rather than as a cut. */
+function travel(label,work){
+  if(Realm.busy)return;
+  G.ready=false;
+  UI.travelFade(true,label);
+  Fish.cancel();
+  G.talking=null;UI.dialogue(null);
+  UI.plates([]);
+  setTimeout(function(){
+    work();
+    var p=G.player;
+    p.pos[0]=W.spawn[0];p.pos[2]=W.spawn[2];
+    p.pos[1]=W.groundAt(W.spawn[0],W.spawn[2]);
+    Pl.vel[0]=Pl.vel[1]=Pl.vel[2]=0;
+    p.anim.play('idle',true);
+    /* the voxel layer the destination loaded has to be meshed before
+       the fade lifts, or you arrive to an empty plot */
+    for(var i=0;i<80;i++)V.update(8);
+    G.ready=true;
+    setTimeout(function(){UI.travelFade(false);},120);
+  },380);
+}
+
+G.travelTo=function(w){
+  var srvWorld=null;
+  Net.request('myWorlds',{},function(r){
+    if(r.ok)srvWorld=r.worlds.filter(function(x){return x.id===w.id;})[0];
+  });
+  if(!srvWorld){UI.toast('That world is not yours.','bad');return;}
+  /* the cells come from the server's own row, not from the listing */
+  Net.request('saveRealm',{id:w.id,cells:undefined});
+  travel('Entering '+w.name,function(){
+    Realm.enter({id:w.id,name:w.name,theme:w.theme,seed:w.seed,
+      radius:w.radius,relief:w.relief,cells:G._realmCells(w.id)});
+  });
+  setTimeout(function(){
+    UI.say('','You are in your own world. Everything here is yours to '+
+      'build on. The gate behind you leads home.','sys');
+  },900);
+};
+/* Cells are held server-side; this asks for them through the boundary
+   rather than reaching into the state. */
+G._realmCells=function(id){
+  var out=[];
+  Net.request('realmCells',{id:id},function(r){if(r.ok)out=r.cells;});
+  return out;
+};
+G.travelHome=function(){
+  if(!Realm.inRealm())return;
+  travel('Returning to Lumen Harbor',function(){Realm.leave();});
+};
 
 /* ---------------- fishing ----------------
    The rod's animation follows the minigame's stage, so what the
@@ -11175,6 +11715,7 @@ App.onUpdate(function(dt,time){
   if(I.pressed('missions'))UI.open('missions');
   if(I.pressed('profile'))UI.open('profile');
   if(I.pressed('map'))UI.open('map');
+  if(I.pressed('worlds'))UI.open('worlds');
   if(I.pressed('menu')){if(UI.isOpen())UI.close();else UI.open('menu');}
   if(I.pressed('emote'))G.player.anim.play('wave',true);
   if(I.pressed('chat'))UI.focusChat();
@@ -11205,7 +11746,7 @@ App.onUpdate(function(dt,time){
 
   Pl.update(dt);
   G.player.update(dt);
-  updateCrowd(dt);
+  if(!Realm.inRealm())updateCrowd(dt);
 
   /* The camera follows the player's chest, not their feet, so a jump
      does not swing the whole view. */
@@ -11241,9 +11782,7 @@ App.onUpdate(function(dt,time){
 
   En.update(dt,G.player.pos,onEnemyHit);
   updatePlates();
-  updateNpcs(dt);
-  trackDistrict();
-  chatter(dt);
+  if(!Realm.inRealm()){updateNpcs(dt);trackDistrict();chatter(dt);}
 
   /* walking away ends a conversation */
   if(G.talking){
@@ -11366,13 +11905,13 @@ App.onDraw(function(dt,time){
   Act.beginFrame();
   Act.submit(G.player);
   Act.submitPet(G.player,time);
-  for(var i=0;i<G.crowd.length;i++){
+  if(!Realm.inRealm())for(var i=0;i<G.crowd.length;i++){
     var n=G.crowd[i];
     /* Skip characters far enough away to be a couple of pixels. */
     if(M.dist2(n.pos,G.player.pos)>150)continue;
     Act.submit(n);Act.submitPet(n,time);
   }
-  if(G.npcs)for(var q=0;q<G.npcs.length;q++){
+  if(G.npcs&&!Realm.inRealm())for(var q=0;q<G.npcs.length;q++){
     var np=G.npcs[q];
     if(M.dist2(np.pos,G.player.pos)>110)continue;
     Act.submit(np);
@@ -11411,7 +11950,8 @@ App.onDraw(function(dt,time){
   /* --- additive: auras --- */
   Act.beginFrame();
   Act.submitAura(G.player,time);
-  for(var j=0;j<G.crowd.length;j++)Act.submitAura(G.crowd[j],time);
+  if(!Realm.inRealm())
+    for(var j=0;j<G.crowd.length;j++)Act.submitAura(G.crowd[j],time);
   En.submitAura(time,G.player.pos);
   var ap=R.beginAdditive();
   Act.flush(ap);
