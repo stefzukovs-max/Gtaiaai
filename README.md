@@ -34,7 +34,7 @@ portable if that decision ever changes.
 | `LH.GL` | WebGL2 device: program introspection at build time, VAOs, instancing, hardware-compare shadow maps, sRGB 2D array textures |
 | `LH.Geo` | Procedural geometry behind a transform stack — boxes, chamfers, lofts, limbs, extrusions, discs — so a prop is written the way you'd describe it out loud |
 | `LH.Tex` | Thirty-one materials painted per-pixel into one texture array, so the whole world draws with a single texture bound |
-| `LH.Render` | Forward renderer: shadow pass, analytic sky with clouds and stars, wrapped-diffuse sun, hemisphere ambient, sixteen point lights a frame, height fog, animated water with a depth-tinted shoreline, bloom, sun shafts, filmic tonemap |
+| `LH.Render` | Forward renderer: shadow pass, analytic sky with clouds and stars, banded toon lighting, silhouette ink, hemisphere ambient, sixteen point lights a frame, height fog, animated water with a depth-tinted shoreline, bloom, sun shafts, filmic tonemap |
 | `LH.Rig` | Nineteen bones and seventeen animation clips, written as functions of phase rather than keyframe tables |
 | `LH.Voxels` | Sparse one-metre build layer, meshed per 16-cube chunk with interior faces culled |
 | `LH.Net` | The authority boundary |
@@ -97,6 +97,38 @@ dispatcher for a WebSocket is a transport change, not a rewrite.
 Open `game/lumen-harbor.html` directly, or serve the folder. Needs WebGL2.
 The game is landscape-only; in portrait it keeps the landscape layout and
 asks you to turn the device.
+
+### The look
+
+The register is Growtopia and Club Penguin: bright, chunky, drawn. Three
+dials in `LH.Render.scene` carry it, and setting all three to zero
+restores the stylized-realism look exactly, which is what makes this an
+art direction rather than a rewrite.
+
+| Dial | What it does |
+| --- | --- |
+| `toon` | Quantises diffuse *and* shadow into three bands with soft shoulders. Both, because a soft shadow gradient beside a hard terminator on one surface reads as a bug rather than a style |
+| `outline` | Inks silhouettes from a depth texture, keyed on the second derivative of depth — a floor at a grazing angle has a huge depth gradient but no curvature, so it does not outline itself. Line weight is in pixels, and the ink fades with distance because a forest inked at full strength is a field of scribble |
+| `saturation` | A straight chroma push after the tonemap |
+
+Proportions come from one table in `LH.Rig`, read by the skeleton, the
+limb meshes, the limb thickness, the head scale and the clothes over
+them — about four and a half heads tall rather than seven and a half.
+A sleeve length derived from the arm bone cannot end up longer than the
+arm inside it.
+
+Emotes are on **V**: a wheel with wave, dance, laugh, cheer, clap, point
+and sit. The number row picks from the wheel while it is open and drives
+the hotbar while it is not, and a looping emote yields the moment you
+move.
+
+The two typefaces are the only downloaded asset in the project: Fredoka
+and Nunito, from Google Fonts, both with real fallbacks so the game
+still looks deliberate with the network off. Nothing else is fetched —
+no mesh packs, no texture packs. Mixing bought low-poly models into a
+world where every vertex is generated at load is the fastest way to make
+a game look like an asset flip, and the loader and the file size would
+both be real costs for a worse result.
 
 ### The sky
 

@@ -7,7 +7,7 @@
 <meta name="description" content="A 3D social sandbox MMO. Claim an island, build what you like, and let people in.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#080B12;
@@ -19,12 +19,12 @@
   --ink:#E8EFFA;
   --ink2:#93A4C0;
   --ink3:#5D6E8C;
-  --acc:#3BE0C8;
-  --acc2:#159C89;
-  --gold:#F5C451;
+  --acc:#4FE3B0;
+  --acc2:#17A886;
+  --gold:#FFC94D;
   --violet:#7C6BFF;
-  --ui:'Chakra Petch','Segoe UI',system-ui,sans-serif;
-  --disp:'Rajdhani','Chakra Petch',system-ui,sans-serif;
+  --ui:'Nunito','Segoe UI',system-ui,sans-serif;
+  --disp:'Fredoka','Nunito','Segoe UI',system-ui,sans-serif;
   --maxw:1180px;
 }
 *{box-sizing:border-box}
@@ -260,13 +260,13 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-con
       <a class="cta" href="../game/lumen-harbor.html">Play in your browser</a>
       <a class="cta ghost" href="#world">See the world</a>
     </div>
-    <p class="note">Runs in any WebGL2 browser. One file, no install, no download.</p>
+    <p class="note">Runs in any WebGL2 browser. One file, no install, nothing downloaded but two fonts.</p>
 
     <div class="stats">
       <div><b>352 m</b><span>Island, nine districts</span></div>
-      <div><b>17</b><span>Animation clips</span></div>
+      <div><b>20</b><span>Animation clips</span></div>
       <div><b>31</b><span>Procedural materials</span></div>
-      <div><b>0</b><span>Downloaded assets</span></div>
+      <div><b>0</b><span>Mesh or texture files</span></div>
     </div>
   </div>
 </div>
@@ -309,6 +309,15 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-con
           <h3>A day that actually turns</h3>
           <p>One clock drives the sun, the sky, the fog and the lamps. Street
              lights fade up as the sun drops, and shop signs light the pavement.</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="pic" style="background-image:url('shots/emotes.jpg')"></div>
+        <div class="body">
+          <span class="tag">Say something</span>
+          <h3>Seven ways to answer</h3>
+          <p>Wave, dance, laugh, cheer, clap, point, sit. On <b>V</b>, on the
+             number row, and gone the moment you walk.</p>
         </div>
       </div>
     </div>
@@ -391,8 +400,8 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-con
       <p>Not a roadmap. These are the systems running in the file you can open.</p>
     </div>
     <div class="systems">
-      <div><h5>Renderer</h5><p>WebGL2 from scratch: shadow pass, analytic sky, height fog, water, bloom, sun shafts, sixteen point lights per frame.</p></div>
-      <div><h5>Characters</h5><p>Nineteen bones, seventeen clips written as functions of phase, crossfaded by a priority state machine.</p></div>
+      <div><h5>Renderer</h5><p>WebGL2 from scratch: banded toon light, silhouette ink off a depth pass, analytic sky, water, bloom, sun shafts, sixteen point lights a frame.</p></div>
+      <div><h5>Characters</h5><p>Nineteen bones and twenty clips written as functions of phase, crossfaded by a priority state machine. One table sets the proportions for bones, meshes and clothes at once.</p></div>
       <div><h5>Authority</h5><p>Every economic action goes through a request handler with a private server context. The client never decides what it owns.</p></div>
       <div><h5>Worlds</h5><p>Private realms share the public island's generator, chunking, lighting and collision — a smaller place, not a lesser one.</p></div>
       <div><h5>Progression</h5><p>Levels, skills, daily and weekly missions, a story chain, achievements, titles and collections.</p></div>

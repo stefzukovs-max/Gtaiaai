@@ -696,7 +696,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .wheel .em i{position:absolute;top:.3cqw;right:.7cqw;font-style:normal;
   font-size:.58cqw;color:var(--ink3)}
 .wheel .hub{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-  text-align:center;pointer-events:none}
+  text-align:center;pointer-events:none;
+  /* The hub sits over whoever is standing in the middle of it, so it
+     carries its own ground rather than trusting the scene behind. */
+  padding:.7cqw 1.4cqw;border-radius:99px;
+  background:radial-gradient(closest-side,rgba(6,9,15,.86),rgba(6,9,15,0))}
 .wheel .hub h4{font-family:var(--disp);font-size:1.3cqw;letter-spacing:.18em;
   text-transform:uppercase;color:var(--ink)}
 .wheel .hub p{font-size:.68cqw;color:var(--ink3);margin-top:.3cqw}
