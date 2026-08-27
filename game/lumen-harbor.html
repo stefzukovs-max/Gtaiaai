@@ -1060,6 +1060,7 @@ GL.u2f=function(p,n,a,b){var l=p.u[n];if(l)gl.uniform2f(l,a,b);};
 GL.u3f=function(p,n,a,b,c){var l=p.u[n];if(l)gl.uniform3f(l,a,b,c);};
 GL.u3v=function(p,n,v){var l=p.u[n];if(l)gl.uniform3f(l,v[0],v[1],v[2]);};
 GL.u4f=function(p,n,a,b,c,d){var l=p.u[n];if(l)gl.uniform4f(l,a,b,c,d);};
+GL.u4fv=function(p,n,v){var l=p.u[n];if(l)gl.uniform4fv(l,v);};
 GL.uM4=function(p,n,m){var l=p.u[n];if(l)gl.uniformMatrix4fv(l,false,m);};
 GL.uM3=function(p,n,m){var l=p.u[n];if(l)gl.uniformMatrix3fv(l,false,m);};
 
@@ -2461,6 +2462,36 @@ float wrapDiffuse(vec3 n,vec3 l,float w){
 vec3 hemi(vec3 n){
   return mix(uGndCol,uSkyCol,n.y*0.5+0.5);
 }
+
+// ---- point lights ----
+// A small fixed set, chosen on the CPU each frame from the lamps and
+// signs nearest the camera. Sixteen is the whole budget: it is enough
+// to light a street, and a forward renderer that loops further than
+// that per fragment stops being worth it.
+#define MAXLIGHTS 16
+uniform int uLightCount;
+uniform vec4 uLightPos[MAXLIGHTS];   // xyz world position, w radius
+uniform vec4 uLightCol[MAXLIGHTS];   // rgb colour premultiplied by strength
+
+vec3 pointLights(vec3 world,vec3 n){
+  vec3 acc=vec3(0.0);
+  for(int i=0;i<MAXLIGHTS;i++){
+    if(i>=uLightCount)break;
+    vec3 d=uLightPos[i].xyz-world;
+    float r=uLightPos[i].w;
+    float d2=dot(d,d);
+    if(d2>r*r)continue;
+    float dist=sqrt(max(d2,1e-6));
+    // Smooth to zero at the radius. A 1/d^2 falloff cut off at a radius
+    // leaves a visible disc edge on the ground under every lamp.
+    float att=1.0-dist/r; att*=att;
+    // Wrapped again, and hard: a street lamp is a big soft source and
+    // a plain N.L makes every wall it touches look like a spotlight.
+    float ndl=saturate(dot(n,d/dist)*0.62+0.38);
+    acc+=uLightCol[i].rgb*(ndl*att);
+  }
+  return acc;
+}
 // Height fog. Distance drives the bulk of it; the height term thins it
 // out as you climb, so the harbour sits in haze while the cliff tops
 // stay clear. Averaging the two endpoint heights is an approximation of
@@ -2514,6 +2545,9 @@ uniform mat4 uVP;
 uniform mat4 uModel;      // used when the mesh is drawn non-instanced
 uniform int  uInstanced;
 uniform vec4 uTint;
+// Scrolls the texture on a surface. Waterfalls, conveyors, anything
+// that has to flow without moving.
+uniform vec2 uUVScroll;
 
 out vec3 vWorld;
 out vec3 vNrm;
@@ -2532,7 +2566,7 @@ void main(){
   // this game is a rotation, a uniform-ish scale, or both, so the
   // upper 3x3 rotates normals correctly on its own.
   vNrm = normalize(mat3(mdl)*aNrm);
-  vUV = aUV;
+  vUV = aUV + uUVScroll;
   vec4 tint = (uInstanced==1) ? aTint : uTint;
   vCol = aCol*tint.rgb;
   vLayer = aMat.x;
@@ -2594,7 +2628,7 @@ void main(){
   vec3 h = normalize(l+v);
   float spec = pow(saturate(dot(n,h)), 32.0)*uSpec*sh*step(0.0,dot(n,l));
 
-  vec3 col = albedo*(direct+ambient) + uSunCol*spec;
+  vec3 col = albedo*(direct+ambient+pointLights(vWorld,n)) + uSunCol*spec;
 
   // Rim light picked out of the sky colour: separates a character from
   // the background without a outline pass.
@@ -2835,12 +2869,43 @@ void main(){
   oCol=vec4(c,1.0);
 }
 `;
+/* Radial blur outward from the sun's screen position, run on the same
+   bright-pass buffer the bloom uses. Two things make it read as light
+   through air rather than a smear: the sample weights fall off along
+   the ray, and the whole effect is gated on the sun actually being in
+   front of the camera — otherwise it blooms from a point behind you. */
+var GODRAY_FS=`#version 300 es
+precision highp float;
+`+COMMON+`
+uniform sampler2D uSrc;
+uniform vec2 uSun;        // sun position in screen UV
+uniform float uAmount;
+uniform float uDecay;
+in vec2 vNDC;
+layout(location=0) out vec4 oCol;
+void main(){
+  vec2 uv=vNDC*0.5+0.5;
+  vec2 delta=(uv-uSun)*(1.0/16.0)*0.62;
+  vec3 acc=vec3(0.0);
+  float w=1.0;
+  vec2 p=uv;
+  for(int i=0;i<16;i++){
+    p-=delta;
+    acc+=texture(uSrc,clamp(p,vec2(0.0),vec2(1.0))).rgb*w;
+    w*=uDecay;
+  }
+  oCol=vec4(acc*(uAmount/16.0),1.0);
+}
+`;
+
 var COMPOSITE_FS=`#version 300 es
 precision highp float;
 `+COMMON+`
 uniform sampler2D uSrc;
 uniform sampler2D uBloom;
+uniform sampler2D uRays;
 uniform float uBloomAmt;
+uniform float uRayAmt;
 uniform float uVignette;
 uniform float uTime;
 uniform vec2 uRes;
@@ -2850,6 +2915,7 @@ void main(){
   vec2 uv=vNDC*0.5+0.5;
   vec3 c=texture(uSrc,uv).rgb;
   c+=texture(uBloom,uv).rgb*uBloomAmt;
+  c+=texture(uRays,uv).rgb*uRayAmt;
 
   c=tonemap(c);
 
@@ -2890,7 +2956,10 @@ R.scene={
   bloom:0.85,
   bloomThresh:1.05,
   vignette:0.55,
-  emisScale:1.0
+  emisScale:1.0,
+  rays:0.34,
+  rayDecay:0.955,
+  lampLevel:0
 };
 
 R.vp=M.m4();R.view=M.m4();R.proj=M.m4();R.invVP=M.m4();
@@ -2899,7 +2968,7 @@ R.eye=M.v3(0,3,8);
 R.time=0;
 R.quality=1;      /* 1 = full, 0.75 / 0.5 scale the internal buffers */
 
-var sceneRT=null,bloomA=null,bloomB=null;
+var sceneRT=null,bloomA=null,bloomB=null,rayRT=null;
 var SHADOW_SIZE=2048;
 
 R.init=function(canvas){
@@ -2911,6 +2980,7 @@ R.init=function(canvas){
   R.progs.water=GL.program('water',WATER_VS,WATER_FS);
   R.progs.bright=GL.program('bright',POST_VS,BRIGHT_FS);
   R.progs.blur=GL.program('blur',POST_VS,BLUR_FS);
+  R.progs.rays=GL.program('rays',POST_VS,GODRAY_FS);
   R.progs.comp=GL.program('comp',POST_VS,COMPOSITE_FS);
 
   /* A weak GPU with a small shadow map still looks fine; a missing one
@@ -2921,6 +2991,7 @@ R.init=function(canvas){
   sceneRT=GL.colorTarget(2,2,true);
   bloomA=GL.colorTarget(2,2,true);
   bloomB=GL.colorTarget(2,2,true);
+  rayRT=GL.colorTarget(2,2,true);
   return R;
 };
 
@@ -2930,6 +3001,7 @@ R.resize=function(w,h){
   GL.resizeColorTarget(sceneRT,iw,ih,true);
   GL.resizeColorTarget(bloomA,Math.max(2,iw>>1),Math.max(2,ih>>1),true);
   GL.resizeColorTarget(bloomB,Math.max(2,iw>>1),Math.max(2,ih>>1),true);
+  GL.resizeColorTarget(rayRT,Math.max(2,iw>>1),Math.max(2,ih>>1),true);
   R.iw=iw;R.ih=ih;
 };
 
@@ -2961,6 +3033,11 @@ R.setCamera=function(view,proj,eye){
 
 function bindSceneUniforms(p){
   var s=R.scene;
+  GL.u1i(p,'uLightCount',R.lightCount);
+  if(R.lightCount){
+    GL.u4fv(p,'uLightPos',R.lightPos);
+    GL.u4fv(p,'uLightCol',R.lightCol);
+  }
   GL.u3v(p,'uSunDir',s.sunDir);
   GL.u3v(p,'uSunCol',s.sunCol);
   GL.u3v(p,'uSkyCol',s.skyCol);
@@ -3006,6 +3083,28 @@ R.beginScene=function(){
   gl.depthMask(true);
 };
 
+/* The active point-light set, refilled each frame from whatever the
+   world says is nearest. Kept as two flat Float32Arrays so the upload
+   is one call per program rather than sixteen. */
+R.MAXLIGHTS=16;
+R.lightCount=0;
+R.lightPos=new Float32Array(R.MAXLIGHTS*4);
+R.lightCol=new Float32Array(R.MAXLIGHTS*4);
+/* list entries: {x,y,z,r,col:[r,g,b],power,always} — `level` is the
+   time-of-day dimmer the sky hands down, which everything but an
+   `always` light is multiplied by. */
+R.setLights=function(list,level){
+  var n=Math.min(list.length,R.MAXLIGHTS);
+  for(var i=0;i<n;i++){
+    var L=list[i],o=i*4;
+    R.lightPos[o]=L.x;R.lightPos[o+1]=L.y;R.lightPos[o+2]=L.z;R.lightPos[o+3]=L.r;
+    var k=(L.power===undefined?1:L.power)*(L.always?1:level);
+    R.lightCol[o]=L.col[0]*k;R.lightCol[o+1]=L.col[1]*k;R.lightCol[o+2]=L.col[2]*k;
+    R.lightCol[o+3]=0;
+  }
+  R.lightCount=n;
+};
+
 R.beginOpaque=function(){
   var p=GL.use(R.progs.std);
   bindSceneUniforms(p);
@@ -3020,6 +3119,7 @@ R.beginOpaque=function(){
   GL.u1f(p,'uAlpha',1);
   GL.u1f(p,'uEmisScale',R.scene.emisScale);
   GL.u4f(p,'uTint',1,1,1,0);
+  GL.u2f(p,'uUVScroll',0,0);
   GL.u1i(p,'uInstanced',0);
   return p;
 };
@@ -3085,10 +3185,42 @@ R.present=function(){
     GL.fullscreen();
   }
 
+  /* Sun shafts. Projected here rather than passed in, so the pass
+     needs nothing from the game but the sun direction it already has. */
+  var rayAmt=0;
+  if(s.rays>0.001){
+    var sd=s.sunDir;
+    var fwdX=-R.view[2],fwdY=-R.view[6],fwdZ=-R.view[10];
+    var facing=fwdX*sd[0]+fwdY*sd[1]+fwdZ*sd[2];
+    if(facing>0.02){
+      var ex=R.eye[0]+sd[0]*900,ey=R.eye[1]+sd[1]*900,ez=R.eye[2]+sd[2]*900;
+      var cx=R.vp[0]*ex+R.vp[4]*ey+R.vp[8]*ez+R.vp[12];
+      var cy=R.vp[1]*ex+R.vp[5]*ey+R.vp[9]*ez+R.vp[13];
+      var cw=R.vp[3]*ex+R.vp[7]*ey+R.vp[11]*ez+R.vp[15];
+      if(cw>0.0001){
+        var sx=cx/cw*0.5+0.5, sy=cy/cw*0.5+0.5;
+        /* fade out as the sun leaves the frame, or the shafts snap off */
+        var edge=Math.max(Math.abs(sx-0.5),Math.abs(sy-0.5));
+        rayAmt=s.rays*Math.min(1,facing*2.4)*Math.max(0,1-Math.max(0,edge-0.5)*3.2);
+        if(rayAmt>0.001){
+          GL.bindTarget(rayRT);
+          var pr=GL.use(R.progs.rays);
+          GL.bindTex(0,bloomA.tex,gl.TEXTURE_2D);GL.u1i(pr,'uSrc',0);
+          GL.u2f(pr,'uSun',sx,sy);
+          GL.u1f(pr,'uAmount',1.0);
+          GL.u1f(pr,'uDecay',s.rayDecay);
+          GL.fullscreen();
+        }
+      }
+    }
+  }
+
   GL.bindTarget(null);
   var pc=GL.use(R.progs.comp);
   GL.bindTex(0,sceneRT.tex,gl.TEXTURE_2D);GL.u1i(pc,'uSrc',0);
   GL.bindTex(1,bloomA.tex,gl.TEXTURE_2D);GL.u1i(pc,'uBloom',1);
+  GL.bindTex(2,rayRT.tex,gl.TEXTURE_2D);GL.u1i(pc,'uRays',2);
+  GL.u1f(pc,'uRayAmt',rayAmt);
   GL.u1f(pc,'uBloomAmt',s.bloom);
   GL.u1f(pc,'uVignette',s.vignette);
   GL.u1f(pc,'uTime',R.time);
@@ -6529,6 +6661,8 @@ var M=LH.M,GL=LH.GL,Geo=LH.Geo,T=LH.Terrain,P=LH.Props,Arch=LH.Arch;
 var W={};
 
 W.statics=[];        /* merged architecture meshes */
+W.falls=null;        /* the sky islands' waterfalls, scrolled at draw */
+W.lights=[];         /* every lamp and glowing thing in the world */
 W.instanced=[];      /* prop meshes with a static instance buffer */
 W.boxes=[];          /* axis-aligned collision volumes */
 W.points=[];         /* named interaction points */
@@ -6633,7 +6767,20 @@ W.nearestPoint=function(x,z,maxD){
 
 /* ---------------- instanced prop placement ---------------- */
 var pending={};
+/* Lamps register a point light where their bulb is. Doing it here
+   rather than at each of the two dozen call sites means a lamp added
+   anywhere in the world lights the ground under it for free. */
+var LAMPLIGHT={
+  /* Deliberately short-range and weak. The plaza carries two dozen of
+     them and they overlap: the first pass at this used a 13m radius at
+     full strength and flooded the square to daylight at midnight. */
+  'lamp:plaza':  {h:4.10,r:9.0,col:[1.00,0.84,0.58],power:0.34},
+  'lamp:harbour':{h:3.76,r:8.5,col:[1.00,0.74,0.42],power:0.32}
+};
 function place(mesh,x,y,z,rot,scale,tint,emis){
+  var lit=LAMPLIGHT[mesh.key];
+  if(lit)W.lights.push({x:x,y:y+lit.h*(scale||1),z:z,r:lit.r*(scale||1),
+    col:lit.col,power:lit.power});
   var list=pending[mesh.key];
   if(!list){
     var kind=String(mesh.key).split(':')[0];
@@ -6752,6 +6899,11 @@ function dressPlaza(b){
   f.sphere(0,2.02,0,0.40,14,10,'#5BE8FF');
   f.pop();
   W.statics.push(f.upload());
+  /* The fountain crystal is lit around the clock — it is the landmark
+     you steer by, and a landmark that only exists after dark is not
+     one. */
+  W.lights.push({x:cx,y:y+2.4,z:cz,r:9.5,col:[0.26,0.70,0.92],
+    power:0.5,always:true});
   box(cx,y+0.42,cz,5.4,0.84,5.4,0,'fountain');
   W.boxes[W.boxes.length-1].walkable=false;
 
@@ -7070,6 +7222,194 @@ function scatterNature(){
   }
 }
 
+/* ---------------- sky islands ----------------
+   The harbour sits under a scatter of floating islands: rock keels
+   hanging under grass caps, a few of them pouring water off an edge
+   into nothing. They exist for the silhouette. Nothing stands on them
+   and nothing walks there — they are the reason a screenshot taken
+   anywhere on the island has something happening above the horizon.
+
+   Built as one merged static mesh rather than instanced props: props
+   are culled around the camera at tens of metres, and these live two
+   to three hundred metres out. */
+W.isles=[];            /* {x,y,z,r} — read by the waterfall builder */
+
+/* A closed noisy ring, used as every loft section of a keel so the
+   rock reads as eroded rather than turned on a lathe. */
+function isleRing(seg,seed){
+  var pts=[],rng=M.rng(seed);
+  var wob=[];
+  for(var i=0;i<seg;i++)wob.push(0.78+rng()*0.44);
+  /* smooth the wobble once around the loop, or neighbouring vertices
+     disagree so hard the normals shatter */
+  for(var k=0;k<2;k++){
+    var out=[];
+    for(var j=0;j<seg;j++){
+      out.push((wob[(j-1+seg)%seg]+wob[j]*2+wob[(j+1)%seg])/4);
+    }
+    wob=out;
+  }
+  for(var t=0;t<seg;t++){
+    var a=t/seg*Math.PI*2,rr=wob[t];
+    pts.push([Math.cos(a)*rr,Math.sin(a)*rr]);
+  }
+  return pts;
+}
+
+function isleTree(b,x,y,z,h,rng){
+  var tr=h*0.085;
+  b.mat('bark');
+  b.cylinder(x,y+h*0.22,z,tr,tr*0.7,h*0.44,6,'#6B5340');
+  b.mat('foliage');
+  var tint=rng()<0.22?'#9FD08A':'#FFFFFF';
+  b.cylinder(x,y+h*0.60,z,h*0.30,h*0.05,h*0.44,7,tint);
+  b.cylinder(x,y+h*0.86,z,h*0.20,0.01,h*0.34,7,tint);
+}
+
+function buildSkyIsles(){
+  var b=Geo.build();
+  var rng=M.rng(90210);
+  var N=12;
+  for(var k=0;k<N;k++){
+    /* Spread by angle so no two crowd the same bearing, then jitter. */
+    var ang=(k/N)*Math.PI*2+rng()*0.5;
+    /* Every third one comes in close, so there is something overhead
+       from the plaza rather than only a distant band. */
+    var near=(k%3===0);
+    var dist=near?(120+rng()*60):(190+rng()*150);
+    var cx=Math.cos(ang)*dist, cz=Math.sin(ang)*dist;
+    var r=near?(15+rng()*11):(19+rng()*24);
+    /* Height is derived, not rolled. A keel hangs 1.72 island-radii
+       below the grass, so a big island placed at a small height puts
+       its point through the rooftops — which is exactly what happened
+       when this was two independent random numbers. */
+    var cy=r*1.72+(near?26:38)+rng()*34;
+    W.isles.push({x:cx,y:cy,z:cz,r:r});
+
+    var seg=16, ring=isleRing(seg,1000+k*37);
+    b.push();b.translate(cx,cy,cz);
+
+    /* Keel: eight sections down to a blunt point. Each section gets its
+       own ring rather than a scaled copy of one — a single ring scaled
+       down is a cone, and a cone is exactly what a floating island must
+       not look like. Different rings make the cross-section wander, so
+       the silhouette breaks up on the way down. Alternating section
+       colours read as strata. */
+    /* A little self-lighting: every face of a keel points down or
+       outward, so hemisphere ambient alone leaves it a flat grey
+       cut-out. 0.10 is enough to keep the strata readable without the
+       rock looking like it is glowing. */
+    b.mat('cliff',0.10);b.mat2('dirt',0.30);
+    var strata=['#E4D6BE','#C9B79C','#DACAAF','#B4A188','#CBB99B',
+                '#9F8D74','#B3A187'];
+    var prof=[[0,1.00],[-0.16,0.99],[-0.34,0.90],[-0.55,0.80],
+              [-0.80,0.62],[-1.08,0.42],[-1.38,0.22],[-1.72,0.05]];
+    var keel=[];
+    for(var ks=0;ks<prof.length;ks++){
+      keel.push({y:prof[ks][0]*r,
+        pts:ks===0?ring:isleRing(seg,1000+k*37+ks*211),
+        scale:r*prof[ks][1],
+        col:ks?strata[(ks-1)%strata.length]:undefined});
+    }
+    /* listed top-down: loft() reads the direction and winds to match */
+    b.loft(keel,'#C9C0B2',{openTop:true});
+
+    /* A couple of spurs hanging off the keel — the shapes that stop it
+       reading as one solid mass when it is silhouetted against sky. */
+    for(var sp=0;sp<3;sp++){
+      var sa=rng()*Math.PI*2, sy=-r*(0.30+rng()*0.65);
+      var sr=r*(0.55-Math.abs(sy)/r*0.28)*(0.7+rng()*0.3);
+      b.push();
+      b.translate(Math.cos(sa)*sr,sy,Math.sin(sa)*sr);
+      b.rotate((rng()-0.5)*0.7,rng()*6.28,(rng()-0.5)*0.7);
+      b.sphere(0,0,0,r*(0.13+rng()*0.11),7,5,strata[(sp*2)%strata.length],
+        {squash:1.7+rng()});
+      b.pop();
+    }
+
+    /* cap: soil rim under a grass crown */
+    b.mat('dirt');
+    b.loft([{y:0,pts:ring,scale:r},
+            {y:r*0.055,pts:ring,scale:r*0.995}],'#8A7358',{openTop:true,openBottom:true});
+    b.mat('grass');
+    b.loft([{y:r*0.05,pts:ring,scale:r*0.995},
+            {y:r*0.13,pts:ring,scale:r*0.90},
+            {y:r*0.17,pts:ring,scale:r*0.62}],'#FFFFFF',{openBottom:true});
+    b.disc(0,r*0.17,0,r*0.62,seg,'#FFFFFF');
+
+    /* dressing: trees around the rim, a boulder or two, and on the
+       nearer islands a lit crystal so they carry after dark */
+    var trees=3+((rng()*5)|0);
+    for(var t=0;t<trees;t++){
+      var ta=rng()*Math.PI*2, td=r*(0.15+rng()*0.55);
+      isleTree(b,Math.cos(ta)*td,r*0.15,Math.sin(ta)*td,r*(0.30+rng()*0.26),rng);
+    }
+    b.mat('stone');
+    for(var q=0;q<2;q++){
+      var qa=rng()*Math.PI*2,qd=r*(0.2+rng()*0.5);
+      b.sphere(Math.cos(qa)*qd,r*0.14,Math.sin(qa)*qd,r*(0.05+rng()*0.07),
+        7,5,'#FFFFFF',{squash:0.6});
+    }
+    if(rng()<0.62){
+      b.mat('crystal',0.85);
+      var ca=rng()*Math.PI*2,cd=r*0.32;
+      var chx=Math.cos(ca)*cd,chz=Math.sin(ca)*cd,ch=r*(0.22+rng()*0.2);
+      b.cylinder(chx,r*0.16+ch*0.5,chz,r*0.07,0.02,ch,6,'#7FE6FF');
+      W.lights.push({x:cx+chx,y:cy+r*0.16+ch*0.5,z:cz+chz,r:r*1.1,
+        col:[0.34,0.82,1.00],power:0.9,always:true});
+    }
+    b.pop();
+  }
+  W.statics.push(b.upload());
+}
+
+/* Waterfalls hang off three of the islands. They are their own mesh so
+   the draw can scroll their UVs — see W.drawFalls. */
+function buildFalls(){
+  var b=Geo.build();
+  b.mat('water',0.18);
+  var rng=M.rng(5150);
+  for(var i=0;i<W.isles.length;i++){
+    if(rng()>0.58)continue;
+    var I=W.isles[i];
+    var a=rng()*Math.PI*2;
+    var ox=Math.cos(a)*I.r*0.80, oz=Math.sin(a)*I.r*0.80;
+    var w=I.r*(0.30+rng()*0.22);
+    /* Long enough to read as a fall rather than a dribble, but stopping
+       well above the sea — it breaks up in the air, which is both
+       cheaper and more interesting than meeting the water. */
+    var drop=I.y-(26+rng()*38);
+    b.push();
+    b.translate(I.x+ox,0,I.z+oz);
+    b.rotate(0,a+Math.PI/2,0);
+    /* Four tapering panels stacked down the fall. Splitting it lets the
+       ribbon narrow and drift sideways instead of hanging as one slab. */
+    var y0=I.y+I.r*0.05, seg=6, drift=0;
+    for(var s2=0;s2<seg;s2++){
+      var f0=s2/seg,f1=(s2+1)/seg;
+      var yA=y0-(y0-drop)*f0, yB=y0-(y0-drop)*f1;
+      var wA=w*(1-f0*0.42), wB=w*(1-f1*0.42);
+      var dA=drift, dB=drift+w*0.10; drift=dB;
+      var c='#DCF2FF';
+      var uA=f0*7,uB=f1*7;
+      var v0=b.vert(-wA/2+dA,yA,0, 0,0,1, 0,uA, [0.74,0.86,0.94]);
+      var v1=b.vert( wA/2+dA,yA,0, 0,0,1, 1,uA, [0.74,0.86,0.94]);
+      var v2=b.vert( wB/2+dB,yB,0, 0,0,1, 1,uB, [1.0,1.0,1.0]);
+      var v3=b.vert(-wB/2+dB,yB,0, 0,0,1, 0,uB, [1.0,1.0,1.0]);
+      b.quad(v0,v1,v2,v3);
+      b.quad(v0,v3,v2,v1);     /* backside, so it reads from any bearing */
+    }
+    /* the burst where it breaks up */
+    b.mat('blank',0.30);
+    for(var m2=0;m2<8;m2++){
+      b.sphere(drift+(rng()-0.5)*w*1.8,drop+(rng()-0.3)*w*1.3,
+        (rng()-0.5)*w*1.1,w*(0.26+rng()*0.34),7,5,'#E8F6FF',{squash:0.65});
+    }
+    b.pop();
+  }
+  W.falls=b.upload();
+}
+
 /* ---------------- water ---------------- */
 function buildWater(){
   var b=Geo.build();
@@ -7096,12 +7436,43 @@ W.build=function(){
   W.statics.push(b.upload());
   scatterNature();
   commitProps();
+  buildSkyIsles();
+  buildFalls();
   buildWater();
 
   W.spawn=M.v3(T.pad('plaza').x,T.pad('plaza').y,T.pad('plaza').z+12);
 };
 
 /* ---------------- draw ---------------- */
+/* The falls are the one surface in the world that flows. Scrolling the
+   UV is enough — a real flow map would buy nothing at this distance. */
+/* The sixteen nearest lights to wherever the camera is looking. A world
+   this size holds a couple of hundred; a forward renderer can afford
+   sixteen, and past about thirty metres a street lamp contributes less
+   than the dither. Insertion sort into a fixed array — no allocation,
+   and the list is nearly sorted from the frame before. */
+var _lit=[];
+W.pickLights=function(x,y,z,max){
+  _lit.length=0;
+  for(var i=0;i<W.lights.length;i++){
+    var L=W.lights[i];
+    var dx=L.x-x,dy=L.y-y,dz=L.z-z;
+    var d2=dx*dx+dy*dy+dz*dz;
+    if(d2>(L.r+34)*(L.r+34))continue;
+    L._d=d2;
+    _lit.push(L);
+  }
+  _lit.sort(function(a,b){return a._d-b._d;});
+  if(_lit.length>max)_lit.length=max;
+  return _lit;
+};
+
+W.drawFalls=function(prog,time){
+  if(!W.falls)return;
+  GL.u2f(prog,'uUVScroll',0,-time*0.85);
+  GL.draw(W.falls);
+  GL.u2f(prog,'uUVScroll',0,0);
+};
 W.drawStatics=function(){
   for(var i=0;i<W.statics.length;i++)GL.draw(W.statics[i]);
 };
@@ -11684,6 +12055,8 @@ function realmGate(){
   b.pop();
   b.pop();
   W.statics.push(b.upload());
+  W.lights.push({x:0,y:y+2.2,z:-14,r:14,col:[1.00,0.63,0.24],
+    power:1.4,always:true});
   W.point('gate','gate',0,-11.5,{y:y,r:4.0,
     label:'Way Home',prompt:'Return to Lumen Harbor'});
 }
@@ -11701,6 +12074,7 @@ function stash(){
     points:W.points.slice(),
     groups:(W.groups||[]).slice(),
     instanced:W.instanced.slice(),
+    lights:W.lights.slice(),
     spawn:M.v3(W.spawn[0],W.spawn[1],W.spawn[2]),
     cells:V.serialise(),
     enemies:En.live.slice()
@@ -11722,6 +12096,8 @@ function restore(){
   W.groups=harbourCache.groups;
   W.instanced.length=0;
   Array.prototype.push.apply(W.instanced,harbourCache.instanced);
+  W.lights.length=0;
+  Array.prototype.push.apply(W.lights,harbourCache.lights);
   M.copy3(W.spawn,harbourCache.spawn);
   En.live.length=0;
   Array.prototype.push.apply(En.live,harbourCache.enemies);
@@ -11735,6 +12111,7 @@ function buildRealm(realm){
   W.boxes.length=0;
   W.points.length=0;
   W.instanced.length=0;
+  W.lights.length=0;
   W.groups=[];
   En.live.length=0;
 
@@ -12632,6 +13009,17 @@ S.update=function(dt){
      scene at night. Baking one value into the mesh would mean the
      harbour glows through the middle of the day. */
   sd.emisScale=0.26+stars*1.05+w.cloud*0.16;
+  /* Street lamps come on as the sun drops, not on a clock edge, and
+     overcast brings them on early — which is what makes an overcast
+     afternoon in the harbour read as weather rather than a filter. */
+  sd.lampLevel=M.clamp((0.26-elev)/0.34,0,1)*(1+w.cloud*0.25);
+  /* Shafts are a low-sun effect. Driving them off the sun's elevation
+     means they arrive at dawn and dusk on their own, and a fixed amount
+     does not sit over the middle of the day looking like a lens smear.
+     Overcast kills them: there is no beam to break up. */
+  var lowSun=1-M.clamp(Math.abs(elev)/0.55,0,1);
+  sd.rays=(0.16+lowSun*0.62)*(1-w.cloud*0.85)*(1-stars*0.85);
+  sd.rayDecay=0.952+lowSun*0.012;
   S.rain=w.rain;
   S.cloud=w.cloud;
 };
@@ -13490,6 +13878,12 @@ App.onDraw(function(dt,time){
   }
   En.submit(time,G.player.pos);
 
+  /* Point lights are picked around what the camera is looking at, not
+     around the player: on a wide orbit the eye can sit well outside the
+     lit street the shot is actually of. */
+  R.setLights(W.pickLights(Cam.target[0],Cam.target[1],Cam.target[2],R.MAXLIGHTS),
+    R.scene.lampLevel);
+
   /* --- shadow --- */
   var dp=R.beginShadow();
   GL.u1i(dp,'uInstanced',0);
@@ -13509,6 +13903,7 @@ App.onDraw(function(dt,time){
   GL.u1f(p,'uSpec',0.18+LH.Sky.wet*0.55);
   T.drawChunks(true);
   W.drawStatics();
+  W.drawFalls(p,time);
   V.draw(true);
   W.drawProps(p);
   Act.flush(p);
