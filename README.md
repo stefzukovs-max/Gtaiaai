@@ -7,7 +7,7 @@ It started in 2D. It is now a 3D social sandbox, built by evolving the
 mechanical DNA rather than restarting — the data-driven item table, the
 rarity tiers, the splice-and-build loop and the economy all crossed over.
 
-This repository holds three deliverables.
+This repository holds four deliverables.
 
 ## `game/lumen-harbor.html` — the 3D build
 
@@ -34,7 +34,7 @@ portable if that decision ever changes.
 | `LH.GL` | WebGL2 device: program introspection at build time, VAOs, instancing, hardware-compare shadow maps, sRGB 2D array textures |
 | `LH.Geo` | Procedural geometry behind a transform stack — boxes, chamfers, lofts, limbs, extrusions, discs — so a prop is written the way you'd describe it out loud |
 | `LH.Tex` | Thirty-one materials painted per-pixel into one texture array, so the whole world draws with a single texture bound |
-| `LH.Render` | Forward renderer: shadow pass, analytic sky with clouds and stars, wrapped-diffuse sun, hemisphere ambient, height fog, animated water with a depth-tinted shoreline, bloom, filmic tonemap |
+| `LH.Render` | Forward renderer: shadow pass, analytic sky with clouds and stars, wrapped-diffuse sun, hemisphere ambient, sixteen point lights a frame, height fog, animated water with a depth-tinted shoreline, bloom, sun shafts, filmic tonemap |
 | `LH.Rig` | Nineteen bones and seventeen animation clips, written as functions of phase rather than keyframe tables |
 | `LH.Voxels` | Sparse one-metre build layer, meshed per 16-cube chunk with interior faces culled |
 | `LH.Net` | The authority boundary |
@@ -97,6 +97,27 @@ dispatcher for a WebSocket is a transport change, not a rewrite.
 Open `game/lumen-harbor.html` directly, or serve the folder. Needs WebGL2.
 The game is landscape-only; in portrait it keeps the landscape layout and
 asks you to turn the device.
+
+### The sky
+
+Twelve floating islands ring the harbour, three of them pouring water into
+open air. Their height is derived from their radius rather than rolled
+independently: a keel hangs 1.72 island-radii below its grass cap, so two
+free random numbers put a large island's point through the rooftops.
+
+Street lamps, shop signs and the fountain crystal register themselves as
+point lights when they are placed, and the renderer picks the sixteen
+nearest the camera each frame. They fade up with the sun's elevation
+instead of switching on at a clock edge, and overcast brings them on early.
+
+---
+
+## `site/index.html` — the landing page
+
+The product page for Lumen Harbor: hero, world, pillars, systems, and a
+plain statement of where the build actually stands. Every image on it is a
+screenshot of the running game — captured through a headless browser from
+the same file you can open — rather than concept art.
 
 ---
 

@@ -6574,9 +6574,18 @@ A.building=function(b,o){
     b.push();b.translate(0,0.44+2.98,d/2+0.10);
     b.chamfer(0,0,0,w*0.88,0.14,0.24,st.trimCol,0.03);b.pop();
     b.mat('neon',0.9);
+    var signCol=o.signCol||'#3BE0C8';
     b.push();b.translate(0,0.44+3.42,d/2+0.16);
-    b.chamfer(0,0,0,w*0.62,0.44,0.06,o.signCol||'#3BE0C8',0.02,{noBand:true});
+    b.chamfer(0,0,0,w*0.62,0.44,0.06,signCol,0.02,{noBand:true});
     b.pop();
+    /* The sign lights the street it faces. Local +Z under a Y rotation
+       lands at (sin, cos), which is why this is not just o.x/o.z. */
+    if(LH.World&&LH.World.lights){
+      var sr=o.rot||0, so=d/2+0.9, sl=Geo.col3(signCol);
+      LH.World.lights.push({
+        x:(o.x||0)+Math.sin(sr)*so, y:y0+0.44+3.42, z:(o.z||0)+Math.cos(sr)*so,
+        r:7.5, col:[sl[0],sl[1],sl[2]], power:0.75});
+    }
   }
   /* Chimneys, vents, aerials — the roofline is the part of a building
      you actually see across a town, and a bare one reads as a model. */
@@ -6886,8 +6895,8 @@ function dressPlaza(b){
   ],'#828A96',{openTop:true,openBottom:true});
   f.annulus(0,0.80,0,2.40,2.60,SEG,'#A6AEBA');
   f.disc(0,0.26,0,2.36,SEG,'#6E7682');
-  f.mat('water',0.05);
-  f.disc(0,0.60,0,2.36,SEG,'#5FC4D8');
+  f.mat('water',0.02);
+  f.disc(0,0.60,0,2.36,SEG,'#2E7C93');
   f.mat('stone');
   f.loft([
     {y:0.42,pts:Geo.circle(0.62,14)},
@@ -7239,10 +7248,10 @@ W.isles=[];            /* {x,y,z,r} — read by the waterfall builder */
 function isleRing(seg,seed){
   var pts=[],rng=M.rng(seed);
   var wob=[];
-  for(var i=0;i<seg;i++)wob.push(0.78+rng()*0.44);
+  for(var i=0;i<seg;i++)wob.push(0.62+rng()*0.66);
   /* smooth the wobble once around the loop, or neighbouring vertices
      disagree so hard the normals shatter */
-  for(var k=0;k<2;k++){
+  for(var k=0;k<1;k++){
     var out=[];
     for(var j=0;j<seg;j++){
       out.push((wob[(j-1+seg)%seg]+wob[j]*2+wob[(j+1)%seg])/4);
@@ -7350,6 +7359,19 @@ function buildSkyIsles(){
       b.sphere(Math.cos(qa)*qd,r*0.14,Math.sin(qa)*qd,r*(0.05+rng()*0.07),
         7,5,'#FFFFFF',{squash:0.6});
     }
+    /* Outcrops on the rim. Grass and rock otherwise meet along one clean
+       circle the whole way round, which is the tell that this is a lathe
+       and not a piece of ground that broke off something. */
+    b.mat('cliff',0.06);
+    for(var e=0;e<5;e++){
+      var ea=rng()*Math.PI*2;
+      var er=r*(0.86+rng()*0.16);
+      b.push();
+      b.translate(Math.cos(ea)*er,r*(0.02+rng()*0.10),Math.sin(ea)*er);
+      b.rotate((rng()-0.5)*0.5,ea,(rng()-0.5)*0.5);
+      b.sphere(0,0,0,r*(0.11+rng()*0.09),7,5,'#C3B49C',{squash:0.55});
+      b.pop();
+    }
     if(rng()<0.62){
       b.mat('crystal',0.85);
       var ca=rng()*Math.PI*2,cd=r*0.32;
@@ -7367,18 +7389,20 @@ function buildSkyIsles(){
    the draw can scroll their UVs — see W.drawFalls. */
 function buildFalls(){
   var b=Geo.build();
-  b.mat('water',0.18);
+  b.mat('water',0.10);
   var rng=M.rng(5150);
   for(var i=0;i<W.isles.length;i++){
     if(rng()>0.58)continue;
     var I=W.isles[i];
     var a=rng()*Math.PI*2;
     var ox=Math.cos(a)*I.r*0.80, oz=Math.sin(a)*I.r*0.80;
-    var w=I.r*(0.30+rng()*0.22);
+    var w=I.r*(0.34+rng()*0.24);
     /* Long enough to read as a fall rather than a dribble, but stopping
        well above the sea — it breaks up in the air, which is both
-       cheaper and more interesting than meeting the water. */
-    var drop=I.y-(26+rng()*38);
+       cheaper and more interesting than meeting the water. Kept short
+       relative to its width: a narrow ribbon dropped sixty metres
+       reads as a blue pipe rather than as water. */
+    var drop=I.y-(15+rng()*20);
     b.push();
     b.translate(I.x+ox,0,I.z+oz);
     b.rotate(0,a+Math.PI/2,0);
@@ -7388,10 +7412,13 @@ function buildFalls(){
     for(var s2=0;s2<seg;s2++){
       var f0=s2/seg,f1=(s2+1)/seg;
       var yA=y0-(y0-drop)*f0, yB=y0-(y0-drop)*f1;
-      var wA=w*(1-f0*0.42), wB=w*(1-f1*0.42);
-      var dA=drift, dB=drift+w*0.10; drift=dB;
+      /* Water spreads as it falls, so the ribbon widens rather than
+         tapering, and leans a little further out each section. */
+      var wA=w*(0.68+f0*0.62), wB=w*(0.68+f1*0.62);
+      var dA=drift, dB=drift+w*(0.06+f1*0.14); drift=dB;
       var c='#DCF2FF';
-      var uA=f0*7,uB=f1*7;
+      var vrep=(y0-drop)/2.4;
+      var uA=f0*vrep,uB=f1*vrep;
       var v0=b.vert(-wA/2+dA,yA,0, 0,0,1, 0,uA, [0.74,0.86,0.94]);
       var v1=b.vert( wA/2+dA,yA,0, 0,0,1, 1,uA, [0.74,0.86,0.94]);
       var v2=b.vert( wB/2+dB,yB,0, 0,0,1, 1,uB, [1.0,1.0,1.0]);
@@ -7399,11 +7426,18 @@ function buildFalls(){
       b.quad(v0,v1,v2,v3);
       b.quad(v0,v3,v2,v1);     /* backside, so it reads from any bearing */
     }
-    /* the burst where it breaks up */
+    /* The burst where it breaks up, plus a thinner veil of spray back
+       up the lower third — a fall that simply stops at a cloud of
+       spheres reads as a ribbon with a full stop on the end. */
     b.mat('blank',0.30);
-    for(var m2=0;m2<8;m2++){
-      b.sphere(drift+(rng()-0.5)*w*1.8,drop+(rng()-0.3)*w*1.3,
-        (rng()-0.5)*w*1.1,w*(0.26+rng()*0.34),7,5,'#E8F6FF',{squash:0.65});
+    for(var m2=0;m2<10;m2++){
+      b.sphere(drift+(rng()-0.5)*w*2.0,drop+(rng()-0.25)*w*1.5,
+        (rng()-0.5)*w*1.2,w*(0.28+rng()*0.38),7,5,'#E8F6FF',{squash:0.65});
+    }
+    for(var m3=0;m3<7;m3++){
+      var ft=0.55+rng()*0.42;
+      b.sphere(drift*ft+(rng()-0.5)*w*1.1,y0-(y0-drop)*ft,
+        (rng()-0.5)*w*0.7,w*(0.10+rng()*0.16),6,4,'#DCEEFF',{squash:0.8});
     }
     b.pop();
   }
