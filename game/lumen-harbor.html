@@ -1,7 +1,7 @@
 <title>Lumen Harbor</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap">
 <style>
 /* ============================================================
    LUMEN HARBOR — a 3D social sandbox MMO.
@@ -35,9 +35,9 @@
   --ink:#E8EFFA;
   --ink2:#93A4C0;
   --ink3:#5D6E8C;
-  --acc:#3BE0C8;
-  --acc2:#159C89;
-  --gold:#F5C451;
+  --acc:#4FE3B0;
+  --acc2:#17A886;
+  --gold:#FFC94D;
   --danger:#FF5A6E;
   --xp:#7C6BFF;
   /* rarity ramp — the 2D build's tiers, restated for a dark UI */
@@ -47,8 +47,12 @@
   --r4:#B269FF;
   --r5:#F5A03C;
   --r6:#FF4F7A;
-  --ui: 'Chakra Petch', 'Segoe UI', system-ui, sans-serif;
-  --disp: 'Rajdhani', 'Chakra Petch', system-ui, sans-serif;
+  /* Rounded, not angular. Nunito carries the small text — it stays
+     legible at the sizes the HUD actually uses — and Fredoka does the
+     headings, where the roundness is the point. Both have real
+     fallbacks: the game has to look deliberate with the network off. */
+  --ui: 'Nunito', 'Segoe UI', system-ui, sans-serif;
+  --disp: 'Fredoka', 'Nunito', 'Segoe UI', system-ui, sans-serif;
 }
 
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -69,7 +73,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .surface{
   background:linear-gradient(180deg,var(--panel2),var(--panel));
   border:1px solid var(--line);
-  border-radius:14px;
+  border-radius:19px;
   backdrop-filter:blur(14px) saturate(1.2);
   -webkit-backdrop-filter:blur(14px) saturate(1.2);
   box-shadow:0 18px 50px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.06);
@@ -99,7 +103,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 #rotate{position:absolute;inset:0;z-index:120;display:none;
   flex-direction:column;align-items:center;justify-content:center;gap:18px;
   background:#05070C;text-align:center;padding:24px}
-#rotate .ph{width:74px;height:120px;border:3px solid var(--ink2);border-radius:12px;
+#rotate .ph{width:74px;height:120px;border:3px solid var(--ink2);border-radius:17px;
   animation:tip 1.8s ease-in-out infinite}
 @keyframes tip{0%,45%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
 
@@ -123,7 +127,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
    a hairline border and a very slight blue lift, so twelve separate
    panels read as one interface rather than twelve decisions. */
 .hp{background:linear-gradient(180deg,rgba(17,23,36,.90),rgba(10,15,24,.88));
-  border:1px solid rgba(126,160,216,.20);border-radius:9px;
+  border:1px solid rgba(126,160,216,.20);border-radius:14px;
   backdrop-filter:blur(14px) saturate(1.15);
   -webkit-backdrop-filter:blur(14px) saturate(1.15);
   box-shadow:0 8px 26px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05)}
@@ -137,7 +141,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .idchip{position:absolute;left:.7cqw;top:.7cqw;display:flex;gap:.5cqw;
   align-items:center;padding:.34cqw .8cqw .34cqw .34cqw}
 .idchip .av{width:2.5cqw;height:2.5cqw;min-width:28px;min-height:28px;
-  border-radius:6px;background:linear-gradient(160deg,#2E3D56,#141D2B);
+  border-radius:11px;background:linear-gradient(160deg,#2E3D56,#141D2B);
   border:1px solid var(--line2);display:grid;place-items:center;
   font-family:var(--disp);font-weight:700;color:var(--acc);
   font-size:1.05cqw;letter-spacing:.04em;position:relative;overflow:hidden}
@@ -167,7 +171,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .coin.c .dot{background:radial-gradient(circle at 34% 30%,#FFE9A8,#D9962A 68%,#9A6412);
   box-shadow:0 0 8px rgba(245,196,81,.5)}
 .coin.g .dot{background:radial-gradient(circle at 34% 30%,#BFF3FF,#3FA9D8 66%,#1D6E96);
-  border-radius:3px;transform:rotate(45deg);
+  border-radius:8px;transform:rotate(45deg);
   box-shadow:0 0 8px rgba(90,200,255,.5)}
 .coin.s .dot{background:radial-gradient(circle at 34% 30%,#F0D2FF,#A45BE0 66%,#6B2FA0);
   box-shadow:0 0 8px rgba(178,105,255,.5)}
@@ -182,7 +186,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .tools{position:absolute;right:.7cqw;top:.7cqw;display:flex;gap:.34cqw;
   align-items:stretch}
 .tbtn2{width:2.1cqw;height:2.1cqw;min-width:24px;min-height:24px;
-  border-radius:7px;display:grid;place-items:center;cursor:pointer;
+  border-radius:12px;display:grid;place-items:center;cursor:pointer;
   color:var(--ink2)}
 .tbtn2:hover{color:var(--acc);border-color:var(--acc)}
 .tbtn2 .hicon{width:1.15cqw;height:1.15cqw}
@@ -210,7 +214,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .myworld .stat{font-size:.68cqw;color:var(--ink3);display:flex;
   justify-content:space-between}
 .myworld .stat b{color:var(--ink2);font-variant-numeric:tabular-nums}
-.wbtn{margin-top:.16cqw;padding:.34cqw;border-radius:7px;cursor:pointer;
+.wbtn{margin-top:.16cqw;padding:.34cqw;border-radius:12px;cursor:pointer;
   font-size:.74cqw;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
   text-align:center;color:#062028;border:0;font-family:var(--ui);
   background:linear-gradient(180deg,#4FE7D0,#1FA894);
@@ -222,7 +226,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
   padding:.5cqw .55cqw;display:none;flex-direction:column;gap:.4cqw}
 .buildp.on{display:flex}
 .brow{display:flex;gap:.3cqw}
-.btool{flex:1;aspect-ratio:1;border-radius:7px;display:grid;place-items:center;
+.btool{flex:1;aspect-ratio:1;border-radius:12px;display:grid;place-items:center;
   cursor:pointer;color:var(--ink2);background:rgba(255,255,255,.045);
   border:1px solid var(--line);transition:all .12s}
 .btool:hover{color:var(--ink);border-color:var(--line2)}
@@ -233,7 +237,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
   max-height:9cqh;overflow-y:auto;padding-right:.15cqw}
 .bpal::-webkit-scrollbar{width:5px}
 .bpal::-webkit-scrollbar-thumb{background:rgba(126,160,216,.25);border-radius:6px}
-.bsw{aspect-ratio:1;border-radius:6px;cursor:pointer;background-size:cover;
+.bsw{aspect-ratio:1;border-radius:11px;cursor:pointer;background-size:cover;
   border:1px solid var(--line);transition:transform .1s,border-color .1s}
 .bsw:hover{transform:translateY(-1px);border-color:var(--line2)}
 .bsw.on{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
@@ -242,7 +246,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .actbar{position:absolute;left:50%;bottom:.55cqw;transform:translateX(-50%);
   display:flex;gap:.16cqw;padding:.24cqw .3cqw}
 .act2{display:flex;align-items:center;gap:.3cqw;padding:.3cqw .68cqw;
-  border-radius:7px;cursor:pointer;font-size:.74cqw;color:var(--ink3);
+  border-radius:12px;cursor:pointer;font-size:.74cqw;color:var(--ink3);
   white-space:nowrap;transition:all .12s}
 .act2:hover{color:var(--ink);background:rgba(255,255,255,.06)}
 .act2.on{color:var(--acc);background:rgba(59,224,200,.14)}
@@ -259,20 +263,20 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .hotbar{position:absolute;left:50%;bottom:2.7cqw;transform:translateX(-50%);
   display:flex;gap:.26cqw;padding:.26cqw;border-radius:10px}
 .slot{position:relative;width:3.05cqw;height:3.05cqw;min-width:34px;min-height:34px;
-  border-radius:7px;background:linear-gradient(165deg,rgba(40,51,70,.9),rgba(19,26,40,.9));
+  border-radius:12px;background:linear-gradient(165deg,rgba(40,51,70,.9),rgba(19,26,40,.9));
   border:1px solid var(--line);display:grid;place-items:center;cursor:pointer;
   transition:transform .12s ease,border-color .12s ease,box-shadow .12s ease}
 .slot:hover{transform:translateY(-2px);border-color:var(--line2)}
 .slot.on{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc),
   0 0 16px rgba(59,224,200,.34);transform:translateY(-3px)}
-.slot .ic{width:80%;height:80%;border-radius:5px;background-size:cover}
+.slot .ic{width:80%;height:80%;border-radius:10px;background-size:cover}
 .slot .n{position:absolute;right:.14cqw;bottom:.02cqw;font-size:.6cqw;
   font-weight:700;color:var(--ink);text-shadow:0 1px 3px #000;
   font-variant-numeric:tabular-nums}
 .slot .k{position:absolute;left:.18cqw;top:.02cqw;font-size:.52cqw;
   color:var(--ink3);font-weight:600}
 .slot.empty .ic{opacity:.09;background:var(--ink3)}
-.hmore{width:2.3cqw;height:3.05cqw;min-width:26px;border-radius:7px;
+.hmore{width:2.3cqw;height:3.05cqw;min-width:26px;border-radius:12px;
   display:grid;place-items:center;cursor:pointer;color:var(--ink3);
   border:1px solid var(--line);background:rgba(255,255,255,.035)}
 .hmore:hover{color:var(--acc);border-color:var(--acc)}
@@ -286,18 +290,18 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .retic.deny{border-color:var(--danger)}
 
 .prompt{position:absolute;left:50%;bottom:7.2cqw;transform:translateX(-50%);
-  display:none;align-items:center;gap:.5cqw;padding:.4cqw .85cqw;border-radius:8px;
+  display:none;align-items:center;gap:.5cqw;padding:.4cqw .85cqw;border-radius:13px;
   font-size:.82cqw;color:var(--ink);white-space:nowrap}
 .prompt.show{display:flex}
 .prompt kbd{display:inline-grid;place-items:center;min-width:1.45cqw;height:1.45cqw;
-  padding:0 .3cqw;border-radius:5px;background:rgba(255,255,255,.10);
+  padding:0 .3cqw;border-radius:10px;background:rgba(255,255,255,.10);
   border:1px solid var(--line2);font-size:.68cqw;font-weight:700;
   font-family:var(--ui);color:var(--acc)}
 
 /* ---- toasts ---- */
 .toasts{position:absolute;right:.7cqw;top:13.6cqw;display:flex;
   flex-direction:column;gap:.34cqw;align-items:flex-end;max-width:20cqw}
-.toast{padding:.4cqw .72cqw;border-radius:8px;font-size:.78cqw;
+.toast{padding:.4cqw .72cqw;border-radius:13px;font-size:.78cqw;
   background:rgba(14,19,30,.92);border:1px solid var(--line);color:var(--ink);
   backdrop-filter:blur(10px);animation:tin .28s ease both;
   box-shadow:0 8px 22px rgba(0,0,0,.45);display:flex;gap:.4cqw;align-items:center}
@@ -315,7 +319,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-48%) scale(.98);
   width:min(74cqw,1080px);max-height:82cqh;display:flex;flex-direction:column;
   background:linear-gradient(180deg,rgba(22,29,44,.97),rgba(12,17,26,.97));
-  border:1px solid var(--line2);border-radius:16px;overflow:hidden;
+  border:1px solid var(--line2);border-radius:21px;overflow:hidden;
   box-shadow:0 30px 80px rgba(0,0,0,.65);opacity:0;pointer-events:none;
   transition:opacity .22s ease,transform .22s ease}
 .panel.on{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
@@ -324,12 +328,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .panel .hd h2{font-family:var(--disp);font-weight:700;letter-spacing:.16em;
   text-transform:uppercase;font-size:1.15cqw;color:var(--ink)}
 .panel .hd .sp{flex:1}
-.xbtn{width:2.2cqw;height:2.2cqw;min-width:24px;min-height:24px;border-radius:8px;
+.xbtn{width:2.2cqw;height:2.2cqw;min-width:24px;min-height:24px;border-radius:13px;
   border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink2);
   display:grid;place-items:center;cursor:pointer;font-size:1.0cqw;line-height:1}
 .xbtn:hover{background:rgba(255,90,110,.16);color:#FFC6CE;border-color:rgba(255,90,110,.4)}
 .tabs{display:flex;gap:.34cqw;flex-wrap:wrap}
-.tab{padding:.38cqw .8cqw;border-radius:8px;font-size:.85cqw;cursor:pointer;
+.tab{padding:.38cqw .8cqw;border-radius:13px;font-size:.85cqw;cursor:pointer;
   color:var(--ink3);border:1px solid transparent;letter-spacing:.04em}
 .tab:hover{color:var(--ink2);background:rgba(255,255,255,.04)}
 .tab.on{color:var(--acc);border-color:var(--line2);background:rgba(59,224,200,.10)}
@@ -339,7 +343,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(4.6cqw,1fr));
   gap:.5cqw}
-.cell{position:relative;aspect-ratio:1;border-radius:10px;cursor:pointer;
+.cell{position:relative;aspect-ratio:1;border-radius:15px;cursor:pointer;
   background:linear-gradient(165deg,rgba(38,48,66,.85),rgba(20,27,40,.85));
   border:1px solid var(--line);display:grid;place-items:center;
   transition:transform .12s,border-color .12s,box-shadow .12s}
@@ -352,7 +356,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .cell .rr{position:absolute;left:0;right:0;top:0;height:2px;border-radius:10px 10px 0 0}
 
 .detail{display:flex;gap:1.1cqw;padding:.9cqw 0 0}
-.detail .big{width:8cqw;height:8cqw;border-radius:12px;border:1px solid var(--line);
+.detail .big{width:8cqw;height:8cqw;border-radius:17px;border:1px solid var(--line);
   background:rgba(0,0,0,.28);display:grid;place-items:center;flex:0 0 auto}
 .detail .big .ic{width:78%;height:78%;border-radius:9px}
 .detail .txt{flex:1;min-width:0}
@@ -363,7 +367,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .detail .meta{display:flex;gap:1.1cqw;flex-wrap:wrap;font-size:.82cqw;color:var(--ink3)}
 .detail .meta b{color:var(--ink);font-weight:600}
 .acts{display:flex;gap:.5cqw;margin-top:.7cqw;flex-wrap:wrap}
-.btn{padding:.46cqw 1.0cqw;border-radius:9px;font-size:.86cqw;font-weight:600;
+.btn{padding:.46cqw 1.0cqw;border-radius:14px;font-size:.86cqw;font-weight:600;
   letter-spacing:.05em;cursor:pointer;border:1px solid var(--line2);
   background:rgba(255,255,255,.05);color:var(--ink);transition:all .14s}
 .btn:hover{background:rgba(59,224,200,.14);border-color:var(--acc);color:var(--acc)}
@@ -401,7 +405,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .fstep{font-size:.74cqw;letter-spacing:.22em;text-transform:uppercase;
   color:var(--acc2)}
 .frow{display:flex;gap:.5cqw;flex-wrap:wrap;align-items:center}
-.fbtn{padding:.66cqw 1.5cqw;border-radius:10px;font-size:.98cqw;font-weight:600;
+.fbtn{padding:.66cqw 1.5cqw;border-radius:15px;font-size:.98cqw;font-weight:600;
   letter-spacing:.06em;cursor:pointer;border:1px solid var(--line2);
   background:rgba(255,255,255,.05);color:var(--ink);transition:all .15s;
   font-family:var(--ui)}
@@ -411,16 +415,16 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .fbtn.pri:hover{filter:brightness(1.12)}
 .fbtn[disabled]{opacity:.4;pointer-events:none}
 .finp{width:100%;background:rgba(6,9,14,.7);border:1px solid var(--line);
-  border-radius:10px;color:var(--ink);font-family:var(--ui);font-size:1.05cqw;
+  border-radius:15px;color:var(--ink);font-family:var(--ui);font-size:1.05cqw;
   padding:.66cqw .9cqw;outline:0}
 .finp:focus{border-color:var(--acc)}
 .swatches{display:flex;gap:.42cqw;flex-wrap:wrap}
-.sw2{width:2.1cqw;height:2.1cqw;min-width:22px;min-height:22px;border-radius:8px;
+.sw2{width:2.1cqw;height:2.1cqw;min-width:22px;min-height:22px;border-radius:13px;
   cursor:pointer;border:2px solid transparent;transition:transform .12s}
 .sw2:hover{transform:scale(1.1)}
 .sw2.on{border-color:var(--acc);box-shadow:0 0 0 2px rgba(59,224,200,.3)}
 .optrow{display:flex;gap:.4cqw;flex-wrap:wrap}
-.opt{padding:.4cqw .8cqw;border-radius:8px;font-size:.84cqw;cursor:pointer;
+.opt{padding:.4cqw .8cqw;border-radius:13px;font-size:.84cqw;cursor:pointer;
   border:1px solid var(--line);color:var(--ink2);transition:all .13s;
   text-transform:capitalize}
 .opt:hover{border-color:var(--line2);color:var(--ink)}
@@ -430,7 +434,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 
 /* the guided first steps, as a small card in the corner */
 .guide{position:absolute;right:.7cqw;bottom:6.4cqw;width:min(13.2cqw,240px);
-  padding:.9cqw 1.0cqw;border-radius:13px;display:none;
+  padding:.9cqw 1.0cqw;border-radius:18px;display:none;
   background:linear-gradient(180deg,rgba(20,27,42,.94),rgba(10,15,24,.92));
   border:1px solid var(--line2);backdrop-filter:blur(12px);
   box-shadow:0 12px 34px rgba(0,0,0,.5)}
@@ -452,28 +456,28 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 
 /* ---- worlds ---- */
 .wcard{display:flex;gap:1.0cqw;align-items:center;padding:.85cqw 1.0cqw;
-  border-radius:12px;border:1px solid var(--line);margin-bottom:.6cqw;
+  border-radius:17px;border:1px solid var(--line);margin-bottom:.6cqw;
   background:rgba(255,255,255,.03);cursor:pointer;transition:all .14s}
 .wcard:hover{border-color:var(--line2);background:rgba(255,255,255,.06)}
 .wcard .badge{width:3.6cqw;height:3.6cqw;min-width:38px;min-height:38px;
-  border-radius:10px;flex:0 0 auto;display:grid;place-items:center;
+  border-radius:15px;flex:0 0 auto;display:grid;place-items:center;
   font-family:var(--disp);font-size:1.1cqw;color:#0B1018;font-weight:700}
 .wcard .wi{flex:1;min-width:0}
 .wcard h4{font-size:1.02cqw;font-weight:600}
 .wcard .sub{font-size:.8cqw;color:var(--ink3);letter-spacing:.04em}
 .wcard .perm{font-size:.7cqw;letter-spacing:.14em;text-transform:uppercase;
-  padding:.16cqw .55cqw;border-radius:6px;border:1px solid var(--line);
+  padding:.16cqw .55cqw;border-radius:11px;border:1px solid var(--line);
   color:var(--ink2)}
 .themes{display:grid;grid-template-columns:repeat(auto-fill,minmax(8cqw,1fr));
   gap:.5cqw;margin:.6cqw 0}
-.theme{padding:.7cqw;border-radius:10px;border:1px solid var(--line);
+.theme{padding:.7cqw;border-radius:15px;border:1px solid var(--line);
   cursor:pointer;text-align:center;font-size:.86cqw;transition:all .14s}
 .theme:hover{border-color:var(--line2)}
 .theme.on{border-color:var(--acc);background:rgba(59,224,200,.10);color:var(--acc)}
 .theme .sw{height:.7cqw;border-radius:99px;margin-bottom:.34cqw}
 .field{display:flex;gap:.5cqw;align-items:center;margin:.5cqw 0}
 .field input{flex:1;background:rgba(6,9,14,.7);border:1px solid var(--line);
-  border-radius:9px;color:var(--ink);font-family:var(--ui);font-size:.92cqw;
+  border-radius:14px;color:var(--ink);font-family:var(--ui);font-size:.92cqw;
   padding:.5cqw .8cqw;outline:0}
 .field input:focus{border-color:var(--acc)}
 
@@ -488,7 +492,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 
 /* ---- missions ---- */
 .mrow{display:flex;gap:.9cqw;align-items:center;padding:.7cqw .9cqw;
-  border-radius:11px;border:1px solid var(--line);margin-bottom:.5cqw;
+  border-radius:16px;border:1px solid var(--line);margin-bottom:.5cqw;
   background:rgba(255,255,255,.028)}
 .mrow.done{border-color:rgba(87,208,122,.42);background:rgba(87,208,122,.07)}
 .mrow .mi{flex:1;min-width:0}
@@ -501,19 +505,19 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
   background:linear-gradient(90deg,var(--acc2),var(--acc))}
 .mrow .ct{font-size:.76cqw;color:var(--ink3);min-width:4cqw;text-align:right}
 .mtype{font-size:.66cqw;letter-spacing:.16em;text-transform:uppercase;
-  color:var(--ink3);padding:.16cqw .5cqw;border-radius:6px;
+  color:var(--ink3);padding:.16cqw .5cqw;border-radius:11px;
   border:1px solid var(--line);white-space:nowrap}
 
 /* ---- NPC dialogue ---- */
 .dlg{position:absolute;left:50%;bottom:9.4cqw;transform:translateX(-50%);
   width:min(46cqw,720px);display:none;gap:1.0cqw;padding:1.0cqw 1.2cqw;
-  border-radius:14px;
+  border-radius:19px;
   background:linear-gradient(180deg,rgba(20,27,42,.96),rgba(10,15,24,.95));
   border:1px solid var(--line2);backdrop-filter:blur(12px);
   box-shadow:0 16px 44px rgba(0,0,0,.55)}
 .dlg.on{display:flex}
 .dlg .face{width:4.4cqw;height:4.4cqw;min-width:46px;min-height:46px;
-  border-radius:11px;flex:0 0 auto;
+  border-radius:16px;flex:0 0 auto;
   background:linear-gradient(160deg,#2C3A52,#151E2C);
   border:1px solid var(--line2);display:grid;place-items:center;
   font-family:var(--disp);font-size:1.6cqw;color:var(--acc)}
@@ -534,7 +538,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
   transition:opacity .2s}
 .chat .tabs2{display:flex;align-items:center;gap:.16cqw;padding:.2cqw .24cqw;
   border-bottom:1px solid var(--line)}
-.chat .ct{padding:.16cqw .5cqw;border-radius:5px;font-size:.66cqw;cursor:pointer;
+.chat .ct{padding:.16cqw .5cqw;border-radius:10px;font-size:.66cqw;cursor:pointer;
   color:var(--ink3);letter-spacing:.04em}
 .chat .ct:hover{color:var(--ink2);background:rgba(255,255,255,.05)}
 .chat .ct.on{color:var(--acc);background:rgba(59,224,200,.14)}
@@ -574,7 +578,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 
 .fishrig{position:absolute;left:50%;bottom:6.6cqw;transform:translateX(-50%);
   width:min(30cqw,460px);display:none;flex-direction:column;gap:.5cqw;
-  padding:.8cqw 1.0cqw;border-radius:14px;
+  padding:.8cqw 1.0cqw;border-radius:19px;
   background:linear-gradient(180deg,rgba(20,27,42,.94),rgba(10,15,24,.92));
   border:1px solid var(--line2);backdrop-filter:blur(12px);
   box-shadow:0 14px 40px rgba(0,0,0,.55)}
@@ -599,7 +603,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 /* the catch card */
 .catch{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) scale(.9);
   display:none;flex-direction:column;align-items:center;gap:.5cqw;
-  padding:1.3cqw 2.0cqw;border-radius:16px;
+  padding:1.3cqw 2.0cqw;border-radius:21px;
   background:linear-gradient(180deg,rgba(22,29,44,.97),rgba(12,17,26,.97));
   border:1px solid var(--line2);opacity:0;transition:all .3s ease;
   box-shadow:0 24px 60px rgba(0,0,0,.6)}
@@ -658,7 +662,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 
 /* ---- trading ---- */
 .tradewrap{display:flex;gap:1.1cqw}
-.tradeside{flex:1;min-width:0;border:1px solid var(--line);border-radius:12px;
+.tradeside{flex:1;min-width:0;border:1px solid var(--line);border-radius:17px;
   padding:.8cqw;background:rgba(255,255,255,.025)}
 .tradeside h4{font-size:.92cqw;font-weight:600;margin-bottom:.5cqw;
   display:flex;justify-content:space-between;align-items:center}
@@ -672,6 +676,30 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .tradetimer{height:.34cqw;border-radius:99px;background:rgba(6,9,14,.7);
   overflow:hidden;margin-top:.6cqw;border:1px solid var(--line)}
 .tradetimer>i{display:block;height:100%;background:var(--acc);transition:width 1s linear}
+
+/* ---- emote wheel ---- */
+.wheel{position:absolute;inset:0;z-index:34;display:none;
+  place-items:center;background:rgba(5,8,14,.44)}
+.wheel.on{display:grid}
+.wheel .ring{position:relative;width:30cqw;height:30cqw;
+  min-width:280px;min-height:280px}
+.wheel .em{position:absolute;transform:translate(-50%,-50%);
+  width:7.4cqw;height:7.4cqw;min-width:74px;min-height:74px;
+  display:grid;place-items:center;gap:.1cqw;border-radius:99px;
+  border:1px solid var(--line2);background:var(--panel2);cursor:pointer;
+  transition:transform .12s ease,border-color .12s ease,background .12s ease}
+.wheel .em:hover{transform:translate(-50%,-50%) scale(1.14);
+  border-color:var(--acc);background:rgba(79,227,176,.16)}
+.wheel .em b{font-size:2.1cqw;line-height:1;min-font-size:20px}
+.wheel .em span{font-size:.62cqw;letter-spacing:.10em;text-transform:uppercase;
+  color:var(--ink2)}
+.wheel .em i{position:absolute;top:.3cqw;right:.7cqw;font-style:normal;
+  font-size:.58cqw;color:var(--ink3)}
+.wheel .hub{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  text-align:center;pointer-events:none}
+.wheel .hub h4{font-family:var(--disp);font-size:1.3cqw;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--ink)}
+.wheel .hub p{font-size:.68cqw;color:var(--ink3);margin-top:.3cqw}
 
 /* ---- narrow / touch ---- */
 @container app (max-aspect-ratio: 13/9){
@@ -1241,7 +1269,7 @@ GL.shadowTarget=function(size){
   return {fb:fb,tex:tex,size:size,ok:ok};
 };
 
-GL.colorTarget=function(w,h,half){
+GL.colorTarget=function(w,h,half,depthAsTexture){
   var fb=gl.createFramebuffer();
   var tex=gl.createTexture();
   var ifmt=(half&&GL.extHF)?gl.RGBA16F:gl.RGBA8;
@@ -1254,8 +1282,20 @@ GL.colorTarget=function(w,h,half){
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
   gl.bindFramebuffer(gl.FRAMEBUFFER,fb);
   gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,tex,0);
-  var depth=null;
-  if(half!=='nodepth'){
+  var depth=null,depthTex=null;
+  if(depthAsTexture){
+    /* A renderbuffer is cheaper but cannot be sampled, and the outline
+       pass reads depth. Only the scene target pays for a texture. */
+    depthTex=gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D,depthTex);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.DEPTH_COMPONENT24,w,h,0,
+      gl.DEPTH_COMPONENT,gl.UNSIGNED_INT,null);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.TEXTURE_2D,depthTex,0);
+  }else if(half!=='nodepth'){
     depth=gl.createRenderbuffer();
     gl.bindRenderbuffer(gl.RENDERBUFFER,depth);
     gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT24,w,h);
@@ -1263,7 +1303,7 @@ GL.colorTarget=function(w,h,half){
   }
   var ok=gl.checkFramebufferStatus(gl.FRAMEBUFFER)===gl.FRAMEBUFFER_COMPLETE;
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);
-  return {fb:fb,tex:tex,depth:depth,w:w,h:h,ok:ok};
+  return {fb:fb,tex:tex,depth:depth,depthTex:depthTex,w:w,h:h,ok:ok};
 };
 
 GL.resizeColorTarget=function(t,w,h,half){
@@ -1273,7 +1313,11 @@ GL.resizeColorTarget=function(t,w,h,half){
   var type=(half&&GL.extHF)?gl.HALF_FLOAT:gl.UNSIGNED_BYTE;
   gl.bindTexture(gl.TEXTURE_2D,t.tex);
   gl.texImage2D(gl.TEXTURE_2D,0,ifmt,w,h,0,gl.RGBA,type,null);
-  if(t.depth){
+  if(t.depthTex){
+    gl.bindTexture(gl.TEXTURE_2D,t.depthTex);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.DEPTH_COMPONENT24,w,h,0,
+      gl.DEPTH_COMPONENT,gl.UNSIGNED_INT,null);
+  }else if(t.depth){
     gl.bindRenderbuffer(gl.RENDERBUFFER,t.depth);
     gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT24,w,h);
   }
@@ -2022,13 +2066,13 @@ R.solid=function(lo,hi,grain,seed,oct){
 
 R.grass=function(){
   return function(u,v){
-    var base=mixv(rgb('#3F7A34'),rgb('#6FB556'),tileFbm(u,v,5,11,4));
+    var base=mixv(rgb('#4C9B3A'),rgb('#89D465'),tileFbm(u,v,5,11,4));
     /* blade streaks: high-frequency stretched noise reads as grass at
        distance without any actual geometry */
     var blade=tileFbm(u*1.0,v*1.0,44,23,2);
-    base=mixv(base,rgb('#8FD36A'),blade*0.35);
+    base=mixv(base,rgb('#A9EC80'),blade*0.35);
     var dry=tileFbm(u,v,2.5,41,3);
-    if(dry>0.66)base=mixv(base,rgb('#93A05A'),(dry-0.66)*2.2);
+    if(dry>0.66)base=mixv(base,rgb('#B4C46A'),(dry-0.66)*2.2);
     var g=(M.hash2(u*SZ|0,v*SZ|0,77)-0.5)*22;
     return litv(base,g);
   };
@@ -2203,20 +2247,20 @@ R.concrete=function(lo,hi,seed){
 };
 
 R.foliage=function(lo,hi,seed){
-  lo=lo||'#1F5027';hi=hi||'#63B44A';
+  lo=lo||'#256B2C';hi=hi||'#79D257';
   return function(u,v){
     /* clumped leaf masses, not uniform green */
     var clump=tileFbm(u,v,8,seed||151,4);
     var fine=tileFbm(u,v,30,(seed||151)+3,2);
     var base=mixv(rgb(lo),rgb(hi),clump*0.7+fine*0.3);
-    if(fine>0.74)base=mixv(base,rgb('#9BD97A'),(fine-0.74)*2.4);
-    if(clump<0.28)base=mixv(base,rgb('#14331B'),(0.28-clump)*2.0);
+    if(fine>0.74)base=mixv(base,rgb('#B4F08C'),(fine-0.74)*2.4);
+    if(clump<0.28)base=mixv(base,rgb('#1B4523'),(0.28-clump)*2.0);
     return litv(base,(M.hash2(u*SZ|0,v*SZ|0,157)-0.5)*20);
   };
 };
 
 R.fabric=function(lo,hi,seed){
-  lo=lo||'#2A3550';hi=hi||'#47597F';
+  lo=lo||'#C4C9D2';hi=hi||'#ECEEF2';
   return function(u,v){
     /* a woven cross-hatch: two out-of-phase high-frequency sines */
     var wu=Math.sin(u*SZ*0.5*Math.PI)*0.5+0.5;
@@ -2373,7 +2417,7 @@ var LAYERS=[
   ['foliage', R.foliage()],
   ['foliagep',R.foliage('#5A2646','#D473A8',313)],   /* blossom */
   ['fabric',  R.fabric()],
-  ['fabricw', R.fabric('#6E2434','#C4566A',317)],
+  ['fabricw', R.fabric('#D8C0C6','#FBF2F4',317)],
   ['glass',   R.glass()],
   ['crystal', R.crystal()],
   ['gold',    R.gold()],
@@ -2461,6 +2505,20 @@ float wrapDiffuse(vec3 n,vec3 l,float w){
 }
 vec3 hemi(vec3 n){
   return mix(uGndCol,uSkyCol,n.y*0.5+0.5);
+}
+
+// Three light bands with soft shoulders. The shoulders matter: a hard
+// step aliases badly on a curved surface, and the whole point of the
+// look is that a sphere reads as two clean shapes rather than a
+// gradient with a staircase in it.
+uniform float uToon;      // 0 = smooth shading, 1 = fully banded
+float cel(float x){
+  return 0.34
+       + 0.30*smoothstep(0.30,0.40,x)
+       + 0.36*smoothstep(0.66,0.76,x);
+}
+float toonify(float x){
+  return mix(x,cel(x),uToon);
 }
 
 // ---- point lights ----
@@ -2620,7 +2678,11 @@ void main(){
 
   float sh = shadowAt(vWorld,n,l);
   float ndl = wrapDiffuse(n,l,0.35);
-  vec3 direct = uSunCol*ndl*sh;
+  // Shadow gets banded too. Leaving the PCF gradient smooth under a
+  // banded terminator puts a soft edge next to a hard one on the same
+  // surface, and the eye reads that as a bug rather than a style.
+  float shT = mix(sh, smoothstep(0.30,0.52,sh)*0.78+0.22, uToon);
+  vec3 direct = uSunCol*toonify(ndl)*shT;
   vec3 ambient = hemi(n);
 
   // Blinn specular, killed in shadow so wet-looking highlights don't
@@ -2632,8 +2694,8 @@ void main(){
 
   // Rim light picked out of the sky colour: separates a character from
   // the background without a outline pass.
-  float rim = pow(1.0-saturate(dot(n,v)),3.0);
-  col += uSkyCol*rim*0.16;
+  float rim = pow(1.0-saturate(dot(n,v)),mix(3.0,2.0,uToon));
+  col += uSkyCol*rim*(0.16+uToon*0.20);
 
   col += albedo*vEmis*3.0*uEmisScale;
 
@@ -2904,13 +2966,52 @@ precision highp float;
 uniform sampler2D uSrc;
 uniform sampler2D uBloom;
 uniform sampler2D uRays;
+uniform sampler2D uDepth;
 uniform float uBloomAmt;
 uniform float uRayAmt;
 uniform float uVignette;
+uniform float uOutline;
+uniform float uSat;
+uniform vec2 uNearFar;
 uniform float uTime;
 uniform vec2 uRes;
 in vec2 vNDC;
 layout(location=0) out vec4 oCol;
+
+float linDepth(vec2 uv){
+  float d=texture(uDepth,uv).r*2.0-1.0;
+  float n=uNearFar.x,f=uNearFar.y;
+  return (2.0*n*f)/(f+n-d*(f-n));
+}
+
+// Silhouette finder. The trick is the *second* derivative: a floor
+// seen at a grazing angle has a huge depth gradient and would outline
+// itself under a plain Sobel, but its curvature is nil. A silhouette
+// spikes the curvature, and that is the edge worth inking.
+uniform float uInkWidth;   // in pixels
+uniform vec2 uInkFade;     // metres: full strength, faded
+float edgeAt(vec2 uv){
+  // Tap radius in pixels, not in UV: a line that is one texel wide is
+  // a hairline at 1440p and a fat marker at 640p, and the drawing has
+  // to weigh the same at both.
+  vec2 t=uInkWidth/uRes;
+  float c=linDepth(uv);
+  float l=linDepth(uv-vec2(t.x,0.0));
+  float r=linDepth(uv+vec2(t.x,0.0));
+  float u=linDepth(uv+vec2(0.0,t.y));
+  float d=linDepth(uv-vec2(0.0,t.y));
+  float dx=abs(l+r-2.0*c);
+  float dy=abs(u+d-2.0*c);
+  // Scaled by distance so a line does not thicken into a blot as
+  // something walks away from the camera.
+  float e=smoothstep(0.055,0.24,(dx+dy)/max(c,0.4));
+  // Ink fades with distance. Past about sixty metres a single pixel
+  // spans several separate leaves, every one of them a silhouette, and
+  // a forest inked at full strength turns into a field of scribble.
+  // Near work stays drawn; the far side reads as colour.
+  return e*mix(1.0,0.16,smoothstep(uInkFade.x,uInkFade.y,c));
+}
+
 void main(){
   vec2 uv=vNDC*0.5+0.5;
   vec3 c=texture(uSrc,uv).rgb;
@@ -2918,6 +3019,16 @@ void main(){
   c+=texture(uRays,uv).rgb*uRayAmt;
 
   c=tonemap(c);
+
+  if(uOutline>0.001){
+    // A dark version of the surface's own colour, not black: a pure
+    // black line on bright grass reads as a hole, not as ink.
+    c=mix(c,c*vec3(0.16,0.17,0.22),edgeAt(uv)*uOutline);
+  }
+  if(uSat>0.0){
+    float lum=dot(c,vec3(0.2126,0.7152,0.0722));
+    c=mix(vec3(lum),c,1.0+uSat);
+  }
 
   float r=length(vNDC*vec2(1.0,0.92));
   c*=mix(1.0,smoothstep(1.45,0.35,r),uVignette);
@@ -2949,7 +3060,7 @@ R.scene={
   fogCol:M.v3(0.55,0.66,0.80),
   /* Tuned by eye against a 120m view: enough haze to give the far
      shore depth, not so much that the middle distance goes flat. */
-  fogDensity:0.0021,
+  fogDensity:0.0012,
   fogHeight:44,
   exposure:1.0,
   stars:0,
@@ -2959,7 +3070,18 @@ R.scene={
   emisScale:1.0,
   rays:0.34,
   rayDecay:0.955,
-  lampLevel:0
+  lampLevel:0,
+  /* The cartoon dial. `toon` bands the lighting, `outline` inks the
+     silhouettes, `saturation` is a straight chroma push after the
+     tonemap. All three at zero gives back the old stylized-realism
+     look exactly, which is what makes this a setting and not a
+     rewrite. */
+  toon:1.0,
+  outline:1.6,
+  inkWidth:1.35,
+  inkNear:24,
+  inkFar:150,
+  saturation:0.30
 };
 
 R.vp=M.m4();R.view=M.m4();R.proj=M.m4();R.invVP=M.m4();
@@ -2988,7 +3110,7 @@ R.init=function(canvas){
   R.shadow=GL.shadowTarget(SHADOW_SIZE);
   if(!R.shadow.ok){SHADOW_SIZE=1024;R.shadow=GL.shadowTarget(SHADOW_SIZE);}
 
-  sceneRT=GL.colorTarget(2,2,true);
+  sceneRT=GL.colorTarget(2,2,true,true);
   bloomA=GL.colorTarget(2,2,true);
   bloomB=GL.colorTarget(2,2,true);
   rayRT=GL.colorTarget(2,2,true);
@@ -3046,6 +3168,7 @@ function bindSceneUniforms(p){
   GL.u2f(p,'uFog',s.fogDensity,s.fogHeight);
   GL.u3v(p,'uEye',R.eye);
   GL.u1f(p,'uExposure',s.exposure);
+  GL.u1f(p,'uToon',s.toon);
   GL.u1f(p,'uTime',R.time);
 }
 
@@ -3131,8 +3254,8 @@ R.beginWater=function(floorY){
   GL.bindTex(0,LH.Tex.array,gl.TEXTURE_2D_ARRAY);
   GL.u1i(p,'uAtlas',0);
   GL.u1f(p,'uDetailLayer',LH.Tex.layer('water'));
-  GL.u3f(p,'uShallow',0.22,0.62,0.66);
-  GL.u3f(p,'uDeep',0.02,0.13,0.24);
+  GL.u3f(p,'uShallow',0.30,0.80,0.80);
+  GL.u3f(p,'uDeep',0.03,0.26,0.48);
   GL.u1f(p,'uFloorY',floorY===undefined?-3:floorY);
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
@@ -3220,6 +3343,17 @@ R.present=function(){
   GL.bindTex(0,sceneRT.tex,gl.TEXTURE_2D);GL.u1i(pc,'uSrc',0);
   GL.bindTex(1,bloomA.tex,gl.TEXTURE_2D);GL.u1i(pc,'uBloom',1);
   GL.bindTex(2,rayRT.tex,gl.TEXTURE_2D);GL.u1i(pc,'uRays',2);
+  GL.bindTex(3,sceneRT.depthTex,gl.TEXTURE_2D);GL.u1i(pc,'uDepth',3);
+  /* Recovered from the projection rather than plumbed through from the
+     camera: proj[14]/(proj[10]-1) is the near plane and
+     proj[14]/(proj[10]+1) the far one, so the outline pass cannot go
+     stale when something else changes the lens. */
+  var p10=R.proj[10],p14=R.proj[14];
+  GL.u2f(pc,'uNearFar',p14/(p10-1.0),p14/(p10+1.0));
+  GL.u1f(pc,'uOutline',sceneRT.depthTex?s.outline:0);
+  GL.u1f(pc,'uInkWidth',s.inkWidth);
+  GL.u2f(pc,'uInkFade',s.inkNear,s.inkFar);
+  GL.u1f(pc,'uSat',s.saturation);
   GL.u1f(pc,'uRayAmt',rayAmt);
   GL.u1f(pc,'uBloomAmt',s.bloom);
   GL.u1f(pc,'uVignette',s.vignette);
@@ -3379,7 +3513,7 @@ Cam.maxDist=13;
 Cam.fov=M.rad(58);
 Cam.near=0.12;
 Cam.far=520;
-Cam.height=1.62;               /* shoulder height above the follow point */
+Cam.height=1.36;               /* shoulder height above the follow point */
 Cam.shoulder=0.55;             /* lateral offset — over-the-shoulder framing */
 Cam.sensitivity=1.0;
 Cam.invertY=false;
@@ -3534,27 +3668,52 @@ var M=LH.M,Rig={};
    which puts it at roughly seven heads — heroic, but not the
    eight-head fashion-plate that would fight the sandbox proportions,
    and nowhere near the three-head chibi we are moving away from. */
+/* ---------------- proportions ----------------
+   The cartoon silhouette lives here, in one table, rather than in a
+   hundred literals spread across the skeleton and the model code.
+   Bones read it directly; LH.Body reads it through Rig.P for limb
+   lengths, limb thickness and head scale; the garments read the same
+   numbers so a sleeve cannot end up longer than the arm inside it.
+
+   The register is Club Penguin, not anatomy: a head about a fifth of
+   the body, short thick legs, arms that stop at the hip. Realistic
+   proportions were roughly seven and a half heads tall — this is
+   about four and a half, which is the range every toy-shaped
+   character in the genre sits in. */
+var P={
+  hipY:0.86, spine:0.10, chest:0.22, neck:0.16, headUp:0.19,
+  shoulderX:0.195, shoulderY:0.12, armOut:0.085,
+  armUp:0.23, armLo:0.21,
+  hipX:0.105, thigh:0.40, shin:0.40,
+  /* Geometry multipliers. headScale is applied about the head bone, so
+     raising it grows the skull in place rather than lifting it off the
+     neck; limbFat thickens arms and legs and the clothes over them by
+     the same factor, which is what keeps a sleeve outside its arm. */
+  headScale:1.45, limbFat:1.20, handScale:1.30, footScale:1.12
+};
+Rig.P=P;
+
 var BONES=[
   /* name,         parent,      offset x,y,z */
-  ['hips',        -1,           0,     0.98,  0    ],
-  ['spine',        0,           0,     0.12,  0    ],
-  ['chest',        1,           0,     0.26,  0    ],
-  ['neck',         2,           0,     0.20,  0    ],
-  ['head',         3,           0,     0.12,  0    ],
-  ['shoulderL',    2,           0.17,  0.13,  0    ],
-  ['armL',         5,           0.08,  0,     0    ],
-  ['forearmL',     6,           0,    -0.27,  0    ],
-  ['handL',        7,           0,    -0.25,  0    ],
-  ['shoulderR',    2,          -0.17,  0.13,  0    ],
-  ['armR',         9,          -0.08,  0,     0    ],
-  ['forearmR',    10,           0,    -0.27,  0    ],
-  ['handR',       11,           0,    -0.25,  0    ],
-  ['thighL',       0,           0.10, -0.06,  0    ],
-  ['shinL',       13,           0,    -0.46,  0    ],
-  ['footL',       14,           0,    -0.46,  0    ],
-  ['thighR',       0,          -0.10, -0.06,  0    ],
-  ['shinR',       16,           0,    -0.46,  0    ],
-  ['footR',       17,           0,    -0.46,  0    ]
+  ['hips',        -1,           0,          P.hipY,       0],
+  ['spine',        0,           0,          P.spine,      0],
+  ['chest',        1,           0,          P.chest,      0],
+  ['neck',         2,           0,          P.neck,       0],
+  ['head',         3,           0,          P.headUp,     0],
+  ['shoulderL',    2,           P.shoulderX, P.shoulderY, 0],
+  ['armL',         5,           P.armOut,   0,            0],
+  ['forearmL',     6,           0,         -P.armUp,      0],
+  ['handL',        7,           0,         -P.armLo,      0],
+  ['shoulderR',    2,          -P.shoulderX, P.shoulderY, 0],
+  ['armR',         9,          -P.armOut,   0,            0],
+  ['forearmR',    10,           0,         -P.armUp,      0],
+  ['handR',       11,           0,         -P.armLo,      0],
+  ['thighL',       0,           P.hipX,    -0.06,         0],
+  ['shinL',       13,           0,         -P.thigh,      0],
+  ['footL',       14,           0,         -P.shin,       0],
+  ['thighR',       0,          -P.hipX,    -0.06,         0],
+  ['shinR',       16,           0,         -P.thigh,      0],
+  ['footR',       17,           0,         -P.shin,       0]
 ];
 
 var NB=BONES.length;
@@ -4032,6 +4191,54 @@ C.sit=function(p,ph,pr){
   return p;
 };
 
+C.laugh=function(p,ph,pr){
+  p.clear();
+  var t=ph*TAU;
+  /* The shake is doubled against the breath so the body jolts twice
+     per cycle while the head only rocks once — that mismatch is what
+     reads as laughing rather than nodding. */
+  var sh=sin(t*4);
+  p.rootY=Math.abs(sh)*0.035;
+  p.set('chest',-0.24+sh*0.05,0,sin(t)*0.05);
+  p.set('head',-0.34+sh*0.07,sin(t*0.5)*0.10,0);
+  p.set('armL',-0.62,0.20,0.62);
+  p.set('armR',-0.62,-0.20,-0.62);
+  p.set('forearmL',-1.70-sh*0.06,0,0.30);
+  p.set('forearmR',-1.70-sh*0.06,0,-0.30);
+  p.set('thighL',0.06,0,0.08);
+  p.set('thighR',0.06,0,-0.08);
+  p.set('shinL',-0.08,0,0);p.set('shinR',-0.08,0,0);
+  return p;
+};
+C.clap=function(p,ph,pr){
+  p.clear();
+  var t=ph*TAU;
+  /* Hands meet at the extremes of the sine, so the clap lands on the
+     beat rather than halfway through the swing. */
+  var open=(sin(t)*0.5+0.5);
+  p.set('chest',-0.10,0,0);
+  p.set('head',-0.06,0,0);
+  p.set('armL',-1.18,0.10,0.34+open*0.30);
+  p.set('armR',-1.18,-0.10,-0.34-open*0.30);
+  p.set('forearmL',-1.05,0,0.26-open*0.24);
+  p.set('forearmR',-1.05,0,-0.26+open*0.24);
+  p.set('handL',0,0,0.20);
+  p.set('handR',0,0,-0.20);
+  p.rootY=-open*0.012;
+  return p;
+};
+C.point=function(p,ph,pr){
+  C.idle(p,ph*0.35,pr);
+  var t=M.clamp(ph,0,1);
+  var out=ease(M.clamp(t/0.18,0,1))*(1-ease(M.clamp((t-0.74)/0.26,0,1)));
+  p.set('armR',-1.62*out,0,-0.18-out*0.10);
+  p.set('forearmR',-0.10*out,0,-0.06);
+  p.set('handR',0,0,-0.06);
+  p.set('chest',-0.04,-0.18*out,0);
+  p.set('head',0.02,-0.22*out,0);
+  return p;
+};
+
 /* ---------------- the state machine ----------------
    States name a clip, a period, whether they loop, and what they fall
    back to. Transitions crossfade; a one-shot returns to its `next`
@@ -4054,10 +4261,14 @@ var STATES={
   wave:      {clip:'wave',      period:1.6,  loop:false, blend:0.22, pri:3, next:'idle'},
   celebrate: {clip:'celebrate', period:1.5,  loop:true,  blend:0.24, pri:3},
   dance:     {clip:'dance',     period:2.0,  loop:true,  blend:0.30, pri:3},
-  sit:       {clip:'sit',       period:6.0,  loop:true,  blend:0.34, pri:3}
+  sit:       {clip:'sit',       period:6.0,  loop:true,  blend:0.34, pri:3},
+  laugh:     {clip:'laugh',     period:1.15, loop:true,  blend:0.20, pri:3},
+  clap:      {clip:'clap',      period:0.62, loop:true,  blend:0.18, pri:3},
+  point:     {clip:'point',     period:1.5,  loop:false, blend:0.18, pri:3, next:'idle'}
 };
 Rig.STATES=STATES;
-Rig.EMOTES=['wave','celebrate','dance','sit'];
+/* Order is the wheel's order, clockwise from the top. */
+Rig.EMOTES=['wave','dance','laugh','celebrate','clap','point','sit'];
 
 function Anim(){
   this.state='idle';
@@ -4173,6 +4384,8 @@ LH.Rig=Rig;
 (function(){
 'use strict';
 var M=LH.M,Geo=LH.Geo,Body={};
+var P=LH.Rig.P;          /* the proportions table — see LH.Rig */
+var FAT=P.limbFat;
 
 var cache={};
 /* Parts are built on demand: a session that never equips wings never
@@ -4200,6 +4413,7 @@ var LIT='#FFFFFF', MID='#D2D2D2', LOW='#A8A8A8', DARK='#7C7C7C', DEEP='#585858';
 Body.head=function(){
   return part('head',function(b){
     b.mat('blank');
+    b.push();b.scale(P.headScale,P.headScale,P.headScale);
     var n=14;
     /* cross-sections from under the chin up over the crown */
     var secs=[
@@ -4251,6 +4465,7 @@ Body.head=function(){
     /* lips: a shallow shelf, enough to catch a shadow */
     b.push();b.translate(0,-0.056,0.100);
     b.chamfer(0,0,0,0.054,0.015,0.015,DARK,0.005,{noBand:true});b.pop();
+    b.pop();
   });
 };
 
@@ -4259,6 +4474,7 @@ Body.head=function(){
 Body.eyes=function(){
   return part('eyes',function(b){
     b.mat('blank');
+    b.push();b.scale(P.headScale,P.headScale,P.headScale);
     for(var s=-1;s<=1;s+=2){
       var x=s*0.046;
       /* Socket, then eyeball. Both are pulled back so their front
@@ -4269,39 +4485,44 @@ Body.eyes=function(){
          whose own front surface is ahead of the eyeball hides the
          eyeball completely, which is what the first attempt did. */
       b.push();b.translate(x,0.008,0.072);b.rotate(0,s*-0.14,0);
-      b.sphere(0,0,0,0.031,10,8,DEEP,{squash:0.60});
+      b.sphere(0,0,0,0.036,10,8,DEEP,{squash:0.64});
       b.pop();
       b.push();b.translate(x,0.008,0.087);b.rotate(0,s*-0.14,0);
-      b.sphere(0,0,0,0.0200,10,8,LIT,{squash:0.72});
+      b.sphere(0,0,0,0.0248,10,8,LIT,{squash:0.76});
       b.pop();
     }
+    b.pop();
   });
 };
 /* The iris carries the player's eye colour, so it is a separate tint. */
 Body.iris=function(){
   return part('iris',function(b){
     b.mat('blank');
+    b.push();b.scale(P.headScale,P.headScale,P.headScale);
     for(var s=-1;s<=1;s+=2){
       var x=s*0.050;
-      b.push();b.translate(x,0.008,0.0995);b.rotate(0,s*-0.14,0);
-      b.sphere(0,0,0,0.0105,10,8,LIT,{squash:0.95});
+      b.push();b.translate(x,0.008,0.1015);b.rotate(0,s*-0.14,0);
+      b.sphere(0,0,0,0.0132,10,8,LIT,{squash:0.95});
       /* pupil and a single specular glint — the glint is what makes a
          stylised eye look alive rather than glassy */
-      b.sphere(0,0,0.005,0.0052,8,6,'#101010');
-      b.sphere(0.004,0.005,0.007,0.0026,6,5,'#FFFFFF');
+      b.sphere(0,0,0.005,0.0066,8,6,'#101010');
+      b.sphere(0.005,0.006,0.008,0.0032,6,5,'#FFFFFF');
       b.pop();
     }
+    b.pop();
   });
 };
 
 Body.brows=function(){
   return part('brows',function(b){
     b.mat('blank');
+    b.push();b.scale(P.headScale,P.headScale,P.headScale);
     for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*0.051,0.036,0.099);b.rotate(0,s*-0.16,s*0.10);
-      b.chamfer(0,0,0,0.052,0.010,0.014,LIT,0.004,{noBand:true});
+      b.push();b.translate(s*0.052,0.042,0.099);b.rotate(0,s*-0.16,s*0.10);
+      b.chamfer(0,0,0,0.056,0.013,0.014,LIT,0.004,{noBand:true});
       b.pop();
     }
+    b.pop();
   });
 };
 
@@ -4374,18 +4595,19 @@ Body.hips=function(){
 Body.upperArm=function(){
   return part('upperArm',function(b){
     b.mat('blank');
-    b.limb(0.27,0.062,0.050,LIT,{seg:10,bulge:0.10});
+    b.limb(P.armUp,0.062*FAT,0.050*FAT,LIT,{seg:10,bulge:0.10});
   });
 };
 Body.forearm=function(){
   return part('forearm',function(b){
     b.mat('blank');
-    b.limb(0.25,0.052,0.038,LIT,{seg:10,bulge:0.06});
+    b.limb(P.armLo,0.052*FAT,0.038*FAT,LIT,{seg:10,bulge:0.06});
   });
 };
 Body.hand=function(){
   return part('hand',function(b){
     b.mat('blank');
+    b.push();b.scale(P.handScale,P.handScale,P.handScale);
     /* palm plus a mitten of fingers and a separate thumb — at the size
        a hand occupies on screen, five modelled fingers are wasted
        triangles, but a visible thumb is the difference between a hand
@@ -4396,27 +4618,29 @@ Body.hand=function(){
     b.chamfer(0,0,0,0.044,0.056,0.062,MID,0.022);b.pop();
     b.push();b.translate(0.030,-0.048,0.028);b.rotate(0,0,-0.5);
     b.chamfer(0,0,0,0.024,0.048,0.026,MID,0.010);b.pop();
+    b.pop();
   });
 };
 Body.thigh=function(){
   return part('thigh',function(b){
     b.mat('blank');
-    b.limb(0.46,0.092,0.068,LIT,{seg:12,bulge:0.08,steps:8});
+    b.limb(P.thigh,0.092*FAT,0.068*FAT,LIT,{seg:12,bulge:0.08,steps:8});
   });
 };
 Body.shin=function(){
   return part('shin',function(b){
     b.mat('blank');
-    b.limb(0.46,0.070,0.046,LIT,{seg:10,bulge:0.10,steps:8});
+    b.limb(P.shin,0.070*FAT,0.046*FAT,LIT,{seg:10,bulge:0.10,steps:8});
     /* calf mass sits behind and high */
-    b.push();b.translate(0,-0.14,-0.028);
-    b.sphere(0,0,0,0.052,10,8,MID,{squash:1.9});b.pop();
+    b.push();b.translate(0,-0.12,-0.030);
+    b.sphere(0,0,0,0.052*FAT,10,8,MID,{squash:1.8});b.pop();
   });
 };
 Body.foot=function(style){
   style=style||'shoe';
   return part('foot:'+style,function(b){
     b.mat('blank');
+    b.scale(P.footScale,P.footScale,P.footScale);
     if(style==='bare'){
       b.push();b.translate(0,-0.030,0.036);
       b.chamfer(0,0,0,0.082,0.056,0.190,LIT,0.024);b.pop();
@@ -4505,16 +4729,19 @@ Body.shirt=function(style){
 Body.sleeve=function(which){
   return part('sleeve:'+which,function(b){
     b.mat('fabric');
-    var len=which==='long'?0.28:0.14;
-    b.limb(len,0.074,which==='long'?0.052:0.064,LIT,
+    /* Derived from the arm bone rather than written out: a sleeve that
+       is longer than the arm inside it is the one clothing bug you
+       cannot see until someone raises their hand. */
+    var len=which==='long'?P.armUp+0.01:P.armUp*0.58;
+    b.limb(len,0.074*FAT,(which==='long'?0.052:0.064)*FAT,LIT,
       {seg:10,steps:5,joint:false,uvScale:2});
     /* shoulder cap, so the deltoid does not show a ring of skin */
-    b.sphere(0,0.006,0,0.072,10,7,LIT);
+    b.sphere(0,0.006,0,0.072*FAT,10,7,LIT);
     /* a cuff, so the sleeve ends in something rather than stopping */
     b.push();b.translate(0,-len,0);
     b.loft([
-      {y:-0.014,pts:Geo.circle(which==='long'?0.050:0.062,10)},
-      {y: 0.010,pts:Geo.circle(which==='long'?0.052:0.064,10)}
+      {y:-0.014,pts:Geo.circle((which==='long'?0.050:0.062)*FAT,10)},
+      {y: 0.010,pts:Geo.circle((which==='long'?0.052:0.064)*FAT,10)}
     ],MID,{openTop:true,openBottom:true});
     b.pop();
   });
@@ -4547,15 +4774,15 @@ Body.pants=function(style){
 Body.legwearLower=function(style){
   return part('legwearLower:'+style,function(b){
     b.mat('fabric');
-    var len=0.44;
-    b.limb(len,0.090,0.058,LIT,{seg:10,steps:5,joint:false,uvScale:2});
+    var len=P.shin-0.02;
+    b.limb(len,0.090*FAT,0.058*FAT,LIT,{seg:10,steps:5,joint:false,uvScale:2});
     /* cover the knee: the shin's own joint sphere sits at this bone's
        origin and pokes through anything cut flush */
-    b.sphere(0,0.010,0,0.086,10,7,LIT);
+    b.sphere(0,0.010,0,0.086*FAT,10,7,LIT);
     b.push();b.translate(0,-len,0);
     b.loft([
-      {y:-0.014,pts:Geo.circle(0.060,10)},
-      {y: 0.014,pts:Geo.circle(0.062,10)}
+      {y:-0.014,pts:Geo.circle(0.060*FAT,10)},
+      {y: 0.014,pts:Geo.circle(0.062*FAT,10)}
     ],MID,{openTop:true,openBottom:true});
     b.pop();
   });
@@ -4564,14 +4791,14 @@ Body.legwearLower=function(style){
 Body.legwear=function(style){
   return part('legwear:'+style,function(b){
     b.mat('fabric');
-    var len=style==='shorts'?0.22:0.50;
-    b.limb(len,0.112,style==='shorts'?0.100:0.080,LIT,
+    var len=style==='shorts'?P.thigh*0.48:P.thigh+0.04;
+    b.limb(len,0.112*FAT,(style==='shorts'?0.100:0.080)*FAT,LIT,
       {seg:12,steps:6,joint:false,uvScale:2});
-    b.sphere(0,0.010,0,0.108,12,8,LIT);
+    b.sphere(0,0.010,0,0.108*FAT,12,8,LIT);
     b.push();b.translate(0,-len,0);
     b.loft([
-      {y:-0.016,pts:Geo.circle(style==='shorts'?0.096:0.078,12)},
-      {y: 0.012,pts:Geo.circle(style==='shorts'?0.098:0.080,12)}
+      {y:-0.016,pts:Geo.circle((style==='shorts'?0.096:0.078)*FAT,12)},
+      {y: 0.012,pts:Geo.circle((style==='shorts'?0.098:0.080)*FAT,12)}
     ],MID,{openTop:true,openBottom:true});
     b.pop();
   });
@@ -4674,7 +4901,10 @@ Body.HAIR=Object.keys(HAIR_BUILD);
 /* Hair and hats are authored against a reference skull and scaled onto
    the real one here, so changing the head's profile does not mean
    re-measuring eleven hairstyles by hand. */
-var HEAD_FIT=[1.085,1.060,1.085];
+/* Hair and hats were modelled against the original skull. They are
+   scaled to fit it, and now also by the cartoon head scale, so growing
+   the head does not bury every hairstyle inside it. */
+var HEAD_FIT=[1.085*P.headScale,1.060*P.headScale,1.085*P.headScale];
 Body.hair=function(style){
   style=HAIR_BUILD[style]?style:'crop';
   return part('hair:'+style,function(b){
@@ -5284,6 +5514,13 @@ A.defaultKit=function(seed){
   var SKIN=['#F2C9A4','#E3AE83','#C98B62','#9C6242','#75462C','#54321F','#FBDCC0'];
   var HAIRC=['#2B2118','#4A3222','#7A5230','#A87740','#D8B978','#8E3B2E','#2A2E3A'];
   var EYEC=['#4A7FB5','#4E6B3A','#6B4A2C','#3A3F4A','#5C4B8A'];
+  /* Everyone arrives in a colour. A plaza of people in slate reads as
+     a crowd of extras; a plaza of people in eight bright tees reads as
+     a place worth standing in. */
+  var TEE=['#FF7A6B','#FFB84D','#5BC8FF','#8BE06A','#C08BFF','#FF8FC7',
+           '#4FE3B0','#FFE066','#FF9A5B','#7FA8FF'];
+  var TROUSER=['#3E63C8','#59606E','#7A5230','#3F7A5E','#8C4A6E','#2F3A52'];
+  var SHOE=['#37405C','#8E3B2E','#2E5A46','#5A4630','#3A3F4A'];
   return {
     scale:1,
     skin:SKIN[(rng()*SKIN.length)|0],
@@ -5291,9 +5528,9 @@ A.defaultKit=function(seed){
     build:'base',
     hair:{style:'crop',color:HAIRC[(rng()*HAIRC.length)|0]},
     hat:{style:'none',color:'#FFFFFF'},
-    shirt:{style:'tee',color:'#8C93A0',sleeve:'short'},
-    pants:{style:'long',color:'#4A5160',leg:'long'},
-    shoes:{style:'shoe',color:'#3A3F4A'},
+    shirt:{style:'tee',color:TEE[(rng()*TEE.length)|0],sleeve:'short'},
+    pants:{style:'long',color:TROUSER[(rng()*TROUSER.length)|0],leg:'long'},
+    shoes:{style:'shoe',color:SHOE[(rng()*SHOE.length)|0]},
     wings:{style:'none',color:'#FFFFFF'},
     cape:{style:'none',color:'#FFFFFF'},
     back:{style:'none',color:'#FFFFFF'},
@@ -7548,13 +7785,16 @@ var BIND={
   KeyW:'fwd',KeyS:'back',KeyA:'left',KeyD:'right',
   ArrowUp:'fwd',ArrowDown:'back',ArrowLeft:'left',ArrowRight:'right',
   Space:'jump',ShiftLeft:'run',ShiftRight:'run',
-  KeyE:'interact',KeyF:'interact',
-  KeyQ:'tool',KeyC:'crouch',
+  KeyE:'interact',
+  KeyZ:'tool',KeyC:'crouch',
   KeyX:'fly',KeyR:'rotate',
   Digit1:'slot1',Digit2:'slot2',Digit3:'slot3',Digit4:'slot4',Digit5:'slot5',
   Digit6:'slot6',Digit7:'slot7',Digit8:'slot8',Digit9:'slot9',Digit0:'slot0',
-  Tab:'inventory',KeyI:'inventory',KeyM:'map',KeyJ:'missions',
-  KeyP:'profile',KeyT:'chat',KeyB:'build',KeyG:'worlds',KeyK:'craft',
+  Tab:'inventory',KeyI:'inventory',KeyM:'map',
+  KeyQ:'missions',KeyJ:'missions',
+  KeyF:'profile',KeyP:'profile',
+  KeyT:'trade',Enter:'chat',
+  KeyB:'build',KeyG:'worlds',KeyK:'craft',
   Escape:'menu',KeyV:'emote',KeyH:'help'
 };
 I.BIND=BIND;
@@ -7743,8 +7983,11 @@ Pl.grounded=true;
 Pl.inWater=false;
 Pl.swimming=false;
 Pl.radius=0.36;
-Pl.height=1.82;
-Pl.eyeH=1.62;
+/* Crown lands at about 1.78 m with the cartoon proportions: shorter
+   legs and a much bigger head roughly cancel out, so the capsule
+   barely moves. */
+Pl.height=1.78;
+Pl.eyeH=1.50;
 
 var WALK=4.2, RUN=7.6, SWIM=2.8, FLY=9.5;
 var ACCEL=26, AIRACCEL=6, FRICTION=13;
@@ -7932,9 +8175,15 @@ Pl.update=function(dt){
 
   /* ---- animation ---- */
   var st=a.anim.state;
+  /* A looping emote holds until you do something else. Dancing through
+     a walk cycle, or staying seated while swimming, reads as a bug the
+     first time anyone sees it. */
+  var emoting=LH.Rig.EMOTES.indexOf(st)>=0;
+  if(emoting&&(speed>0.35||!Pl.grounded||Pl.swimming)){
+    a.anim.play('idle');emoting=false;st='idle';
+  }
   var busy=(st==='mine'||st==='build'||st==='attack'||st==='hurt'||
-            st==='fishCast'||st==='fishWait'||st==='fishReel'||
-            st==='wave'||st==='celebrate'||st==='dance'||st==='sit');
+            st==='fishCast'||st==='fishWait'||st==='fishReel'||emoting);
   if(!busy){
     if(Pl.flying){
       /* the fall clip reads as hovering once gravity is off */
@@ -9606,6 +9855,7 @@ var ICON={
   mail:'M3 6h18v12H3V6zm0 0l9 7 9-7',
   people:'M16 20v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 10a4 4 0 100-8 4 4 0 000 8zm13 10v-2a4 4 0 00-3-3.9M16 2.1a4 4 0 010 7.8',
   world:'M12 21a9 9 0 100-18 9 9 0 000 18zm-9-9h18M12 3a14 14 0 000 18 14 14 0 000-18z',
+  emote:'M12 21a9 9 0 100-18 9 9 0 000 18zM8.5 14a4.5 4.5 0 007 0M9 9.5v.01M15 9.5v.01',
   cursor:'M5 3l14 7-6 2-2 6-6-15z',
   place:'M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zm0 0v18m8-13.5L12 12 4 7.5',
   remove:'M4 7h16M9 7V5h6v2m-8 0l1 13h8l1-13',
@@ -9632,6 +9882,7 @@ var MENU=[
   ['Trade','trade','T','trade'],
   ['Worlds','world','G','worlds'],
   ['Friends','friends','F','profile'],
+  ['Emotes','emote','V','emotes'],
   ['Settings','gear','ESC','menu']
 ];
 
@@ -9646,6 +9897,37 @@ var ACTS=[
   ['Fly Up','up','flyup'],
   ['Fly Down','down','flydown']
 ];
+
+/* Labels and glyphs for LH.Rig.EMOTES, in the same order — the wheel
+   places them clockwise from the top. */
+var EMOTE_UI=[
+  ['wave',     '\u{1F44B}','Wave'],
+  ['dance',    '\u{1F57A}','Dance'],
+  ['laugh',    '\u{1F604}','Laugh'],
+  ['celebrate','\u{1F389}','Cheer'],
+  ['clap',     '\u{1F44F}','Clap'],
+  ['point',    '\u{1F449}','Point'],
+  ['sit',      '\u{1FA91}','Sit']
+];
+var wheelOn=false;
+
+/* Play an emote and shut the wheel. Emotes are pure presentation —
+   they never touch the authority boundary, which is why this is the
+   whole of it. */
+U.emote=function(name){
+  var pl=LH.Game&&LH.Game.player;
+  if(pl)pl.anim.play(name,true);
+  U.wheel(false);
+  LH.Audio&&LH.Audio.play('ui');
+};
+U.wheel=function(on){
+  if(!els.wheel)return false;
+  wheelOn=(on===undefined)?!wheelOn:!!on;
+  els.wheel.classList.toggle('on',wheelOn);
+  return wheelOn;
+};
+U.wheelOn=function(){return wheelOn;};
+U.EMOTE_UI=EMOTE_UI;
 
 U.init=function(){
   hud=document.getElementById('hud');
@@ -9728,6 +10010,7 @@ U.init=function(){
     row.addEventListener('click',function(){
       LH.Audio&&LH.Audio.play('ui');
       if(m[3]==='buildmode')U.toggleBuild();
+      else if(m[3]==='emotes')U.wheel(true);
       else U.open(m[3]);
     });
     menu.appendChild(row);
@@ -9901,6 +10184,26 @@ U.init=function(){
   makePanel('worlds','Worlds',['My Worlds','New World']);
   makePanel('trade','Trade',null);
   makePanel('menu','Menu',null);
+
+  /* ---- emote wheel ----
+     Laid out on a circle from one list, so adding an emote is a row in
+     LH.Rig.EMOTES and a label here rather than a chunk of markup. */
+  els.wheel=el('div','wheel pe');
+  var ring=el('div','ring');
+  EMOTE_UI.forEach(function(e,i){
+    var a=(i/EMOTE_UI.length)*Math.PI*2-Math.PI/2;
+    var btn=el('div','em');
+    btn.style.left=(50+Math.cos(a)*41)+'%';
+    btn.style.top=(50+Math.sin(a)*41)+'%';
+    btn.innerHTML='<b>'+e[1]+'</b><span>'+e[2]+'</span><i>'+(i+1)+'</i>';
+    btn.addEventListener('click',function(){U.emote(e[0]);});
+    ring.appendChild(btn);
+  });
+  var hub=el('div','hub');
+  hub.innerHTML='<h4>Emotes</h4><p>1–'+EMOTE_UI.length+' or click · V closes</p>';
+  ring.appendChild(hub);
+  els.wheel.appendChild(ring);
+  hud.appendChild(els.wheel);
 
   els.travel=el('div');
   els.travel.id='travel';
@@ -12960,15 +13263,15 @@ S.wet=0;               /* 0..1, eased so weather changes are not a cut */
    snapping from night to day. */
 var KEY=[
   /* hour  sun            zenith         horizon        fog            amb sky        amb gnd       exp   stars */
-  [ 0.0, [0.10,0.13,0.26],[0.01,0.02,0.07],[0.05,0.07,0.16],[0.05,0.07,0.14],[0.05,0.07,0.14],[0.02,0.02,0.03],1.10,1.0],
-  [ 5.0, [0.20,0.17,0.26],[0.03,0.05,0.14],[0.16,0.13,0.22],[0.14,0.13,0.20],[0.08,0.09,0.16],[0.03,0.03,0.04],1.05,0.8],
-  [ 6.6, [1.05,0.55,0.34],[0.09,0.16,0.38],[0.72,0.44,0.34],[0.56,0.42,0.40],[0.16,0.16,0.26],[0.07,0.06,0.06],1.00,0.15],
-  [ 8.5, [1.15,0.96,0.78],[0.10,0.26,0.58],[0.58,0.68,0.84],[0.55,0.66,0.80],[0.17,0.23,0.34],[0.11,0.10,0.09],1.00,0.0],
-  [12.5, [1.18,1.10,0.98],[0.11,0.31,0.66],[0.62,0.74,0.90],[0.60,0.72,0.88],[0.20,0.26,0.36],[0.13,0.12,0.11],0.98,0.0],
-  [17.0, [1.16,0.98,0.74],[0.10,0.27,0.60],[0.64,0.70,0.84],[0.60,0.68,0.82],[0.18,0.23,0.34],[0.12,0.11,0.10],1.00,0.0],
-  [19.2, [1.20,0.52,0.26],[0.10,0.14,0.36],[0.86,0.42,0.26],[0.66,0.40,0.34],[0.18,0.15,0.22],[0.08,0.06,0.05],1.02,0.2],
-  [20.6, [0.42,0.26,0.30],[0.04,0.06,0.18],[0.26,0.16,0.26],[0.20,0.16,0.26],[0.09,0.10,0.18],[0.04,0.03,0.04],1.08,0.7],
-  [24.0, [0.10,0.13,0.26],[0.01,0.02,0.07],[0.05,0.07,0.16],[0.05,0.07,0.14],[0.05,0.07,0.14],[0.02,0.02,0.03],1.10,1.0]
+  [ 0.0, [0.14,0.18,0.34],[0.02,0.03,0.12],[0.07,0.10,0.24],[0.07,0.10,0.22],[0.07,0.10,0.20],[0.04,0.04,0.06],1.10,1.0],
+  [ 5.0, [0.26,0.22,0.34],[0.04,0.08,0.22],[0.22,0.18,0.32],[0.19,0.18,0.28],[0.11,0.13,0.22],[0.05,0.05,0.07],1.05,0.8],
+  [ 6.6, [1.10,0.60,0.38],[0.10,0.20,0.48],[0.92,0.56,0.42],[0.72,0.54,0.50],[0.21,0.21,0.32],[0.10,0.09,0.09],1.00,0.15],
+  [ 8.5, [1.16,1.00,0.84],[0.10,0.32,0.76],[0.66,0.82,0.97],[0.64,0.81,0.96],[0.23,0.30,0.42],[0.16,0.15,0.13],1.00,0.0],
+  [12.5, [1.18,1.12,1.02],[0.10,0.37,0.84],[0.70,0.87,1.00],[0.69,0.86,1.00],[0.26,0.34,0.46],[0.19,0.18,0.16],0.98,0.0],
+  [17.0, [1.17,1.02,0.80],[0.10,0.33,0.78],[0.72,0.84,0.96],[0.70,0.83,0.95],[0.24,0.31,0.43],[0.17,0.16,0.14],1.00,0.0],
+  [19.2, [1.22,0.58,0.30],[0.11,0.18,0.46],[1.00,0.54,0.34],[0.82,0.52,0.44],[0.23,0.20,0.29],[0.11,0.09,0.08],1.02,0.2],
+  [20.6, [0.50,0.32,0.36],[0.05,0.09,0.26],[0.34,0.22,0.36],[0.27,0.22,0.35],[0.13,0.14,0.24],[0.06,0.05,0.06],1.08,0.7],
+  [24.0, [0.14,0.18,0.34],[0.02,0.03,0.12],[0.07,0.10,0.24],[0.07,0.10,0.22],[0.07,0.10,0.20],[0.04,0.04,0.06],1.10,1.0]
 ];
 
 function sample(h){
@@ -13032,7 +13335,7 @@ S.update=function(dt){
   M.set3(sd.fogCol,fog[0],fog[1],fog[2]);
   M.set3(sd.skyCol,ambS[0]*w.ambMul,ambS[1]*w.ambMul,ambS[2]*w.ambMul);
   M.set3(sd.gndCol,ambG[0]*w.ambMul,ambG[1]*w.ambMul,ambG[2]*w.ambMul);
-  sd.fogDensity=0.0021*w.fogMul;
+  sd.fogDensity=0.0012*w.fogMul;
   sd.exposure=exp*w.exp;
   sd.stars=stars;
   /* Night and rain both want more bloom: wet surfaces and lit windows
@@ -13109,9 +13412,9 @@ App.stage('Waking the harbour',function(){
   var spawn=W.spawn;
   var kit=Act.defaultKit(7);
   kit.hair.style='swept';
-  kit.shirt.style='jacket';kit.shirt.color='#3A4658';kit.shirt.sleeve='long';
-  kit.pants.color='#2E3542';
-  kit.shoes.color='#22262E';
+  kit.shirt.style='hoodie';kit.shirt.color='#4FC3F7';kit.shirt.sleeve='long';
+  kit.pants.color='#3E63C8';
+  kit.shoes.color='#F5A03C';
   G.player=Act.Actor({x:spawn[0],y:spawn[1],z:spawn[2],kit:kit,name:'You'});
   Pl.init(G.player);
 
@@ -13127,11 +13430,11 @@ App.stage('Waking the harbour',function(){
     var k=Act.defaultKit(i*31+5);
     k.hair.style=LH.Body.HAIR[(rng()*LH.Body.HAIR.length)|0];
     k.shirt.style=['tee','jacket','hoodie'][(rng()*3)|0];
-    k.shirt.color=['#C4485E','#3E7BE0','#38A86A','#F5A03C','#B269FF','#3BE0C8',
-                   '#8E97A4','#D8D2C4'][(rng()*8)|0];
+    k.shirt.color=['#FF6B6B','#4FA8FF','#4FD08A','#FFB84D','#C08BFF','#4FE3B0',
+                   '#FF8FC7','#FFE066'][(rng()*8)|0];
     k.shirt.sleeve=rng()<0.5?'long':'short';
-    k.pants.color=Geo.shade(k.shirt.color,-58);
-    k.shoes.color='#2E333C';
+    k.pants.color=Geo.shade(k.shirt.color,-42);
+    k.shoes.color='#3A404C';
     if(rng()<0.25)k.hat.style=LH.Body.HATS[(rng()*LH.Body.HATS.length)|0];
     if(rng()<0.14){k.wings.style=LH.Cos.WINGS[(rng()*LH.Cos.WINGS.length)|0];
       k.wings.color=k.shirt.color;}
@@ -13160,10 +13463,10 @@ App.stage('Waking the harbour',function(){
     var kit=Act.defaultKit(600+i*41);
     kit.hair.style=['swept','bun','long','crop','braids','spiked'][i%6];
     kit.shirt.style=['jacket','hoodie','jacket','jacket','tee','hoodie'][i%6];
-    kit.shirt.color=['#2E5C7A','#7A4A2E','#4A3A6A','#3A4A3A','#7A2E4A','#4A4A2E'][i%6];
+    kit.shirt.color=['#3EA7DC','#F08A3C','#7C5BD8','#4FBF77','#E8557E','#E0C24A'][i%6];
     kit.shirt.sleeve='long';
-    kit.pants.color=Geo.shade(kit.shirt.color,-50);
-    kit.shoes.color='#26292F';
+    kit.pants.color=Geo.shade(kit.shirt.color,-46);
+    kit.shoes.color='#3A404C';
     if(i%2)kit.hat.style=['cap','beanie','brim'][i%3];
     kit.hat.color=kit.shirt.color;
     var a=Act.Actor({x:nx,y:T.heightAt(nx,nz),z:nz,kit:kit,name:def.name,
@@ -13682,8 +13985,20 @@ App.onUpdate(function(dt,time){
   }
 
   /* --- panel and hotbar input --- */
-  for(var n=0;n<10;n++){
-    if(I.pressed('slot'+n))UI.selectSlot(n===0?9:n-1);
+  if(I.pressed('emote'))UI.wheel();
+  if(UI.wheelOn()){
+    /* While the wheel is up the number row picks an emote instead of a
+       hotbar slot. Same keys, different mode — which is the whole
+       reason the wheel is worth having over seven more bindings. */
+    var EM=LH.Rig.EMOTES;
+    for(var w=1;w<=EM.length&&w<=9;w++){
+      if(I.pressed('slot'+w))UI.emote(EM[w-1]);
+    }
+    if(I.pressed('menu'))UI.wheel(false);
+  }else{
+    for(var n=0;n<10;n++){
+      if(I.pressed('slot'+n))UI.selectSlot(n===0?9:n-1);
+    }
   }
   if(I.pressed('inventory'))UI.open('inv');
   if(I.pressed('craft'))UI.open('craft');
@@ -13691,11 +14006,11 @@ App.onUpdate(function(dt,time){
   if(I.pressed('profile'))UI.open('profile');
   if(I.pressed('map'))UI.open('map');
   if(I.pressed('worlds'))UI.open('worlds');
+  if(I.pressed('trade'))UI.open('trade');
   if(I.pressed('build'))UI.toggleBuild();
   if(I.pressed('fly'))Pl.toggleFly();
   if(I.pressed('rotate')&&UI.buildOn())UI.setTool('rotate');
   if(I.pressed('menu')){if(UI.isOpen())UI.close();else UI.open('menu');}
-  if(I.pressed('emote'))G.player.anim.play('wave',true);
   if(I.pressed('chat'))UI.focusChat();
   /* typing in chat must not also drive the character */
   if(UI.chatFocused()){I.move.x=0;I.move.y=0;}
