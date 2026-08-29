@@ -2573,6 +2573,13 @@ var SHADOW=`
 uniform sampler2DShadow uShadow;
 uniform mat4 uLightVP;
 uniform vec2 uShadowTexel;   // 1/size, bias scale
+uniform float uShadowSoft;   // kernel radius, in shadow texels
+const vec2 POISSON12[12]=vec2[12](
+  vec2(-0.326,-0.406),vec2(-0.840,-0.074),vec2(-0.696, 0.457),
+  vec2(-0.203, 0.621),vec2( 0.962,-0.195),vec2( 0.473,-0.480),
+  vec2( 0.519, 0.767),vec2( 0.185,-0.893),vec2( 0.507, 0.064),
+  vec2( 0.896, 0.412),vec2(-0.322,-0.933),vec2(-0.792,-0.598)
+);
 float shadowAt(vec3 world,vec3 n,vec3 l){
   vec4 lp=uLightVP*vec4(world,1.0);
   vec3 p=lp.xyz/lp.w*0.5+0.5;
@@ -2583,12 +2590,19 @@ float shadowAt(vec3 world,vec3 n,vec3 l){
   float ndl=saturate(dot(n,l));
   float bias=uShadowTexel.y*(0.6+2.6*(1.0-ndl));
   p.z-=bias;
-  // 3x3 PCF on top of the hardware comparison's own 2x2
+  // A rotated Poisson disc rather than a 3x3 grid. Twelve taps in a
+  // ring cover more of the penumbra than nine in a square for the same
+  // cost, and rotating the ring per pixel turns the banding a fixed
+  // kernel leaves into noise the eye does not read as structure.
+  float ang=fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453)*6.28318;
+  float ca=cos(ang),sa=sin(ang);
   float s=0.0;
-  for(int y=-1;y<=1;y++)
-    for(int x=-1;x<=1;x++)
-      s+=texture(uShadow,vec3(p.xy+vec2(float(x),float(y))*uShadowTexel.x,p.z));
-  return s/9.0;
+  for(int i=0;i<12;i++){
+    vec2 o=POISSON12[i];
+    vec2 r=vec2(o.x*ca-o.y*sa,o.x*sa+o.y*ca)*uShadowTexel.x*uShadowSoft;
+    s+=texture(uShadow,vec3(p.xy+r,p.z));
+  }
+  return s/12.0;
 }
 `;
 
@@ -2613,7 +2627,10 @@ vec3 windOffset(vec3 local,vec3 world,float layer){
   // because a merged static mesh hands us world height rather than
   // local height and an unclamped term would fling a treetop on a
   // ninety-metre sky island across the sky.
-  float h=clamp(local.y,0.0,4.0)*0.09;
+  // A constant term as well as a height term. Height alone gives a
+  // quarter-metre tree top a quarter-millimetre of sway, so ground
+  // clutter would stand perfectly still in a gale.
+  float h=0.045+clamp(local.y,0.0,4.0)*0.085;
   float ph=world.x*0.33+world.z*0.27;
   float t=uWindTime;
   // Two frequencies per axis. One is a metronome; two is weather.
@@ -2910,9 +2927,26 @@ uniform float uDetailLayer;
 uniform vec3 uShallow;
 uniform vec3 uDeep;
 uniform float uFloorY;
+// The gradient the sky pass is drawing, so the water can hand back the
+// sky that is actually up there rather than a single ambient colour.
+uniform vec3 uZenith;
+uniform vec3 uHorizonC;
 in vec3 vWorld;
 in vec2 vUV;
 layout(location=0) out vec4 oCol;
+
+/* The same gradient the sky shader uses, minus the clouds and stars.
+   Reflecting one flat colour is what made the harbour read as painted
+   tin: at dusk the sky is orange and the water stayed teal. */
+vec3 skyAt(vec3 d){
+  float h=max(d.y,0.0);
+  vec3 c=mix(uHorizonC,uZenith,pow(h,0.42));
+  float sd=dot(d,uSunDir);
+  // The sun's own reflection, and the wide sheen around it that turns
+  // into the glitter path once the ripples break it up.
+  c+=uSunCol*(pow(saturate(sd),340.0)*4.0+pow(saturate(sd),16.0)*0.12);
+  return c;
+}
 
 void main(){
   // Analytic normal from the same three swells the vertex stage used.
@@ -2928,6 +2962,12 @@ void main(){
   float r1=texture(uAtlas,vec3(a,uDetailLayer)).g;
   float r2=texture(uAtlas,vec3(b,uDetailLayer)).g;
   n=normalize(n+vec3((r1-r2)*0.32,0.0,(r2-r1)*0.32));
+  // A third, much finer octave. It contributes almost nothing to the
+  // shape and everything to the sparkle: glitter is small normals
+  // catching the sun, and two octaves are too smooth to catch it.
+  vec2 c3=vUV*31.0+vec2(uTime*-0.031,uTime*0.041);
+  float r3=texture(uAtlas,vec3(c3,uDetailLayer)).g;
+  vec3 nFine=normalize(n+vec3((r3-0.5)*0.55,0.0,(0.5-r3)*0.55));
 
   vec3 v=normalize(uEye-vWorld);
   float fres=pow(1.0-saturate(dot(n,v)),4.0);
@@ -2940,17 +2980,28 @@ void main(){
 
   // Fresnel drives how much sky the surface hands back: near-flat views
   // are almost mirror, straight down is almost pure body colour.
-  vec3 col=mix(body,uSkyCol*1.15,saturate(fres*0.9+0.06));
+  vec3 refl=reflect(-v,n);
+  refl.y=abs(refl.y);   // never reflect the ground half of the sphere
+  vec3 col=mix(body,skyAt(refl),saturate(fres*0.92+0.05));
 
   vec3 h=normalize(uSunDir+v);
   float spec=pow(saturate(dot(n,h)),220.0)*1.4;
   float sheen=pow(saturate(dot(n,h)),24.0)*0.18;
-  col+=uSunCol*(spec+sheen);
+  // Glitter rides the fine normal and only exists where the sun's
+  // reflection already is, which is what keeps it a path across the
+  // water rather than static on the whole surface.
+  vec3 hf=normalize(uSunDir+v);
+  float glint=pow(saturate(dot(nFine,hf)),90.0);
+  col+=uSunCol*(spec+sheen+glint*0.55);
 
-  // Foam where the water is thin — the shoreline line.
-  float foam=smoothstep(0.16,0.0,depth);
-  float fw=smoothstep(0.45,0.85,r1*0.6+r2*0.4);
-  col=mix(col,vec3(0.92,0.97,1.0),foam*fw*0.75);
+  // Foam where the water is thin — the shoreline line. Two bands: a
+  // solid one right at the edge and a broken one just outside it, so
+  // the shore has a wash rather than a contour.
+  float foam=smoothstep(0.20,0.0,depth);
+  float fw=smoothstep(0.40,0.82,r1*0.6+r2*0.4);
+  float surge=0.5+0.5*sin(uTime*0.9+vWorld.x*0.18+vWorld.z*0.15);
+  col=mix(col,vec3(0.95,0.99,1.0),foam*fw*(0.55+surge*0.42));
+  col=mix(col,vec3(0.90,0.97,1.0),smoothstep(0.05,0.0,depth)*0.55);
 
   col=applyFog(col,vWorld,uEye);
   // Near-opaque away from the shore. Any real transparency out here
@@ -3324,6 +3375,10 @@ R.scene={
   aoPower:1.45,
   debugView:0,
   fxaa:1,
+  /* Kernel radius in shadow texels. Two is a hard edge with the
+     aliasing filtered off; four is a soft one that starts to leak
+     under thin geometry. */
+  shadowSoft:2.6,
   outline:1.6,
   inkWidth:1.35,
   inkNear:24,
@@ -3506,6 +3561,7 @@ R.beginOpaque=function(){
   GL.uM4(p,'uVP',R.vp);
   GL.uM4(p,'uLightVP',R.lightVP);
   GL.u2f(p,'uShadowTexel',1/SHADOW_SIZE,0.0016);
+  GL.u1f(p,'uShadowSoft',R.scene.shadowSoft);
   GL.bindTex(0,LH.Tex.array,gl.TEXTURE_2D_ARRAY);
   GL.u1i(p,'uAtlas',0);
   GL.bindTex(1,R.shadow.tex,gl.TEXTURE_2D);
@@ -3528,6 +3584,8 @@ R.beginWater=function(floorY){
   GL.u1f(p,'uDetailLayer',LH.Tex.layer('water'));
   GL.u3f(p,'uShallow',0.30,0.80,0.80);
   GL.u3f(p,'uDeep',0.03,0.26,0.48);
+  GL.u3v(p,'uZenith',R.scene.zenith);
+  GL.u3v(p,'uHorizonC',R.scene.horizon);
   GL.u1f(p,'uFloorY',floorY===undefined?-3:floorY);
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
@@ -5990,6 +6048,7 @@ function Actor(opt){
   this.driftT=Math.random()*4;
   this.driftYaw=0;this.driftPitch=0;
   this.lag=[0,0];          /* cape / hair lag, actor-local */
+  this.turnRate=0;
   this.squash=0;           /* landing compression, set by the controller */
   this.ik=false;           /* foot IK, switched on for whoever is close */
   this.ikW=0;
@@ -6005,7 +6064,13 @@ A.Actor=function(o){return new Actor(o);};
 Actor.prototype.faceToward=function(yaw,dt,rate){
   this.wantFacing=yaw;
   var d=M.angDelta(this.facing,yaw);
-  this.facing+=d*Math.min(1,dt*(rate||14));
+  var step=d*Math.min(1,dt*(rate||14));
+  this.facing+=step;
+  /* Turn rate in radians per second, damped. The lean is built from
+     this rather than from the angle error, because the error is
+     largest at the instant the turn starts and a body leans hardest in
+     the middle of one. */
+  this.turnRate=M.damp(this.turnRate||0,step/Math.max(dt,0.0001),0.09,dt);
 };
 
 /* Everything here is presentation: nothing it does can change where
@@ -6096,6 +6161,15 @@ Actor.prototype.life=function(dt,pose){
   var side=vx*cf-vz*sf;
   this.lag[0]=M.damp(this.lag[0],M.clamp(fwd*0.052,-0.42,0.42),0.11,dt);
   this.lag[1]=M.damp(this.lag[1],M.clamp(side*0.040,-0.30,0.30),0.13,dt);
+
+  /* Bank into the turn. Scaled by how fast the actor is actually
+     travelling — leaning while turning on the spot is a comedy pose,
+     not a run. */
+  var sp=Math.hypot(vx,vz);
+  var bank=M.clamp((this.turnRate||0)*0.11,-0.32,0.32)*M.clamp(sp/4.5,0,1);
+  pose.rootRoll+=bank;
+  pose.add('chest',0,0,-bank*0.35);
+  pose.add('head',0,0,-bank*0.30);
   return pose;
 };
 
@@ -6636,6 +6710,14 @@ T.slopeAt=function(x,z){
   return Math.hypot(hR-hL,hU-hD)/(2*e);
 };
 T.flatAt=function(x,z){return stamped(x,z).flat;};
+/* Which material the ground is made of at a point. The surface grid is
+   one sample per metre, which is all anything asking this needs. */
+T.matAt=function(x,z){
+  if(!T.mats)return 0;
+  var i=Math.round(x+T.HALF), j=Math.round(z+T.HALF);
+  i=M.clamp(i,0,T.N-1);j=M.clamp(j,0,T.N-1);
+  return T.mats[j*T.N+i];
+};
 T.inBounds=function(x,z){return x>-HALF&&x<HALF&&z>-HALF&&z<HALF;};
 
 /* ---------------- meshing ---------------- */
@@ -8238,6 +8320,127 @@ function buildFalls(){
   W.falls=b.upload();
 }
 
+/* ---------------- ground clutter ----------------
+   Wildflowers scattered across the lawns, following the camera.
+
+   This started as grass blades and they were wrong — not buggy,
+   wrong. A field of thin blades needs density this budget cannot
+   reach, and at reachable density it reads as dirt on the lawn rather
+   than grass growing out of it. Worse, the ink pass outlines every
+   blade, so each tuft came back as a black speck. Flat, clean ground
+   is also what the games this one is aimed at actually have.
+
+   Flowers work where grass did not, for the same reason: they are
+   meant to be sparse. A hundred and fifty bright dots read as a
+   meadow; a hundred and fifty grass tufts read as neglect. And an
+   inked flower looks like a drawing of a flower.
+
+   Placement is a pure function of the grid cell — hash it for a
+   jittered position, ask the terrain what it is made of, keep it if
+   the answer is grass — so walking away and coming back finds the
+   field exactly where it was left. */
+var clutter=null;
+var CLUT_CELL=2.10, CLUT_RAD=26, CLUT_MAX=760;
+var clutCX=1e9, clutCZ=1e9;
+
+/* A flower: two leaves, a stem, five petals and a centre. The petals
+   are the only part that takes the instance tint — the leaves and stem
+   are painted green in the mesh, so one mesh can be every colour of
+   flower without the foliage turning pink with it. */
+function buildClutterMesh(){
+  var b=Geo.build();
+  var leaf=Geo.col3('#7FBE55'), stem=Geo.col3('#6FAD4A');
+
+  b.mat('foliage');b.mat2('blank',0.45);
+  /* leaves at the base, splayed */
+  for(var l=0;l<2;l++){
+    b.push();b.rotate(0,l*2.2+0.4,0);
+    b.push();b.translate(0.035,0.018,0);b.rotate(0,0,-0.9);
+    b.sphere(0,0,0,0.030,7,5,leaf,{squash:0.22});
+    b.pop();b.pop();
+  }
+  b.mat('blank');
+  b.cylinder(0,0.075,0,0.0075,0.0055,0.15,5,stem);
+
+  /* The head. Petals are tinted white so the per-instance colour is
+     what decides whether this is a daisy or a poppy. */
+  b.push();b.translate(0,0.155,0);
+  var white=Geo.col3('#FFFFFF');
+  for(var i=0;i<5;i++){
+    var a=i/5*6.2832;
+    b.push();
+    b.translate(Math.cos(a)*0.030,0,Math.sin(a)*0.030);
+    b.rotate(0,-a,0.22);
+    b.sphere(0,0,0,0.026,7,5,white,{squash:0.30});
+    b.pop();
+  }
+  b.mat('blank');
+  b.sphere(0,0.006,0,0.017,7,5,Geo.col3('#FFD34D'),{squash:0.55});
+  b.pop();
+
+  clutter=b.upload(CLUT_MAX);
+  clutter.key='clutter';
+}
+
+/* Petal colours. Enough range to look wild, narrow enough that a lawn
+   full of them still reads as one meadow. */
+var BLOOM=[[1.00,1.00,1.00],[1.00,0.86,0.36],[1.00,0.62,0.72],
+           [0.72,0.66,1.00],[1.00,0.74,0.42],[0.98,0.98,0.86]];
+
+var _cm=M.m4(),_ct=M.v3(),_cs=M.v3(1,1,1);
+W.refreshClutter=function(px,pz,force){
+  if(!clutter)return;
+  var dx0=px-clutCX, dz0=pz-clutCZ;
+  /* Rebuilding every frame would cost more than drawing it. Three
+     metres of travel is well inside the edge fade, so nothing pops. */
+  if(!force&&dx0*dx0+dz0*dz0<9)return;
+  clutCX=px;clutCZ=pz;
+
+  var grass=LH.Tex.layer('grass');
+  var d=clutter.idata, n=0, R2=CLUT_RAD*CLUT_RAD;
+  var i0=Math.floor((px-CLUT_RAD)/CLUT_CELL), i1=Math.floor((px+CLUT_RAD)/CLUT_CELL);
+  var j0=Math.floor((pz-CLUT_RAD)/CLUT_CELL), j1=Math.floor((pz+CLUT_RAD)/CLUT_CELL);
+  for(var j=j0;j<=j1&&n<CLUT_MAX;j++){
+    for(var i=i0;i<=i1&&n<CLUT_MAX;i++){
+      var h3=M.hash2(i,j,41);
+      if(h3>0.52)continue;                 /* wildflowers, not turf */
+      var x=(i+0.5+(M.hash2(i,j,17)-0.5)*0.92)*CLUT_CELL;
+      var z=(j+0.5+(M.hash2(i,j,29)-0.5)*0.92)*CLUT_CELL;
+      var dx=x-px, dz=z-pz, dd=dx*dx+dz*dz;
+      if(dd>R2)continue;
+      if(T.matAt(x,z)!==grass)continue;
+      if(T.slopeAt(x,z)>1.0)continue;
+      var y=T.heightAt(x,z);
+      if(y<0.35)continue;                  /* not in the surf */
+      /* Shrink toward the edge of the field instead of cutting off.
+         A tuft that fades to nothing is invisible arriving; one that
+         appears at full size is a pop. */
+      var edge=1-M.smooth(M.clamp((dd/R2-0.62)/0.38,0,1));
+      if(edge<=0.02)continue;
+      var sc=(1.15+M.hash2(i,j,53)*0.75)*edge;
+      M.set3(_ct,x,y,z);
+      M.set3(_cs,sc,sc*(0.85+M.hash2(i,j,67)*0.5),sc);
+      M.fromTRS(_cm,_ct,0,M.hash2(i,j,71)*6.283,0,_cs);
+      var o=n*GL.ISTRIDE;
+      for(var q=0;q<16;q++)d[o+q]=_cm[q];
+      /* Vary the green a little or the field reads as one decal
+         repeated, which is exactly what it is. */
+      var bl=BLOOM[(M.hash2(i,j,83)*BLOOM.length)|0];
+      d[o+16]=bl[0];d[o+17]=bl[1];d[o+18]=bl[2];d[o+19]=0;
+      n++;
+    }
+  }
+  clutter.instances=n;
+  GL.updateInstances(clutter,n);
+};
+
+W.drawClutter=function(prog){
+  if(!clutter||!clutter.instances)return;
+  GL.u1i(prog,'uInstanced',1);
+  GL.drawInstanced(clutter,clutter.instances);
+  GL.u1i(prog,'uInstanced',0);
+};
+
 /* ---------------- water ---------------- */
 function buildWater(){
   var b=Geo.build();
@@ -8264,6 +8467,8 @@ W.build=function(){
   W.statics.push(b.upload());
   scatterNature();
   commitProps();
+  if(!clutter)buildClutterMesh();
+  clutCX=1e9;clutCZ=1e9;      /* force a rebuild for the new terrain */
   buildSkyIsles();
   buildFalls();
   buildWater();
@@ -8559,7 +8764,7 @@ var MAX_STEP=0.62;      /* how tall a ledge you walk up rather than into */
    is right, because they did press it. */
 var COYOTE=0.13;       /* how long a jump still works after a ledge   */
 var JUMPBUF=0.16;      /* how early a jump can be asked for           */
-var JUMP_CUT=0.45;     /* velocity kept when the button is released   */
+var JUMP_CUT=0.60;     /* velocity kept when the button is released   */
 Pl.coyote=0;
 Pl.jumpBuf=0;
 Pl.rising=false;       /* mid-jump and still holding the button       */
@@ -14582,7 +14787,8 @@ App.onUpdate(function(dt,time){
     Cam.update(dt,G.player.pos,null);
     R.updateLight(G.player.pos,44);
     T.extractFrustum(R.vp);
-    W.cullProps(Cam.target[0],Cam.target[2],1.3);
+    W.refreshClutter(Cam.target[0],Cam.target[2]);
+  W.cullProps(Cam.target[0],Cam.target[2],1.3);
     I.end();
     return;
   }
@@ -14647,7 +14853,8 @@ App.onUpdate(function(dt,time){
     UI.plates([]);
     R.updateLight(G.player.pos,44);
     T.extractFrustum(R.vp);
-    W.cullProps(Cam.target[0],Cam.target[2],Math.min(1.7,1+Cam.dist*0.030));
+    W.refreshClutter(Cam.target[0],Cam.target[2]);
+  W.cullProps(Cam.target[0],Cam.target[2],Math.min(1.7,1+Cam.dist*0.030));
     V.update(2);
     return;
   }
@@ -14749,6 +14956,7 @@ App.onUpdate(function(dt,time){
      island entirely and most of the world vanishes. */
   /* Capped: a very wide orbit would otherwise open the radius far
      enough to draw every prop on the island. */
+  W.refreshClutter(Cam.target[0],Cam.target[2]);
   W.cullProps(Cam.target[0],Cam.target[2],Math.min(1.7,1+Cam.dist*0.030));
 
   I.end();
@@ -14896,6 +15104,10 @@ App.onDraw(function(dt,time){
   W.drawFalls(p,time);
   V.draw(true);
   W.drawProps(p);
+  /* Clutter is drawn but never shadowed: a grass blade's own shadow is
+     a pixel, and the shadow pass would double the cost of the densest
+     draw in the frame to produce it. */
+  W.drawClutter(p);
   Act.flush(p);
 
   /* --- water --- */

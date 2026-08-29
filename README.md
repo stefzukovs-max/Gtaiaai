@@ -34,7 +34,7 @@ portable if that decision ever changes.
 | `LH.GL` | WebGL2 device: program introspection at build time, VAOs, instancing, hardware-compare shadow maps, sRGB 2D array textures |
 | `LH.Geo` | Procedural geometry behind a transform stack — boxes, chamfers, lofts, limbs, extrusions, discs — so a prop is written the way you'd describe it out loud |
 | `LH.Tex` | Thirty-one materials painted per-pixel into one texture array, so the whole world draws with a single texture bound |
-| `LH.Render` | Forward renderer: shadow pass, analytic sky with clouds and stars, banded toon lighting, silhouette ink, hemisphere ambient, sixteen point lights a frame, height fog, animated water with a depth-tinted shoreline, bloom, sun shafts, filmic tonemap |
+| `LH.Render` | Forward renderer: shadow pass with a rotated Poisson kernel, analytic sky, banded toon lighting, silhouette ink, screen-space ambient occlusion, hemisphere ambient, sixteen point lights a frame, wind, cloud shadows, height fog, water that reflects the real sky, bloom, sun shafts, filmic tonemap, FXAA |
 | `LH.Rig` | Nineteen bones and seventeen animation clips, written as functions of phase rather than keyframe tables |
 | `LH.Voxels` | Sparse one-metre build layer, meshed per 16-cube chunk with interior faces culled |
 | `LH.Net` | The authority boundary |
@@ -116,6 +116,24 @@ limb meshes, the limb thickness, the head scale and the clothes over
 them — about four and a half heads tall rather than seven and a half.
 A sleeve length derived from the arm bone cannot end up longer than the
 arm inside it.
+
+### What makes it move
+
+| System | What it does, and the part that was easy to get wrong |
+| --- | --- |
+| **Ambient occlusion** | Hemisphere SSAO from the depth texture the ink pass already needs — view position by unprojecting depth, normals from its derivatives. The sample rotation repeats on a 4×4 grid so a 4×4 box blur cancels it exactly; borrowing the bloom's gaussian instead reaches seven pixels and averages a contact band into nothing |
+| **Wind** | Leaves are found by their material, not a per-vertex weight. Trunks are bark and hold still. The same snippet runs in the depth pass, because a canopy that sways while its shadow stays put is worse than no wind |
+| **Cloud shadows** | Two octaves of value noise drifting in world XZ, gated on sun elevation and thinned by rain — past a point overcast is one sheet and stops casting anything separate |
+| **Foot IK** | Two-bone, second forward pass, close actors only. The target is not the ground: it is the lift the animation asked for, measured from the ground under *that* foot. Driving feet to the ground deletes the walk cycle |
+| **Movement** | Coyote time, a buffered jump, a cut on release. Landing squash scaled by impact drives the body's compression and a camera *dip* — one signed motion, not a shake |
+| **Life** | Blinks that double up the way real ones do, eyes that dart and lead the head, a turn spread into neck and chest, cloth that lags, and a bank into a turn scaled by how fast you are actually going |
+| **Water** | Reflects the sky gradient the sky pass is drawing rather than one ambient colour, so dusk turns the harbour orange. A third fine normal octave exists only to catch the sun as glitter |
+
+Ground clutter is wildflowers, not grass. Grass was tried first and was
+wrong: a field of thin blades needs a density this budget cannot reach,
+and at reachable density it reads as dirt on the lawn — and the ink pass
+outlines every blade, so each tuft came back a black speck. Flowers are
+*meant* to be sparse, and an inked flower looks like a drawing of one.
 
 Emotes are on **V**: a wheel with wave, dance, laugh, cheer, clap, point
 and sit. The number row picks from the wheel while it is open and drives
