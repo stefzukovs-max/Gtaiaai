@@ -2593,6 +2593,38 @@ float shadowAt(vec3 world,vec3 n,vec3 l){
 `;
 
 /* ---------------- standard object shader ---------------- */
+/* ---------------- wind ----------------
+   Leaves are found by their material rather than by a per-vertex sway
+   weight: the vertex format has no spare channel, and "this vertex is
+   foliage" is exactly what the layer index already says. Trunks are
+   bark, so they hold still while the canopy above them moves, which
+   is the difference between a tree in wind and a tree being shaken.
+
+   The same snippet goes through the depth pass. A canopy that sways
+   while its own shadow stays put is worse than no wind at all. */
+var WIND=`
+uniform vec3 uWind;        // direction * strength
+uniform float uWindTime;
+uniform vec2 uLeaf;        // the two foliage layer indices
+vec3 windOffset(vec3 local,vec3 world,float layer){
+  float lf=floor(layer+0.5);
+  if(lf!=uLeaf.x&&lf!=uLeaf.y)return vec3(0.0);
+  // Height above the piece's own origin drives the amplitude, clamped
+  // because a merged static mesh hands us world height rather than
+  // local height and an unclamped term would fling a treetop on a
+  // ninety-metre sky island across the sky.
+  float h=clamp(local.y,0.0,4.0)*0.09;
+  float ph=world.x*0.33+world.z*0.27;
+  float t=uWindTime;
+  // Two frequencies per axis. One is a metronome; two is weather.
+  vec3 o=vec3(
+    sin(t+ph)*0.62+sin(t*2.31+ph*1.7)*0.24,
+    sin(t*1.73+ph*1.31)*0.16,
+    cos(t*0.91+ph*0.8)*0.62+cos(t*2.13+ph*2.2)*0.21);
+  return o*uWind*h;
+}
+`;
+
 var STD_VS=`#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPos;
@@ -2610,7 +2642,7 @@ uniform vec4 uTint;
 // Scrolls the texture on a surface. Waterfalls, conveyors, anything
 // that has to flow without moving.
 uniform vec2 uUVScroll;
-
+`+WIND+`
 out vec3 vWorld;
 out vec3 vNrm;
 out vec2 vUV;
@@ -2623,6 +2655,7 @@ out float vEmis;
 void main(){
   mat4 mdl = (uInstanced==1) ? aModel : uModel;
   vec4 wp = mdl*vec4(aPos,1.0);
+  wp.xyz += windOffset(aPos,wp.xyz,aMat.x);
   vWorld = wp.xyz;
   // Inverse-transpose is overkill here: every instance transform in
   // this game is a rotation, a uniform-ish scale, or both, so the
@@ -2652,6 +2685,11 @@ uniform float uAlpha;
 // driven by the time of day, keeps them readable in daylight and lets
 // them carry the night.
 uniform float uEmisScale;
+// Cloud cover drifting over the ground. Cheap two-octave value noise
+// in world XZ — the sky already draws clouds, and a world where they
+// cast nothing on it looks painted on rather than under them.
+uniform float uCloudAmt;
+uniform vec2 uCloudDrift;
 
 in vec3 vWorld;
 in vec3 vNrm;
@@ -2663,6 +2701,24 @@ in float vBlend;
 in float vEmis;
 
 layout(location=0) out vec4 oCol;
+
+float cnoise2(vec2 p){
+  vec2 i=floor(p),f=fract(p);
+  f=f*f*(3.0-2.0*f);
+  float a=fract(sin(dot(i,vec2(127.1,311.7)))*43758.5453);
+  float b=fract(sin(dot(i+vec2(1,0),vec2(127.1,311.7)))*43758.5453);
+  float c=fract(sin(dot(i+vec2(0,1),vec2(127.1,311.7)))*43758.5453);
+  float d=fract(sin(dot(i+vec2(1,1),vec2(127.1,311.7)))*43758.5453);
+  return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);
+}
+float cloudShadow(vec2 wxz){
+  if(uCloudAmt<0.001)return 1.0;
+  vec2 p=wxz*0.0085+uCloudDrift;
+  float n=cnoise2(p)*0.65+cnoise2(p*2.17+7.3)*0.35;
+  // Wide bright gaps, soft edges: a hard-edged blotch reads as a
+  // texture bug, not as weather.
+  return mix(1.0,smoothstep(0.34,0.70,n),uCloudAmt);
+}
 
 void main(){
   // Round the layer indices: they are interpolated across the triangle
@@ -2685,6 +2741,7 @@ void main(){
   // Shadow gets banded too. Leaving the PCF gradient smooth under a
   // banded terminator puts a soft edge next to a hard one on the same
   // surface, and the eye reads that as a bug rather than a style.
+  sh *= cloudShadow(vWorld.xz);
   float shT = mix(sh, smoothstep(0.30,0.52,sh)*0.78+0.22, uToon);
   vec3 direct = uSunCol*toonify(ndl)*shT;
   vec3 ambient = hemi(n);
@@ -2712,13 +2769,17 @@ void main(){
 var DEPTH_VS=`#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPos;
+layout(location=4) in vec4 aMat;
 layout(location=5) in mat4 aModel;
 uniform mat4 uLightVP;
 uniform mat4 uModel;
 uniform int uInstanced;
+`+WIND+`
 void main(){
   mat4 mdl=(uInstanced==1)?aModel:uModel;
-  gl_Position=uLightVP*mdl*vec4(aPos,1.0);
+  vec4 wp=mdl*vec4(aPos,1.0);
+  wp.xyz+=windOffset(aPos,wp.xyz,aMat.x);
+  gl_Position=uLightVP*wp;
 }
 `;
 var DEPTH_FS=`#version 300 es
@@ -2964,6 +3025,155 @@ void main(){
 }
 `;
 
+/* ---------------- ambient occlusion ----------------
+   Hemisphere SSAO reconstructed entirely from the depth texture the
+   ink pass already needs: view position by unprojecting depth, and the
+   normal from the derivatives of that position. No normal buffer, no
+   second geometry pass.
+
+   This is the change that makes objects sit *on* the ground rather
+   than in front of it. Everything else in the frame can be right and
+   a scene with no contact darkening still reads as a diorama of
+   cut-outs. */
+var SSAO_FS=`#version 300 es
+precision highp float;
+uniform sampler2D uDepth;
+uniform mat4 uProj;
+uniform mat4 uInvProj;
+uniform vec2 uRes;
+uniform float uRadius;    // metres
+uniform float uBias;
+uniform float uStrength;
+uniform float uPower;
+in vec2 vNDC;
+layout(location=0) out vec4 oCol;
+
+vec3 viewPos(vec2 uv){
+  float d=texture(uDepth,uv).r*2.0-1.0;
+  vec4 c=uInvProj*vec4(uv*2.0-1.0,d,1.0);
+  return c.xyz/c.w;
+}
+/* Sixteen rotations on a 4x4 grid. Paired with a 4x4 box blur they
+   cancel exactly — which is why the blur below is a box of that size
+   and not a gaussian of a convenient one. */
+float gridAngle(vec2 fc){
+  vec2 g=mod(floor(fc),4.0);
+  return (g.x+g.y*4.0)*(6.28318/16.0);
+}
+
+/* A fixed hemisphere kernel, weighted toward the origin so the near
+   field — where contact shadows actually live — gets most of the
+   samples. */
+const vec3 KERN[12]=vec3[12](
+  vec3( 0.24, 0.11, 0.30),vec3(-0.31, 0.22, 0.18),vec3( 0.08,-0.35, 0.26),
+  vec3(-0.16,-0.20, 0.44),vec3( 0.44, 0.30, 0.12),vec3(-0.48, 0.06, 0.36),
+  vec3( 0.20,-0.52, 0.20),vec3(-0.28,-0.44, 0.48),vec3( 0.62, 0.14, 0.42),
+  vec3(-0.10, 0.66, 0.30),vec3( 0.34,-0.24, 0.72),vec3(-0.58,-0.30, 0.60)
+);
+
+void main(){
+  vec2 uv=vNDC*0.5+0.5;
+  vec3 P=viewPos(uv);
+  // Sky and the far field get no occlusion. Without this the horizon
+  // picks up a grey band where the reconstruction goes singular.
+  if(-P.z>240.0){oCol=vec4(1.0);return;}
+  vec3 N=normalize(cross(dFdx(P),dFdy(P)));
+
+  float a=gridAngle(gl_FragCoord.xy);
+  float ca=cos(a),sa=sin(a);
+  float occ=0.0;
+  for(int i=0;i<12;i++){
+    vec3 k=KERN[i];
+    vec3 t=vec3(k.x*ca-k.y*sa, k.x*sa+k.y*ca, k.z);
+    // Flip the sample into the surface's own hemisphere rather than
+    // rejecting it — half a kernel is half the quality for the same
+    // cost.
+    if(dot(t,N)<0.0)t=-t;
+    vec3 sp=P+t*uRadius;
+    vec4 cp=uProj*vec4(sp,1.0);
+    if(cp.w<=0.0)continue;
+    vec2 suv=cp.xy/cp.w*0.5+0.5;
+    if(suv.x<0.0||suv.x>1.0||suv.y<0.0||suv.y>1.0)continue;
+    float sceneZ=viewPos(suv).z;
+    // View z is negative ahead of the camera, so "the surface here is
+    // nearer than my sample" is a greater-than.
+    float hit=(sceneZ>=sp.z+uBias)?1.0:0.0;
+    // Range check, or a wall fifty metres behind a railing occludes it.
+    float range=smoothstep(0.0,1.0,uRadius/max(0.0001,abs(P.z-sceneZ)));
+    occ+=hit*range;
+  }
+  float ao=1.0-(occ/12.0)*uStrength;
+  // Curve it. The raw average is a gentle slope and reads as dirt on
+  // the lens; the power puts the contrast where the geometry actually
+  // touches and leaves open ground alone.
+  oCol=vec4(vec3(pow(clamp(ao,0.0,1.0),uPower)),1.0);
+}
+`;
+
+/* Occlusion needs its own blur. Borrowing the bloom's gaussian looked
+   free and was not: that kernel reaches three and a half texels at half
+   resolution, which is seven full-res pixels, and averaging a
+   centimetre-wide contact band over seven pixels of open floor is how
+   you turn a contact shadow into a rumour. Five tight taps instead. */
+var AOBLUR_FS=`#version 300 es
+precision highp float;
+uniform sampler2D uSrc;
+uniform vec2 uDir;
+in vec2 vNDC;
+layout(location=0) out vec4 oCol;
+void main(){
+  vec2 uv=vNDC*0.5+0.5;
+  // Four equal taps spanning exactly four texels. Run once across and
+  // once down, that is a 4x4 box — the width the rotation grid needs,
+  // and no wider, so contact bands survive it.
+  float c=texture(uSrc,uv-uDir*1.5).r;
+  c+=texture(uSrc,uv-uDir*0.5).r;
+  c+=texture(uSrc,uv+uDir*0.5).r;
+  c+=texture(uSrc,uv+uDir*1.5).r;
+  oCol=vec4(vec3(c*0.25),1.0);
+}
+`;
+
+/* ---------------- FXAA ----------------
+   The ink pass draws one-pixel lines off a depth derivative, and those
+   alias harder than any geometry edge in the scene. This runs last, on
+   the finished LDR image, which is the only place a luma-based filter
+   can see what it is smoothing. */
+var FXAA_FS=`#version 300 es
+precision highp float;
+uniform sampler2D uSrc;
+uniform vec2 uRes;
+in vec2 vNDC;
+layout(location=0) out vec4 oCol;
+float luma(vec3 c){return dot(c,vec3(0.299,0.587,0.114));}
+void main(){
+  vec2 uv=vNDC*0.5+0.5;
+  vec2 t=1.0/uRes;
+  vec3 mC=texture(uSrc,uv).rgb;
+  float lM=luma(mC);
+  float lNW=luma(texture(uSrc,uv+vec2(-t.x,-t.y)).rgb);
+  float lNE=luma(texture(uSrc,uv+vec2( t.x,-t.y)).rgb);
+  float lSW=luma(texture(uSrc,uv+vec2(-t.x, t.y)).rgb);
+  float lSE=luma(texture(uSrc,uv+vec2( t.x, t.y)).rgb);
+  float lMin=min(lM,min(min(lNW,lNE),min(lSW,lSE)));
+  float lMax=max(lM,max(max(lNW,lNE),max(lSW,lSE)));
+  // Flat enough to leave alone. Skipping early is most of the speed.
+  if(lMax-lMin<max(0.028,lMax*0.115)){oCol=vec4(mC,1.0);return;}
+
+  vec2 dir=vec2(-((lNW+lNE)-(lSW+lSE)),((lNW+lSW)-(lNE+lSE)));
+  float dirRed=max((lNW+lNE+lSW+lSE)*0.25*0.20,0.0078);
+  float rcp=1.0/(min(abs(dir.x),abs(dir.y))+dirRed);
+  dir=clamp(dir*rcp,vec2(-6.0),vec2(6.0))*t;
+
+  vec3 a=0.5*(texture(uSrc,uv+dir*(1.0/3.0-0.5)).rgb+
+              texture(uSrc,uv+dir*(2.0/3.0-0.5)).rgb);
+  vec3 b=a*0.5+0.25*(texture(uSrc,uv+dir*-0.5).rgb+
+                     texture(uSrc,uv+dir* 0.5).rgb);
+  float lB=luma(b);
+  oCol=vec4((lB<lMin||lB>lMax)?a:b,1.0);
+}
+`;
+
 var COMPOSITE_FS=`#version 300 es
 precision highp float;
 `+COMMON+`
@@ -2971,6 +3181,12 @@ uniform sampler2D uSrc;
 uniform sampler2D uBloom;
 uniform sampler2D uRays;
 uniform sampler2D uDepth;
+uniform sampler2D uAO;
+uniform float uAOAmt;
+// Dev view: 1 shows the occlusion buffer on its own, 2 shows linear
+// depth. Both are the only practical way to tell "the pass produced
+// nothing" apart from "the pass produced something too subtle to see".
+uniform float uDebug;
 uniform float uBloomAmt;
 uniform float uRayAmt;
 uniform float uVignette;
@@ -3018,7 +3234,18 @@ float edgeAt(vec2 uv){
 
 void main(){
   vec2 uv=vNDC*0.5+0.5;
+  if(uDebug>0.5){
+    if(uDebug<1.5){oCol=vec4(vec3(texture(uAO,uv).r),1.0);return;}
+    float ld=linDepth(uv)/60.0;
+    oCol=vec4(vec3(fract(ld),ld*0.25,1.0-ld*0.25),1.0);return;
+  }
   vec3 c=texture(uSrc,uv).rgb;
+  // Occlusion goes on before the tonemap and before the glow, so a
+  // bloomed window is not dimmed by the eaves above it.
+  if(uAOAmt>0.001){
+    float ao=texture(uAO,uv).r;
+    c*=mix(1.0,ao,uAOAmt);
+  }
   c+=texture(uBloom,uv).rgb*uBloomAmt;
   c+=texture(uRays,uv).rgb*uRayAmt;
 
@@ -3081,6 +3308,22 @@ R.scene={
      look exactly, which is what makes this a setting and not a
      rewrite. */
   toon:1.0,
+  /* Occlusion strength, the sample radius in metres, and a depth bias
+     that stops a surface shadowing itself. */
+  /* Weather the world can feel. `wind` is a direction times a
+     strength; `windTime` is its own clock so a paused game stops
+     swaying; the cloud terms drift the shadow field over the ground. */
+  wind:M.v3(1,0.35,0.42),
+  windTime:0,
+  cloudAmt:0.34,
+  cloudDrift:[0,0],
+  ao:1.0,
+  aoRadius:1.05,
+  aoBias:0.018,
+  aoStrength:2.2,
+  aoPower:1.45,
+  debugView:0,
+  fxaa:1,
   outline:1.6,
   inkWidth:1.35,
   inkNear:24,
@@ -3088,13 +3331,14 @@ R.scene={
   saturation:0.30
 };
 
-R.vp=M.m4();R.view=M.m4();R.proj=M.m4();R.invVP=M.m4();
+R.vp=M.m4();R.view=M.m4();R.proj=M.m4();R.invVP=M.m4();R.invProj=M.m4();
 R.lightVP=M.m4();
 R.eye=M.v3(0,3,8);
 R.time=0;
 R.quality=1;      /* 1 = full, 0.75 / 0.5 scale the internal buffers */
 
 var sceneRT=null,bloomA=null,bloomB=null,rayRT=null;
+var aoRT=null,aoBlurRT=null,ldrRT=null;
 var SHADOW_SIZE=2048;
 
 R.init=function(canvas){
@@ -3108,6 +3352,9 @@ R.init=function(canvas){
   R.progs.blur=GL.program('blur',POST_VS,BLUR_FS);
   R.progs.rays=GL.program('rays',POST_VS,GODRAY_FS);
   R.progs.comp=GL.program('comp',POST_VS,COMPOSITE_FS);
+  R.progs.ssao=GL.program('ssao',POST_VS,SSAO_FS);
+  R.progs.aoblur=GL.program('aoblur',POST_VS,AOBLUR_FS);
+  R.progs.fxaa=GL.program('fxaa',POST_VS,FXAA_FS);
 
   /* A weak GPU with a small shadow map still looks fine; a missing one
      does not, so fall back a step rather than disabling shadows. */
@@ -3118,6 +3365,12 @@ R.init=function(canvas){
   bloomA=GL.colorTarget(2,2,true);
   bloomB=GL.colorTarget(2,2,true);
   rayRT=GL.colorTarget(2,2,true);
+  /* Occlusion at half resolution and blurred: it is a low-frequency
+     term and full-res noise costs four times as much to produce and
+     then has to be blurred away anyway. */
+  aoRT=GL.colorTarget(2,2,'nodepth');
+  aoBlurRT=GL.colorTarget(2,2,'nodepth');
+  ldrRT=GL.colorTarget(2,2,'nodepth');
   return R;
 };
 
@@ -3128,6 +3381,9 @@ R.resize=function(w,h){
   GL.resizeColorTarget(bloomA,Math.max(2,iw>>1),Math.max(2,ih>>1),true);
   GL.resizeColorTarget(bloomB,Math.max(2,iw>>1),Math.max(2,ih>>1),true);
   GL.resizeColorTarget(rayRT,Math.max(2,iw>>1),Math.max(2,ih>>1),true);
+  GL.resizeColorTarget(aoRT,Math.max(2,iw>>1),Math.max(2,ih>>1),'nodepth');
+  GL.resizeColorTarget(aoBlurRT,Math.max(2,iw>>1),Math.max(2,ih>>1),'nodepth');
+  GL.resizeColorTarget(ldrRT,iw,ih,'nodepth');
   R.iw=iw;R.ih=ih;
 };
 
@@ -3155,6 +3411,9 @@ R.setCamera=function(view,proj,eye){
   M.copy(R.view,view);M.copy(R.proj,proj);M.copy3(R.eye,eye);
   M.mul(R.vp,proj,view);
   M.invert(R.invVP,R.vp);
+  /* The occlusion pass works in view space, so it needs the lens on
+     its own rather than the whole view-projection. */
+  M.invert(R.invProj,proj);
 };
 
 function bindSceneUniforms(p){
@@ -3173,6 +3432,11 @@ function bindSceneUniforms(p){
   GL.u3v(p,'uEye',R.eye);
   GL.u1f(p,'uExposure',s.exposure);
   GL.u1f(p,'uToon',s.toon);
+  GL.u3v(p,'uWind',s.wind);
+  GL.u1f(p,'uWindTime',s.windTime);
+  GL.u2f(p,'uLeaf',LH.Tex.layer('foliage'),LH.Tex.layer('foliagep'));
+  GL.u1f(p,'uCloudAmt',s.cloudAmt);
+  GL.u2f(p,'uCloudDrift',s.cloudDrift[0],s.cloudDrift[1]);
   GL.u1f(p,'uTime',R.time);
 }
 
@@ -3185,6 +3449,10 @@ R.beginShadow=function(){
   gl.cullFace(gl.FRONT);
   var p=GL.use(R.progs.depth);
   GL.uM4(p,'uLightVP',R.lightVP);
+  var s=R.scene;
+  GL.u3v(p,'uWind',s.wind);
+  GL.u1f(p,'uWindTime',s.windTime);
+  GL.u2f(p,'uLeaf',LH.Tex.layer('foliage'),LH.Tex.layer('foliagep'));
   return p;
 };
 R.endShadow=function(){gl.cullFace(gl.BACK);};
@@ -3291,6 +3559,34 @@ R.present=function(){
   gl.disable(gl.DEPTH_TEST);
   gl.disable(gl.BLEND);
 
+  /* --- ambient occlusion --- */
+  var aoOn=(s.ao>0.001&&sceneRT.depthTex);
+  if(aoOn){
+    GL.bindTarget(aoRT);
+    var pa=GL.use(R.progs.ssao);
+    GL.bindTex(0,sceneRT.depthTex,gl.TEXTURE_2D);GL.u1i(pa,'uDepth',0);
+    GL.uM4(pa,'uProj',R.proj);
+    GL.uM4(pa,'uInvProj',R.invProj);
+    GL.u2f(pa,'uRes',aoRT.w,aoRT.h);
+    GL.u1f(pa,'uRadius',s.aoRadius);
+    GL.u1f(pa,'uBias',s.aoBias);
+    GL.u1f(pa,'uStrength',s.aoStrength);
+    GL.u1f(pa,'uPower',s.aoPower);
+    GL.fullscreen();
+    /* Two separable passes over the AO. The kernel is rotated per
+       pixel, so what comes out of the pass is correct but noisy, and
+       the blur is what turns the noise back into a gradient. */
+    var pab=GL.use(R.progs.aoblur);
+    GL.bindTarget(aoBlurRT);
+    GL.bindTex(0,aoRT.tex,gl.TEXTURE_2D);GL.u1i(pab,'uSrc',0);
+    GL.u2f(pab,'uDir',1/aoRT.w,0);
+    GL.fullscreen();
+    GL.bindTarget(aoRT);
+    GL.bindTex(0,aoBlurRT.tex,gl.TEXTURE_2D);GL.u1i(pab,'uSrc',0);
+    GL.u2f(pab,'uDir',0,1/aoRT.h);
+    GL.fullscreen();
+  }
+
   if(s.bloom>0.001){
     GL.bindTarget(bloomA);
     var pb=GL.use(R.progs.bright);
@@ -3342,9 +3638,15 @@ R.present=function(){
     }
   }
 
-  GL.bindTarget(null);
+  /* The composite lands in a buffer rather than on screen, because
+     FXAA has to run on the finished image. */
+  var aaOn=!!s.fxaa;
+  GL.bindTarget(aaOn?ldrRT:null);
   var pc=GL.use(R.progs.comp);
   GL.bindTex(0,sceneRT.tex,gl.TEXTURE_2D);GL.u1i(pc,'uSrc',0);
+  GL.bindTex(4,aoRT.tex,gl.TEXTURE_2D);GL.u1i(pc,'uAO',4);
+  GL.u1f(pc,'uAOAmt',aoOn?s.ao:0);
+  GL.u1f(pc,'uDebug',s.debugView||0);
   GL.bindTex(1,bloomA.tex,gl.TEXTURE_2D);GL.u1i(pc,'uBloom',1);
   GL.bindTex(2,rayRT.tex,gl.TEXTURE_2D);GL.u1i(pc,'uRays',2);
   GL.bindTex(3,sceneRT.depthTex,gl.TEXTURE_2D);GL.u1i(pc,'uDepth',3);
@@ -3364,6 +3666,14 @@ R.present=function(){
   GL.u1f(pc,'uTime',R.time);
   GL.u2f(pc,'uRes',R.iw,R.ih);
   GL.fullscreen();
+
+  if(aaOn){
+    GL.bindTarget(null);
+    var pf=GL.use(R.progs.fxaa);
+    GL.bindTex(0,ldrRT.tex,gl.TEXTURE_2D);GL.u1i(pf,'uSrc',0);
+    GL.u2f(pf,'uRes',R.iw,R.ih);
+    GL.fullscreen();
+  }
 
   gl.enable(gl.DEPTH_TEST);
 };
@@ -3531,6 +3841,12 @@ Cam.proj=M.m4();
 var PITCH_MIN=M.rad(-72),PITCH_MAX=M.rad(74);
 var _shakeT=0,_shakeAmp=0;
 Cam.shake=function(amp,dur){_shakeAmp=Math.max(_shakeAmp,amp);_shakeT=Math.max(_shakeT,dur||0.25);};
+/* A dip is not a shake. Shake is noise and says "something hit you";
+   dip is a single signed motion and says "you hit the ground". Landing
+   wants the second, and getting them confused is why so many jumps
+   feel like being punched. */
+var _dip=0,_dipV=0;
+Cam.dip=function(amount){_dipV-=Math.min(0.85,amount)*3.4;};
 
 Cam.orbit=function(dx,dy){
   var s=Cam.sensitivity*0.0032;
@@ -3561,7 +3877,12 @@ Cam.update=function(dt,followPos,solid){
     return;
   }
   M.lerp3(Cam.focus,Cam.focus,followPos,1-Math.pow(0.0008,dt));
-  M.set3(Cam.target,Cam.focus[0],Cam.focus[1]+Cam.height,Cam.focus[2]);
+  /* Critically-ish damped spring back to level. Stiff enough to settle
+     inside a third of a second, soft enough to be felt. */
+  _dipV+=(-_dip*46-_dipV*9.5)*dt;
+  _dip+=_dipV*dt;
+  if(Math.abs(_dip)<0.0004&&Math.abs(_dipV)<0.004){_dip=0;_dipV=0;}
+  M.set3(Cam.target,Cam.focus[0],Cam.focus[1]+Cam.height+_dip,Cam.focus[2]);
 
   var cp=Math.cos(Cam.pitch),sp=Math.sin(Cam.pitch);
   M.set3(_dir,Math.sin(Cam.yaw)*cp,sp,Math.cos(Cam.yaw)*cp);
@@ -4358,10 +4679,87 @@ Rig.poseMatrices=function(out,pose,rootMat){
 /* The whole-body channels (bob, lean, roll, yaw) apply above the hips,
    so they are folded into the root matrix rather than any one bone. */
 var _rt=M.v3(),_rs=M.v3(1,1,1),_rm=M.m4(),_rm2=M.m4();
-Rig.rootMatrix=function(out,pos,facing,pose,scale){
+/* ---------------- foot IK ----------------
+   The one thing that gives a character away as pasted onto the terrain
+   rather than standing on it. On a slope both feet sit at the body's
+   ground height, so the downhill one hangs in the air and the uphill
+   one is buried to the ankle.
+
+   The fix is not to drive the feet to the ground — that would delete
+   the walk cycle and leave a figure gliding on stiff legs. It is to
+   keep the lift the animation asked for and measure it from the ground
+   under *that foot* instead of the ground under the body. On flat
+   ground the solve reproduces the clip almost exactly, which is also
+   how you know the angle conventions are right. */
+var LEGS=[['thighL','shinL','footL'],['thighR','shinR','footR']];
+
+Rig.footIK=function(actor,pose,groundAt,dt){
+  var want=actor.grounded?1:0;
+  var w=actor.ikW||0;
+  w+=(want-w)*Math.min(1,dt*9);
+  actor.ikW=w;
+  if(w<0.02)return false;
+
+  var sc=actor.scale||1;
+  var L1=P.thigh*sc, L2=P.shin*sc;
+  var yaw=actor.facing+pose.rootYaw;
+  var cy=Math.cos(yaw), sy=Math.sin(yaw);
+  var baseY=actor.pos[1];
+
+  var hxA=[],hyA=[],hzA=[],txA=[],tyA=[],tzA=[],drop=0,i;
+  for(i=0;i<2;i++){
+    var tm=actor.mats[NAME[LEGS[i][0]]];
+    var fm=actor.mats[NAME[LEGS[i][2]]];
+    hxA[i]=tm[12];hyA[i]=tm[13];hzA[i]=tm[14];
+    var g=groundAt(fm[12],fm[14]);
+    txA[i]=fm[12];tzA[i]=fm[14];
+    /* Keep the animation's lift; move the floor under it. */
+    tyA[i]=g+(fm[13]-baseY);
+    var need=g-baseY;
+    if(need<drop)drop=need;
+  }
+  /* Only ever drop. Lifting the hips to reach a high foot would push
+     the whole body off the ground it is standing on. */
+  drop=Math.max(drop,-0.34*sc)*w;
+
+  for(var j=0;j<2;j++){
+    var vx=txA[j]-hxA[j], vy=tyA[j]-(hyA[j]+drop), vz=tzA[j]-hzA[j];
+    /* Undo the body's facing so the solve happens in the plane the
+       leg bones actually rotate in. */
+    var lx=vx*cy-vz*sy;
+    var lz=vx*sy+vz*cy;
+    var d=Math.sqrt(lx*lx+vy*vy+lz*lz);
+    /* Never fully straight: at exactly L1+L2 the knee angle is a
+       singularity and the joint flickers between the two solutions. */
+    d=M.clamp(d,Math.abs(L1-L2)+0.02,L1+L2-0.012);
+    var a2=Math.acos(M.clamp((L1*L1+L2*L2-d*d)/(2*L1*L2),-1,1));
+    var a1=Math.acos(M.clamp((L1*L1+d*d-L2*L2)/(2*L1*d),-1,1));
+    /* Pitch of the hip-to-target line from straight down. Negative X
+       on a thigh swings the leg forward in this rig, and the knee
+       bends forward, so the thigh leads the line by a1. */
+    var theta=Math.atan2(lz,-vy);
+    var thighX=-(theta+a1);
+    var shinX=Math.PI-a2;
+    var thighZ=Math.atan2(-lx,-vy);
+    var bi=NAME[LEGS[j][0]]*3, si=NAME[LEGS[j][1]]*3, fi=NAME[LEGS[j][2]]*3;
+    var r=pose.rot;
+    r[bi]  +=(thighX-r[bi])*w;
+    r[bi+2]+=(thighZ-r[bi+2])*w;
+    r[si]  +=(shinX-r[si])*w;
+    /* Sole level with the world, whatever the leg above it is doing. */
+    r[fi]  +=(-(thighX+shinX)-r[fi])*w;
+  }
+  pose.rootY+=drop/sc;
+  return true;
+};
+
+Rig.rootMatrix=function(out,pos,facing,pose,scale,squash){
   var s=scale||1;
   M.set3(_rt,pos[0],pos[1]+pose.rootY*s,pos[2]);
-  M.set3(_rs,s,s,s);
+  /* Squash conserves rough volume — down in y, out in x and z — so a
+     landing compresses rather than shrinking. */
+  var q=squash||0;
+  M.set3(_rs,s*(1+q*0.13),s*(1-q*0.22),s*(1+q*0.13));
   M.fromTRS(out,_rt,0,facing+pose.rootYaw,0,_rs);
   M.set3(_rt,0,0,0);M.set3(_rs,1,1,1);
   M.fromTRS(_rm,_rt,pose.rootLean,0,pose.rootRoll,_rs);
@@ -4511,6 +4909,23 @@ Body.iris=function(){
          stylised eye look alive rather than glassy */
       b.sphere(0,0,0.005,0.0066,8,6,'#101010');
       b.sphere(0.005,0.006,0.008,0.0032,6,5,'#FFFFFF');
+      b.pop();
+    }
+    b.pop();
+  });
+};
+
+/* Eyelids. Parked up inside the brow ridge when the eye is open — the
+   skull is solid and the depth test hides them — and slid down over
+   the eye to close it. Cheaper and steadier than squashing the eyeball,
+   which distorts the iris on the way. */
+Body.lids=function(){
+  return part('lids',function(b){
+    b.mat('blank');
+    b.push();b.scale(P.headScale,P.headScale,P.headScale);
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.048,0.012,0.083);b.rotate(0.10,s*-0.14,0);
+      b.chamfer(0,0,0,0.086,0.062,0.030,LIT,0.014,{noBand:true});
       b.pop();
     }
     b.pop();
@@ -5562,6 +5977,23 @@ function Actor(opt){
   this.tag=null;         /* DOM name tag, attached by the UI */
   this.petPos=M.v3(opt.x||0,opt.y||0,opt.z||0);
   this.petPhase=Math.random()*6.28;
+  /* --- the small signs of life --- */
+  this.lookAt=null;        /* v3 in world space, or null for "nothing" */
+  this.lookYaw=0;          /* current, damped toward the target */
+  this.lookPitch=0;
+  this.lookW=0;            /* 0..1, how much of the cone is being used */
+  this.blink=0;            /* 0 open, 1 shut */
+  this.blinkT=0.6+Math.random()*3.2;
+  this.eyeX=0;this.eyeY=0; /* iris dart, in head-local metres */
+  this.eyeTX=0;this.eyeTY=0;
+  this.dartT=Math.random()*2;
+  this.driftT=Math.random()*4;
+  this.driftYaw=0;this.driftPitch=0;
+  this.lag=[0,0];          /* cape / hair lag, actor-local */
+  this.squash=0;           /* landing compression, set by the controller */
+  this.ik=false;           /* foot IK, switched on for whoever is close */
+  this.ikW=0;
+  this.lastPos=M.v3(opt.x||0,opt.y||0,opt.z||0);
   this.id=opt.id||('a'+(A._next++));
 }
 A._next=1;
@@ -5576,10 +6008,109 @@ Actor.prototype.faceToward=function(yaw,dt,rate){
   this.facing+=d*Math.min(1,dt*(rate||14));
 };
 
+/* Everything here is presentation: nothing it does can change where
+   the actor is or what it owns. It runs after the clip and before the
+   matrices, so it composes on top of whatever the animation did. */
+var _lk=M.v3();
+Actor.prototype.life=function(dt,pose){
+  /* --- blinking ---
+     Two blinks close together now and then, which is what people
+     actually do, and never on a fixed metronome. */
+  this.blinkT-=dt;
+  if(this.blinkT<=0){
+    this.blink=1;
+    this.blinkT=(Math.random()<0.22)?0.18+Math.random()*0.12
+                                    :1.8+Math.random()*4.2;
+  }
+  if(this.blink>0)this.blink=Math.max(0,this.blink-dt*9.0);
+
+  /* --- where the head is pointed ---
+     A target if something asked for one; otherwise a slow wander, so
+     an idle character is looking *somewhere* rather than through you. */
+  var wantY=0,wantP=0,wantW=0;
+  if(this.lookAt){
+    var dx=this.lookAt[0]-this.pos[0];
+    var dy=this.lookAt[1]-(this.pos[1]+1.45*this.scale);
+    var dz=this.lookAt[2]-this.pos[2];
+    var flat=Math.hypot(dx,dz);
+    if(flat>0.05){
+      /* Facing 0 points at +Z, so the bearing is atan2(x,z) and the
+         head only has to make up the difference. */
+      var bearing=Math.atan2(dx,dz);
+      var rel=bearing-this.facing;
+      while(rel>Math.PI)rel-=Math.PI*2;
+      while(rel<-Math.PI)rel+=Math.PI*2;
+      /* Past the shoulder a head does not follow — the whole body
+         turns, or the look is simply dropped. Dropping it is right
+         here: the alternative is a neck that snaps at the limit. */
+      if(Math.abs(rel)<2.0){
+        wantY=M.clamp(rel,-1.15,1.15);
+        wantP=M.clamp(Math.atan2(dy,flat),-0.42,0.55);
+        wantW=1-M.smooth(M.clamp((Math.abs(rel)-1.15)/0.85,0,1));
+      }
+    }
+  }
+  if(wantW<0.02){
+    this.driftT-=dt;
+    if(this.driftT<=0){
+      this.driftT=2.2+Math.random()*4.5;
+      this.driftYaw=(Math.random()-0.5)*0.46;
+      this.driftPitch=(Math.random()-0.5)*0.18;
+    }
+    wantY=this.driftYaw;wantP=this.driftPitch;wantW=0.55;
+  }
+  this.lookYaw=M.damp(this.lookYaw,wantY,0.13,dt);
+  this.lookPitch=M.damp(this.lookPitch,wantP,0.15,dt);
+  this.lookW=M.damp(this.lookW,wantW,0.18,dt);
+
+  /* Spread the turn down the spine. All of it in the neck is an owl;
+     a share in the chest is a person. */
+  var w=this.lookW;
+  pose.add('head', this.lookPitch*0.62*w, this.lookYaw*0.58*w, 0);
+  pose.add('neck', this.lookPitch*0.24*w, this.lookYaw*0.26*w, 0);
+  pose.add('chest',this.lookPitch*0.07*w, this.lookYaw*0.16*w, 0);
+
+  /* --- the eyes lead the head --- */
+  this.dartT-=dt;
+  if(this.dartT<=0){
+    this.dartT=0.5+Math.random()*2.4;
+    this.eyeTX=(Math.random()-0.5)*0.0055;
+    this.eyeTY=(Math.random()-0.5)*0.0035;
+  }
+  /* Bias the target toward whatever the head is turning to reach: eyes
+     arrive first and the head catches up, never the other way round. */
+  var lx=M.clamp(this.lookYaw*0.0090,-0.0075,0.0075)*w;
+  var ly=M.clamp(this.lookPitch*0.0060,-0.0045,0.0045)*w;
+  this.eyeX=M.damp(this.eyeX,this.eyeTX+lx,0.05,dt);
+  this.eyeY=M.damp(this.eyeY,this.eyeTY+ly,0.05,dt);
+
+  /* --- cloth lag ---
+     A cape hangs from the chest and answers to where the body has
+     been, not where it is. Two damped scalars in actor space is the
+     whole simulation and it is enough to stop it reading as board. */
+  var vx=(this.pos[0]-this.lastPos[0])/Math.max(dt,0.0001);
+  var vz=(this.pos[2]-this.lastPos[2])/Math.max(dt,0.0001);
+  M.copy3(this.lastPos,this.pos);
+  var sf=Math.sin(this.facing),cf=Math.cos(this.facing);
+  var fwd=vx*sf+vz*cf;         /* along the way the actor is facing */
+  var side=vx*cf-vz*sf;
+  this.lag[0]=M.damp(this.lag[0],M.clamp(fwd*0.052,-0.42,0.42),0.11,dt);
+  this.lag[1]=M.damp(this.lag[1],M.clamp(side*0.040,-0.30,0.30),0.13,dt);
+  return pose;
+};
+
 Actor.prototype.update=function(dt){
   var pose=this.anim.update(dt);
-  Rig.rootMatrix(this.root,this.pos,this.facing,pose,this.scale);
+  this.life(dt,pose);
+  Rig.rootMatrix(this.root,this.pos,this.facing,pose,this.scale,this.squash);
   Rig.poseMatrices(this.mats,pose,this.root);
+  /* A second forward pass, and only for actors close enough to see it.
+     The solve needs the first pass's foot positions to know where the
+     animation wanted them, so there is no way to fold this into one. */
+  if(this.ik&&A.groundAt&&Rig.footIK(this,pose,A.groundAt,dt)){
+    Rig.rootMatrix(this.root,this.pos,this.facing,pose,this.scale,this.squash);
+    Rig.poseMatrices(this.mats,pose,this.root);
+  }
   /* the pet trails with a spring rather than sticking to a fixed offset */
   if(this.kit.pet&&this.kit.pet.style!=='none'){
     this.petPhase+=dt;
@@ -5604,6 +6135,9 @@ function pushInstance(mesh,mat,tint,emis){
   mesh.instances++;
 }
 A.pushInstance=pushInstance;
+/* Where the ground is. Set once by the game so the rig never has to
+   know what a world is. */
+A.groundAt=null;
 
 A.beginFrame=function(){
   for(var i=0;i<touched.length;i++)touched[i].instances=0;
@@ -5611,14 +6145,16 @@ A.beginFrame=function(){
 };
 
 var _m=M.m4(),_t=M.v3(),_s=M.v3(1,1,1),_off=M.m4(),_tmp=M.m4();
-function boneMat(actor,boneName,offset){
+function boneMat(actor,boneName,offset,rot){
   var bi=Rig.NAME[boneName];
   var bm=actor.mats[bi];
   if(!bm)return null;
-  if(!offset||(!offset[0]&&!offset[1]&&!offset[2]))return bm;
-  M.set3(_t,offset[0],offset[1],offset[2]);
+  var moved=offset&&(offset[0]||offset[1]||offset[2]);
+  var turned=rot&&(rot[0]||rot[1]||rot[2]);
+  if(!moved&&!turned)return bm;
+  M.set3(_t,offset?offset[0]:0,offset?offset[1]:0,offset?offset[2]:0);
   M.set3(_s,1,1,1);
-  M.fromTRS(_off,_t,0,0,0,_s);
+  M.fromTRS(_off,_t,rot?rot[0]:0,rot?rot[1]:0,rot?rot[2]:0,_s);
   return M.mul(_m,bm,_off);
 }
 
@@ -5628,19 +6164,33 @@ A.submit=function(actor){
   if(!actor.visible)return;
   var k=actor.kit;
   var skin=Geo.col3(k.skin);
-  function P(mesh,bone,off,col,emis){
-    var m=boneMat(actor,bone,off);
+  function P(mesh,bone,off,col,emis,rot){
+    var m=boneMat(actor,bone,off,rot);
     if(m)pushInstance(mesh,m,col,emis);
   }
   var headOff=SLOT_BONE.head[2];
+  var lag=actor.lag||[0,0];
 
   /* --- head --- */
   P(Body.head(),'head',headOff,skin);
   P(Body.eyes(),'head',headOff,Geo.col3('#FFFFFF'));
-  P(Body.iris(),'head',headOff,Geo.col3(k.eye));
-  P(Body.brows(),'head',headOff,Geo.col3(k.hair.color));
+  /* The iris carries the dart. Moving the whole eye part would take
+     the socket with it, and a socket that slides around the face is
+     worse than an eye that never moves. */
+  P(Body.iris(),'head',
+    [headOff[0]+(actor.eyeX||0),headOff[1]+(actor.eyeY||0),headOff[2]],
+    Geo.col3(k.eye));
+  P(Body.brows(),'head',
+    [headOff[0],headOff[1]+(actor.eyeY||0)*0.4,headOff[2]],
+    Geo.col3(k.hair.color));
+  /* Lids ride down from inside the brow. Skipped entirely while the
+     eye is open, so an unblinking crowd costs nothing. */
+  if((actor.blink||0)>0.02)
+    P(Body.lids(),'head',
+      [headOff[0],headOff[1]+(1-actor.blink)*0.085,headOff[2]],skin);
   if(k.hair.style!=='bald')
-    P(Body.hair(k.hair.style),'head',headOff,Geo.col3(k.hair.color));
+    P(Body.hair(k.hair.style),'head',headOff,Geo.col3(k.hair.color),0,
+      [-lag[0]*0.30,0,lag[1]*0.30]);
   if(k.hat.style!=='none')
     P(Body.hat(k.hat.style),'head',headOff,Geo.col3(k.hat.color));
   P(Body.neck(),'neck',null,skin);
@@ -5650,7 +6200,10 @@ A.submit=function(actor){
   if(k.shirt.style!=='none')
     P(Body.shirt(k.shirt.style),'chest',null,Geo.col3(k.shirt.color));
   if(k.cape.style!=='none')
-    P(Cos.cape(k.cape.style),'chest',null,Geo.col3(k.cape.color));
+    /* The cape answers to where the body has been. Sign checked by
+       eye: running forward has to throw it back, not wrap it round. */
+    P(Cos.cape(k.cape.style),'chest',null,Geo.col3(k.cape.color),0,
+      [-lag[0],0,lag[1]]);
   if(k.back.style!=='none')
     P(Cos.backpack(k.back.style),'chest',null,Geo.col3(k.back.color));
   if(k.wings.style!=='none')
@@ -7998,6 +8551,21 @@ var ACCEL=26, AIRACCEL=6, FRICTION=13;
 var GRAVITY=-24, JUMP=8.0;
 var MAX_STEP=0.62;      /* how tall a ledge you walk up rather than into */
 
+/* ---------------- the forgiving bits ----------------
+   None of this changes where the character can go. All of it changes
+   whether the controller feels like it is listening. A jump that is
+   refused because you left the ledge 40ms ago, or because you pressed
+   40ms before landing, reads as the game being wrong — and the player
+   is right, because they did press it. */
+var COYOTE=0.13;       /* how long a jump still works after a ledge   */
+var JUMPBUF=0.16;      /* how early a jump can be asked for           */
+var JUMP_CUT=0.45;     /* velocity kept when the button is released   */
+Pl.coyote=0;
+Pl.jumpBuf=0;
+Pl.rising=false;       /* mid-jump and still holding the button       */
+Pl.squash=0;           /* landing compression, 0..1, decays           */
+Pl.airTime=0;
+
 Pl.flying=false;
 Pl.flyWish=0;          /* -1, 0 or +1 from the action bar */
 Pl.init=function(actor){
@@ -8114,9 +8682,21 @@ Pl.update=function(dt){
     if(I.down('crouch'))buoy-=6.0;
     Pl.vel[1]+=(buoy-Pl.vel[1])*Math.min(1,7*dt);
   }else{
+    /* Variable height: releasing the button early cuts the rise, so a
+       tap is a hop and a hold is a jump. Both from one impulse. */
+    if(Pl.rising){
+      if(!I.down('jump')){
+        if(Pl.vel[1]>0)Pl.vel[1]*=JUMP_CUT;
+        Pl.rising=false;
+      }else if(Pl.vel[1]<=0)Pl.rising=false;
+    }
     Pl.vel[1]+=GRAVITY*dt;
-    if(I.pressed('jump')&&Pl.grounded){
+
+    Pl.coyote=Pl.grounded?COYOTE:Math.max(0,Pl.coyote-dt);
+    Pl.jumpBuf=I.pressed('jump')?JUMPBUF:Math.max(0,Pl.jumpBuf-dt);
+    if(Pl.jumpBuf>0&&Pl.coyote>0){
       Pl.vel[1]=JUMP;Pl.grounded=false;
+      Pl.coyote=0;Pl.jumpBuf=0;Pl.rising=true;
       a.anim.play('jump');
       LH.Audio&&LH.Audio.play('jump');
     }
@@ -8148,10 +8728,20 @@ Pl.update=function(dt){
   }else if(a.pos[1]<=ground+0.001){
     /* Landing. The impact animation only fires from a real fall, not
        from walking down a kerb. */
-    if(!Pl.grounded&&Pl.vel[1]<-6.5){
-      a.anim.play('land');
-      Cam.shake(M.clamp(-Pl.vel[1]*0.014,0,0.22),0.22);
-      LH.Audio&&LH.Audio.play('land');
+    if(!Pl.grounded){
+      /* Squash scales with the impact and drives both the character's
+         compression and the camera's dip, so a long fall lands heavier
+         than a hop off a kerb without either being a separate case. */
+      var impact=M.clamp((-Pl.vel[1]-2.0)/12.0,0,1);
+      if(impact>0.02){
+        Pl.squash=Math.max(Pl.squash,impact);
+        Cam.dip(impact);
+      }
+      if(-Pl.vel[1]>6.5){
+        a.anim.play('land');
+        Cam.shake(M.clamp(-Pl.vel[1]*0.014,0,0.22),0.22);
+        LH.Audio&&LH.Audio.play('land');
+      }
     }
     a.pos[1]=ground;
     if(Pl.vel[1]<0)Pl.vel[1]=0;
@@ -8168,6 +8758,12 @@ Pl.update=function(dt){
     }
   }
   if(a.pos[1]<ground){a.pos[1]=ground;Pl.grounded=true;if(Pl.vel[1]<0)Pl.vel[1]=0;}
+
+  /* Squash relaxes on a spring rather than a ramp: the overshoot back
+     past neutral is the part that reads as weight. */
+  Pl.squash=Math.max(0,Pl.squash-dt*4.2);
+  Pl.airTime=Pl.grounded?0:Pl.airTime+dt;
+  a.squash=Pl.squash;
 
   /* ---- facing ---- */
   var speed=Math.hypot(Pl.vel[0],Pl.vel[2]);
@@ -13354,6 +13950,20 @@ S.update=function(dt){
      overcast brings them on early — which is what makes an overcast
      afternoon in the harbour read as weather rather than a filter. */
   sd.lampLevel=M.clamp((0.26-elev)/0.34,0,1)*(1+w.cloud*0.25);
+
+  /* Wind. A gust term on top of a base breeze, so the canopy is never
+     doing exactly the same thing twice, and weather leans on it. */
+  var gust=0.72+Math.sin(S.time*2.3)*0.16+Math.sin(S.time*7.1)*0.09;
+  var force=gust*(1+w.cloud*0.55+S.wet*0.85);
+  M.set3(sd.wind,0.86*force,0.30*force,0.40*force);
+  sd.windTime+=dt*(1.35+w.cloud*0.5+S.wet*0.9);
+  /* Overcast is not "more clouds on the ground": past a point the sky
+     is a single sheet and the shadows it casts stop being separate.
+     Cover peaks around broken cloud and falls away again. */
+  sd.cloudAmt=M.clamp(0.30+w.cloud*0.55,0,1)*(1-S.wet*0.55)*
+    M.clamp(elev*3.2,0,1);
+  sd.cloudDrift[0]+=dt*0.0042*(1+w.cloud);
+  sd.cloudDrift[1]+=dt*0.0026*(1+w.cloud);
   /* Shafts are a low-sun effect. Driving them off the sun's elevation
      means they arrive at dawn and dusk on their own, and a fixed amount
      does not sit over the middle of the day looking like a lens smear.
@@ -13412,6 +14022,10 @@ App.stage('Opening the interface',function(){
   var st=Net.snapshot();
   for(var k in st.inv)Icon.of(k);
 });
+/* The rig asks the world how high the ground is; this is the whole of
+   that contract — nothing in LH.Rig has to know what a world is. */
+Act.groundAt=function(x,z){return W.groundAt(x,z);};
+
 App.stage('Waking the harbour',function(){
   var spawn=W.spawn;
   var kit=Act.defaultKit(7);
@@ -13903,6 +14517,7 @@ function updateCrowd(dt){
   var rng=Math.random;
   for(var i=0;i<G.crowd.length;i++){
     var n=G.crowd[i];
+    socialLook(n,7);
     var dx=n.wander[0]-n.pos[0], dz=n.wander[1]-n.pos[2];
     var d=Math.hypot(dx,dz);
     if(d<0.8){
@@ -14042,6 +14657,7 @@ App.onUpdate(function(dt,time){
   if(I.zoom)Cam.zoom(I.zoom);
 
   Pl.update(dt);
+  G.player.ik=true;
   G.player.update(dt);
   if(!Realm.inRealm())updateCrowd(dt);
 
@@ -14141,10 +14757,31 @@ App.onUpdate(function(dt,time){
 /* NPCs turn to face you when you are close, and idle otherwise. It is
    a small thing and it is most of what makes them read as people
    rather than statues. */
+/* Foot IK and social glances are both per-actor costs that only pay
+   off close up, so they share one distance test. Twenty-two metres is
+   about where a foot stops being a foot and starts being three
+   pixels. */
+var IK_RANGE2=22*22;
+
+/* Everyone glances at whoever walks past. It costs one vector per
+   actor per frame and it is most of the difference between a crowd and
+   a set of props that happen to be walking. */
+var _lookP=M.v3();
+function socialLook(a,range){
+  var d=M.dist2(a.pos,G.player.pos);
+  a.ik=(d<IK_RANGE2);
+  if(d<range*range){
+    M.set3(_lookP,G.player.pos[0],G.player.pos[1]+1.45,G.player.pos[2]);
+    a.lookAt=a.lookAt||M.v3();
+    M.copy3(a.lookAt,_lookP);
+  }else a.lookAt=null;
+}
+
 function updateNpcs(dt){
   if(!G.npcs)return;
   for(var i=0;i<G.npcs.length;i++){
     var a=G.npcs[i];
+    socialLook(a,9);
     var d=M.dist2(a.pos,G.player.pos);
     if(d<6){
       a.faceToward(Math.atan2(G.player.pos[0]-a.pos[0],
