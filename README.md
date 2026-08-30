@@ -173,6 +173,80 @@ The scatter band is narrow on purpose. The first pass used one a third
 of a hemisphere wide and turned every face orange; scatter shows at the
 terminator, not across the whole lit side.
 
+### Surface
+
+Every material in this world was flat. Geometry normals only, so a brick
+wall lit from the side was a smooth plane with brick-coloured rectangles
+painted on it, and cloth, bark, gravel and gold were all equally glassy
+under the same fixed highlight.
+
+There is now a second texture array carrying relief and roughness, and
+neither of them needed a second image authored per material. The height
+is taken from the luminance of the albedo that already exists — a guess,
+but a good one here, because every recipe in this file was painted by
+making the recessed parts darker: mortar lines, plank grooves, the gaps
+between cobbles. Where the guess is wrong it is wrong in **sign**, not
+in shape, which is why `bump` is signed: brick's mortar is lighter than
+its brick and further in, so brick's bump is negative. Roughness rides
+in the blue channel, so one fetch delivers both.
+
+The tangent frame comes from screen-space derivatives rather than a
+tangent attribute. Every mesh in this game is generated at load and none
+of them carry tangents; deriving the frame per fragment costs four
+derivatives and works on all of them, including the skinned ones, where
+a baked tangent would have to be skinned too.
+
+With roughness available, the specular became a GGX lobe instead of a
+fixed Blinn exponent, and the ambient gained a specular term — the sky
+reflected in proportion to how smooth a surface is. That last one is
+what makes metal look like metal: diffuse ambient alone leaves a brass
+fitting in shadow indistinguishable from a grey plastic one, because
+what tells you a thing is metal is what it reflects when the sun is off
+it.
+
+### Ground under the feet
+
+Three things the controller used to ignore.
+
+**Slope.** The heightmap has plenty of steep ground and all of it was
+treated as floor — you could stand on a sixty-degree quarry face as
+comfortably as on the plaza and walk up it at full speed. The gradient
+is now sampled from the same height function the camera and the foot IK
+use, so there is one definition of where the ground is. Climbing costs
+speed and descending returns a little, taken from the gradient in the
+direction you asked to go rather than the steepness of the hill in
+general; past about forty-seven degrees control fades out and gravity
+takes over along the fall line. Measured: 4.4 m/s on the flat, 1.5 m/s
+up a slope whose normal is 0.52.
+
+**Wading.** Between ankle and chest the water takes about half your
+speed and none of your control. Having no state between dry land and
+swimming made the shoreline read as a switch.
+
+**Crowding.** Characters stood inside one another. Nothing in the game
+cared but the eye does — two people in the same half metre is the
+clearest possible signal that neither is really there. A soft separation
+pass runs after everyone has moved: two relaxation rounds, O(n²) over at
+most twenty actors, which is cheaper than any spatial structure would be
+to rebuild each frame. It pushes rather than blocks, and the player
+never gets moved, so a crowd parts around you instead of pinning you.
+Being shoved by pathing NPCs feels like a bug even when it is the
+physically fairer answer.
+
+### One action, two bodies
+
+Standing still, a swing should involve the whole body: the hips turn
+into it and the weight shifts onto the front foot, and a clip that only
+moved the arms would look like a mime. Walking, the legs are busy, and
+the same clip has to be confined to the ribs and above.
+
+So an action now routes to whichever it needs — full body when the base
+state is standing, upper body only when it is not. One rule, no
+duplicate clips, and the caller never has to know which happened. The
+mask is a per-bone fraction with the spine graded rather than switched,
+because a hard cut at the waist gives a character two halves that
+disagree about which way the torso is facing.
+
 ### Hair, and the face
 
 Cards, not blobs. Every hairstyle was a cluster of spheres over a lofted

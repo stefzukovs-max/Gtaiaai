@@ -1254,6 +1254,7 @@ GL.texFromCanvas=function(cv,opt){
    unused slot carries the layer index. */
 GL.texArrayFromCanvases=function(list,size,opt){
   opt=opt||{};
+  if(opt.data)return GL.dataArrayFromCanvases(list,size);
   var t=gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D_ARRAY,t);
   /* SRGB8_ALPHA8, not RGBA8. The canvases are painted in sRGB, and the
@@ -1278,6 +1279,29 @@ GL.texArrayFromCanvases=function(list,size,opt){
   if(GL.extAF&&GL.maxAniso>1)
     gl.texParameterf(gl.TEXTURE_2D_ARRAY,GL.extAF.TEXTURE_MAX_ANISOTROPY_EXT,
       Math.min(8,GL.maxAniso));
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY,null);
+  return t;
+};
+
+/* The same upload without the sRGB decode. Normal and roughness maps
+   are numbers, not colours: running them through a gamma curve bends
+   every normal toward the surface and makes every rough surface look
+   polished. */
+GL.dataArrayFromCanvases=function(list,size){
+  var t=gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY,t);
+  gl.texStorage3D(gl.TEXTURE_2D_ARRAY,
+    Math.floor(Math.log2(size))+1,gl.RGBA8,size,size,list.length);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+  for(var i=0;i<list.length;i++)
+    gl.texSubImage3D(gl.TEXTURE_2D_ARRAY,0,0,0,i,size,size,1,
+      gl.RGBA,gl.UNSIGNED_BYTE,list[i]);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+  gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_WRAP_S,gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_WRAP_T,gl.REPEAT);
   gl.bindTexture(gl.TEXTURE_2D_ARRAY,null);
   return t;
 };
@@ -2158,6 +2182,61 @@ function paint(cv,fn,label){
   ctx.putImageData(img,0,0);
   return cv;
 }
+/* ---------------- surface relief ----------------
+   Every material in this world was flat. Geometry normals only, so a
+   brick wall lit from the side was a smooth plane with brick-coloured
+   rectangles on it, and cloth, bark, gravel and skin were all equally
+   glassy-smooth under the same highlight.
+
+   Rather than author a second image per material, the height is taken
+   from the luminance of the one that already exists. That is a guess,
+   but a good one here: every recipe in this file was painted by making
+   the recessed parts darker — mortar lines, plank grooves, the gaps
+   between cobbles. Where the guess is wrong it is wrong in *sign*
+   rather than in shape, which is why `bump` is signed: brick's mortar
+   is lighter than its brick and further in, so brick's bump is
+   negative.
+
+   The blue channel carries roughness, so one texture fetch delivers
+   both. Normals only need two channels — the third is reconstructed. */
+function bumpMap(cv,opt,label){
+  opt=opt||{};
+  var src=cv.getContext('2d').getImageData(0,0,SZ,SZ).data;
+  var h=new Float32Array(SZ*SZ),i;
+  for(i=0;i<SZ*SZ;i++)
+    h[i]=(src[i*4]*0.30+src[i*4+1]*0.59+src[i*4+2]*0.11)/255;
+  /* One blur. The grain in these recipes is per-pixel noise, and a
+     normal map built straight off it is a field of static that turns
+     into flat grey two mip levels down — costing the fetch and
+     delivering nothing. */
+  var bl=new Float32Array(SZ*SZ),x,y,dx,dy,sum;
+  for(y=0;y<SZ;y++)for(x=0;x<SZ;x++){
+    sum=0;
+    for(dy=-1;dy<=1;dy++)for(dx=-1;dx<=1;dx++)
+      sum+=h[((y+dy+SZ)%SZ)*SZ+((x+dx+SZ)%SZ)];
+    bl[y*SZ+x]=sum/9;
+  }
+  var out=make(),ctx=out.getContext('2d');
+  var img=ctx.createImageData(SZ,SZ),d=img.data;
+  var k=(opt.bump===undefined?0.6:opt.bump)*5.0;
+  var rough=Math.round(255*M.clamp(opt.rough===undefined?0.80:opt.rough,0,1));
+  for(y=0;y<SZ;y++)for(x=0;x<SZ;x++){
+    var l=bl[y*SZ+((x-1+SZ)%SZ)], r=bl[y*SZ+((x+1)%SZ)];
+    var up=bl[((y-1+SZ)%SZ)*SZ+x], dn=bl[((y+1)%SZ)*SZ+x];
+    /* The upload flips Y, so the canvas's downward y is the texture's
+       decreasing v — hence the sign on the second gradient. */
+    var nx=-(r-l)*k, ny=(dn-up)*k, nz=1;
+    var len=Math.sqrt(nx*nx+ny*ny+nz*nz);
+    var o=(y*SZ+x)*4;
+    d[o]=Math.round((nx/len*0.5+0.5)*255);
+    d[o+1]=Math.round((ny/len*0.5+0.5)*255);
+    d[o+2]=rough;
+    d[o+3]=255;
+  }
+  ctx.putImageData(img,0,0);
+  return out;
+}
+
 function rgb(hex){var h=hex.charAt(0)==='#'?hex.slice(1):hex;
   var n=parseInt(h,16);return [(n>>16)&255,(n>>8)&255,n&255];}
 function mixv(a,b,t){return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
@@ -2644,14 +2723,44 @@ var LAYERS=[
 Tex.NAME={};
 Tex.SIZE=SZ;
 
+/* Relief depth and roughness per material. `bump` is signed; `rough`
+   is 0 for a mirror and 1 for chalk. These are the only two numbers
+   that separate wet slate from dry bark in this renderer, so they are
+   worth setting by hand rather than defaulting. */
+var SURF={
+  blank:{bump:0,rough:0.70},
+  grass:{bump:0.55,rough:0.96}, dirt:{bump:0.85,rough:0.97},
+  sand:{bump:0.60,rough:0.95},  stone:{bump:1.00,rough:0.90},
+  cliff:{bump:1.20,rough:0.92}, gravel:{bump:1.10,rough:0.94},
+  snow:{bump:0.35,rough:0.66},  planks:{bump:0.75,rough:0.78},
+  deck:{bump:0.80,rough:0.82},  bark:{bump:1.30,rough:0.96},
+  brick:{bump:-0.95,rough:0.90},brickpale:{bump:-0.95,rough:0.90},
+  panel:{bump:0.45,rough:0.42}, panelw:{bump:0.40,rough:0.46},
+  concrete:{bump:0.55,rough:0.92},
+  tile:{bump:-0.35,rough:0.66}, tilepale:{bump:-0.35,rough:0.64},
+  tiledark:{bump:-0.35,rough:0.62},
+  roof:{bump:0.85,rough:0.80},  road:{bump:0.65,rough:0.93},
+  foliage:{bump:0.45,rough:0.86},foliagep:{bump:0.45,rough:0.86},
+  skin:{bump:0.30,rough:0.62},  face:{bump:0.26,rough:0.56},
+  fabric:{bump:0.60,rough:0.93},fabricw:{bump:0.60,rough:0.93},
+  glass:{bump:0.05,rough:0.08}, crystal:{bump:0.30,rough:0.14},
+  gold:{bump:0.20,rough:0.22},  water:{bump:0,rough:0.10},
+  neon:{bump:0,rough:0.55},     neonw:{bump:0,rough:0.55}
+};
+Tex.SURF=SURF;
+
 Tex.buildAll=function(){
-  var canvases=[];
+  var canvases=[],normals=[];
   for(var i=0;i<LAYERS.length;i++){
-    Tex.NAME[LAYERS[i][0]]=i;
-    canvases.push(paint(make(),LAYERS[i][1],LAYERS[i][0]));
+    var name=LAYERS[i][0];
+    Tex.NAME[name]=i;
+    var cv=paint(make(),LAYERS[i][1],name);
+    canvases.push(cv);
+    normals.push(bumpMap(cv,SURF[name],name));
   }
   Tex.count=LAYERS.length;
   Tex.array=LH.GL.texArrayFromCanvases(canvases,SZ);
+  Tex.normals=LH.GL.texArrayFromCanvases(normals,SZ,{data:true});
   /* keep the canvases: the UI paints item icons from the same source
      so a block's tile and its inventory icon can never drift apart */
   Tex.canvases=canvases;
@@ -2929,6 +3038,11 @@ precision highp sampler2DArray;
 precision highp sampler2DShadow;
 `+COMMON+LIGHTING+SHADOW+`
 uniform sampler2DArray uAtlas;
+// Relief and roughness. RG is the tangent-space normal, B is roughness,
+// so one fetch carries both and there is no third texture to keep in
+// step with the first two.
+uniform sampler2DArray uNorm;
+uniform float uBump;
 uniform float uSpec;
 // Which texture-array layer means skin. One comparison per fragment
 // buys a second lighting model without a second shader or a second
@@ -2988,9 +3102,36 @@ void main(){
   float alpha = tex.a*uAlpha;
   if(alpha<0.02) discard;
 
-  vec3 n = normalize(vNrm);
+  vec3 gn = normalize(vNrm);
   vec3 v = normalize(uEye-vWorld);
   vec3 l = uSunDir;
+
+  // ---- surface relief ----
+  // A cotangent frame built from screen-space derivatives, rather than
+  // a tangent attribute. Every mesh in this game is generated at load
+  // and none of them carry tangents; deriving the frame per fragment
+  // costs four derivatives and works on all of them, including the
+  // skinned ones where a baked tangent would have to be skinned too.
+  vec4 nmap = texture(uNorm, vec3(vUV, floor(vLayer+0.5)));
+  if(vBlend>0.002){
+    vec4 nm2 = texture(uNorm, vec3(vUV, floor(vLayer2+0.5)));
+    nmap = mix(nmap, nm2, clamp(vBlend,0.0,1.0));
+  }
+  float rough = clamp(nmap.z,0.05,1.0);
+  vec3 n = gn;
+  if(uBump>0.001){
+    vec3 nt = vec3((nmap.xy*2.0-1.0)*uBump, 0.0);
+    nt.z = sqrt(max(1e-4, 1.0-dot(nt.xy,nt.xy)));
+    vec3 dp1=dFdx(vWorld), dp2=dFdy(vWorld);
+    vec2 du1=dFdx(vUV),   du2=dFdy(vUV);
+    vec3 dp2p=cross(dp2,gn), dp1p=cross(gn,dp1);
+    vec3 T=dp2p*du1.x+dp1p*du2.x;
+    vec3 B=dp2p*du1.y+dp1p*du2.y;
+    float sc=inversesqrt(max(dot(T,T),dot(B,B))+1e-9);
+    // A degenerate frame — a face whose UVs collapse — leaves the
+    // geometry normal alone rather than shipping a NaN.
+    if(sc<1e6) n = normalize(T*sc*nt.x + B*sc*nt.y + gn*nt.z);
+  }
 
   float sh = shadowAt(vWorld,n,l);
   float ndl = wrapDiffuse(n,l,0.35);
@@ -3015,12 +3156,33 @@ void main(){
 
   // Blinn specular, killed in shadow so wet-looking highlights don't
   // float on surfaces the sun cannot see.
+  // A GGX lobe rather than a fixed Blinn exponent, so the roughness
+  // that came out of the same fetch as the normal actually does
+  // something: gold and window glass get a tight hot highlight, bark
+  // and cloth get almost none, and skin gets the broad faint one it
+  // should. Clamped, because GGX at low roughness spikes hard enough
+  // to alias on a curved surface.
   vec3 h = normalize(l+v);
-  float spec = pow(saturate(dot(n,h)), 32.0)*uSpec*sh*step(0.0,dot(n,l));
-  spec = mix(spec, pow(saturate(dot(n,h)),16.0)*0.085*sh*step(0.0,dot(n,l)),
-             isSkin);
+  float a = max(0.045, rough*rough);
+  float ndh = saturate(dot(n,h));
+  float dd = ndh*ndh*(a*a-1.0)+1.0;
+  float ggx = min(12.0, (a*a)/(3.14159*dd*dd));
+  float fres = 0.04+0.96*pow(1.0-saturate(dot(h,v)),5.0);
+  float spec = ggx*fres*uSpec*4.0*sh*step(0.0,dot(n,l));
+  spec = mix(spec, min(2.2,ggx)*fres*0.55*sh*step(0.0,dot(n,l)), isSkin);
 
   vec3 col = albedo*(direct+ambient+pointLights(vWorld,n)) + uSunCol*spec;
+
+  // Ambient specular: the sky, reflected in proportion to how smooth
+  // the surface is. Diffuse ambient alone makes a brass fitting in
+  // shadow indistinguishable from a grey plastic one — what tells you
+  // a thing is metal is what it reflects when the sun is off it. The
+  // reflection is not multiplied by albedo, because a dielectric's
+  // reflection is the colour of what it is looking at, not its own.
+  vec3 refl = reflect(-v,n);
+  float amb_f = 0.04+0.96*pow(1.0-saturate(dot(n,v)),5.0);
+  vec3 skyRefl = mix(uGndCol,uSkyCol,refl.y*0.5+0.5)*2.4;
+  col += skyRefl*amb_f*(1.0-rough)*(1.0-rough)*0.85;
 
   // Subsurface: a narrow warm band either side of the terminator, where
   // light entered the skin and came back out somewhere else. It is a
@@ -3659,6 +3821,10 @@ R.scene={
   /* Kernel radius in shadow texels. Two is a hard edge with the
      aliasing filtered off; four is a soft one that starts to leak
      under thin geometry. */
+  /* Relief strength. 0 is the flat-shaded world this replaces; past
+     about 1.4 the derived normals start fighting the geometry ones at
+     grazing angles and surfaces shimmer. */
+  bump:1.0,
   shadowSoft:2.0,
   outline:0.0,
   inkWidth:1.35,
@@ -3769,6 +3935,7 @@ function bindSceneUniforms(p){
   GL.u1f(p,'uExposure',s.exposure);
   GL.u1f(p,'uToon',s.toon);
   GL.u1f(p,'uSkinLayer',LH.Tex.layer('skin'));
+  GL.u1f(p,'uBump',s.bump);
   GL.u1f(p,'uFaceLayer',LH.Tex.layer('face'));
   GL.u3v(p,'uWind',s.wind);
   GL.u1f(p,'uWindTime',s.windTime);
@@ -3849,6 +4016,8 @@ R.beginOpaque=function(){
   GL.u1i(p,'uAtlas',0);
   GL.bindTex(1,R.shadow.tex,gl.TEXTURE_2D);
   GL.u1i(p,'uShadow',1);
+  GL.bindTex(2,LH.Tex.normals,gl.TEXTURE_2D_ARRAY);
+  GL.u1i(p,'uNorm',2);
   GL.u1f(p,'uSpec',0.25);
   GL.u1f(p,'uAlpha',1);
   GL.u1f(p,'uEmisScale',R.scene.emisScale);
@@ -5122,6 +5291,50 @@ var STATES={
   point:     {clip:'point',     period:1.5,  loop:false, blend:0.18, pri:3, next:'idle'}
 };
 Rig.STATES=STATES;
+
+/* ---------------- the upper-body layer ----------------
+   Standing still, a swing should involve the whole body: the hips turn
+   into it and the weight shifts onto the front foot, and a clip that
+   only moved the arms would look like a mime. Walking, the legs are
+   busy, and the same clip has to be confined to the ribs and above.
+
+   So an action routes to whichever it needs: full body when the base
+   state is standing, upper body only when it is not. One rule, no
+   duplicate clips, and the caller never has to know which happened.
+
+   The mask is the fraction of each bone the action layer owns. The
+   spine is graded rather than switched, because a hard cut at the
+   waist gives a character two halves that disagree about which way
+   the torso is facing. */
+var UPPER=new Float32Array(NB);
+(function(){
+  var w={spine:0.22,spine2:0.55,chest:0.90,neck:1,head:1,
+         shoulderL:1,armL:1,forearmL:1,handL:1,
+         shoulderR:1,armR:1,forearmR:1,handR:1};
+  for(var k in w)if(NAME[k]!==undefined)UPPER[NAME[k]]=w[k];
+})();
+Rig.UPPER=UPPER;
+/* Which actions are willing to be played from the ribs up. Anything
+   that moves the feet — a jump, a landing, a dance — is not. */
+var UPPER_OK={mine:1,build:1,attack:1,wave:1,point:1,clap:1,laugh:1,
+              fishCast:1,fishReel:1,hurt:1};
+
+/* Blend `over` into `out` through a per-bone mask. Root channels are
+   left alone: the walk's lean, bob and roll belong to the legs that
+   are producing them, not to the arm swinging above. */
+Pose.blendMask=function(out,over,w,mask){
+  if(w<=0)return out;
+  for(var i=0;i<NB;i++){
+    var m=mask[i]*w;
+    if(m<=0.001)continue;
+    for(var k=0;k<3;k++){
+      var j=i*3+k;
+      out.rot[j]+=(over.rot[j]-out.rot[j])*m;
+      out.off[j]+=(over.off[j]-out.off[j])*m;
+    }
+  }
+  return out;
+};
 /* Order is the wheel's order, clockwise from the top. */
 Rig.EMOTES=['wave','dance','laugh','celebrate','clap','point','sit'];
 
@@ -5137,11 +5350,28 @@ function Anim(){
   this.b=new Pose();
   this.out=new Pose();
   this.done=false;
+  /* the action layer, above the waist */
+  this.up=null;         /* state name, or null when nothing is playing */
+  this.upPhase=0;
+  this.upW=0;           /* fade, so an action does not snap on and off */
+  this.upDone=false;
+  this.upPose=new Pose();
 }
 Rig.Anim=function(){return new Anim();};
 
+/* Play an action from the ribs up, over whatever the legs are doing. */
+Anim.prototype.playUpper=function(name){
+  if(!STATES[name])return this;
+  this.up=name;this.upPhase=0;this.upDone=false;
+  return this;
+};
+
 Anim.prototype.play=function(name,force){
   if(!STATES[name])return this;
+  /* Moving? Then this action goes on the upper layer and the walk
+     underneath it carries on. */
+  if(UPPER_OK[name]&&this.state==='locomote'&&this.blend>0.5)
+    return this.playUpper(name);
   if(this.state===name&&!force)return this;
   var cur=STATES[this.state],nxt=STATES[name];
   /* A lower-priority state cannot interrupt a running one-shot; that is
@@ -5179,10 +5409,32 @@ Anim.prototype.update=function(dt){
 
   var C2=Rig.clips;
   C2[st.clip](this.b,this.phase,this.params);
-  if(this.blend>=1)return this.out.copyFrom(this.b);
-  var pst2=STATES[this.prev];
-  C2[pst2?pst2.clip:'idle'](this.a,this.prevPhase,this.params);
-  return Pose.blend(this.out,this.a,this.b,M.smooth(this.blend));
+  if(this.blend>=1)this.out.copyFrom(this.b);
+  else{
+    var pst2=STATES[this.prev];
+    C2[pst2?pst2.clip:'idle'](this.a,this.prevPhase,this.params);
+    Pose.blend(this.out,this.a,this.b,M.smooth(this.blend));
+  }
+
+  /* ---- the action layer ---- */
+  if(this.up){
+    var ust=STATES[this.up];
+    this.upPhase+=dt/ust.period;
+    if(this.upPhase>=1){
+      if(ust.loop)this.upPhase%=1;
+      else{this.upPhase=1;this.upDone=true;}
+    }
+    /* An action that stops mid-walk has to leave as smoothly as it
+       arrived, or the arm snaps back to the swing it abandoned. */
+    var wantW=this.upDone?0:1;
+    this.upW+=(wantW-this.upW)*Math.min(1,dt/Math.max(0.05,ust.blend));
+    if(this.upDone&&this.upW<0.02){this.up=null;this.upW=0;}
+    else{
+      C2[ust.clip](this.upPose,this.upPhase,this.params);
+      Pose.blendMask(this.out,this.upPose,M.smooth(this.upW),Rig.UPPER);
+    }
+  }else if(this.upW>0)this.upW=0;
+  return this.out;
 };
 
 /* ---------------- posing ----------------
@@ -10956,6 +11208,19 @@ var WALK=4.2, RUN=7.6, SWIM=2.8, FLY=9.5;
 var ACCEL=26, AIRACCEL=6, FRICTION=13;
 var GRAVITY=-24, JUMP=8.0;
 var MAX_STEP=0.62;      /* how tall a ledge you walk up rather than into */
+/* ---------------- slopes ----------------
+   The heightmap has plenty of steep ground and the controller used to
+   treat all of it as a floor, so you could stand on a 60-degree quarry
+   face as comfortably as on the plaza and walk up it at full speed.
+   Three numbers fix that: how far apart to sample the gradient, how
+   flat counts as walkable, and how hard gravity drags you down what
+   does not. */
+var SLOPE_EPS=0.55;
+var SLOPE_STAND=0.68;   /* ground normal Y at about 47 degrees */
+var SLIDE_ACC=17;
+var WADE=0.55;          /* fraction of top speed in knee-deep water  */
+Pl.slope=1;             /* the ground normal's Y under the feet     */
+Pl.slide=0;             /* 0..1, how much the ground is refusing to hold */
 
 /* ---------------- the forgiving bits ----------------
    None of this changes where the character can go. All of it changes
@@ -11055,11 +11320,43 @@ Pl.update=function(dt){
   Pl.inWater=feet<seaY-0.15;
   Pl.swimming=feet<seaY-1.05;
 
+  /* ---- the ground's shape under the feet ----
+     Taken from the same height function the camera and the foot IK
+     use, so there is one definition of where the ground is and they
+     cannot disagree about it. */
+  var gyx0=W.groundAt(a.pos[0]-SLOPE_EPS,a.pos[2]);
+  var gyx1=W.groundAt(a.pos[0]+SLOPE_EPS,a.pos[2]);
+  var gyz0=W.groundAt(a.pos[0],a.pos[2]-SLOPE_EPS);
+  var gyz1=W.groundAt(a.pos[0],a.pos[2]+SLOPE_EPS);
+  var gx=(gyx1-gyx0)/(2*SLOPE_EPS), gz=(gyz1-gyz0)/(2*SLOPE_EPS);
+  Pl.slope=1/Math.sqrt(gx*gx+gz*gz+1);
+  Pl.slide=Pl.grounded&&!Pl.flying&&!Pl.swimming
+    ? M.clamp((SLOPE_STAND-Pl.slope)/0.26,0,1) : 0;
+
   var top=Pl.swimming?SWIM:((I.run?RUN:WALK));
+  /* Wading is not swimming. Between ankle and chest the water takes
+     about half your speed and none of your control, and having no
+     state in between made the shoreline read as a switch. */
+  if(!Pl.swimming&&Pl.inWater)top*=WADE;
+  if(!Pl.swimming&&!Pl.flying){
+    /* Climbing costs speed and descending gives a little back — the
+       gradient in the direction you are actually asking to go, not the
+       steepness of the hill in general. */
+    var climb=_want[0]*gx+_want[2]*gz;
+    top*=M.clamp(1-climb*0.34,0.52,1.14);
+  }
   var targetX=_want[0]*top*wl, targetZ=_want[2]*top*wl;
 
   var acc=Pl.grounded?ACCEL:AIRACCEL;
   if(Pl.swimming)acc=10;
+  /* On ground too steep to stand on, control fades out and gravity
+     takes over along the fall line. */
+  if(Pl.slide>0.01){
+    acc*=1-Pl.slide*0.85;
+    var dl=Math.hypot(gx,gz)||1;
+    Pl.vel[0]-=gx/dl*SLIDE_ACC*Pl.slide*dt;
+    Pl.vel[2]-=gz/dl*SLIDE_ACC*Pl.slide*dt;
+  }
   Pl.vel[0]+=(targetX-Pl.vel[0])*Math.min(1,acc*dt);
   Pl.vel[2]+=(targetZ-Pl.vel[2])*Math.min(1,acc*dt);
   if(wl<0.01&&Pl.grounded){
@@ -17012,6 +17309,57 @@ function updateCrowd(dt){
   }
 }
 
+/* ---------------- crowding ----------------
+   Characters used to stand inside one another. Nothing in the game
+   cared, but the eye does: two people occupying the same half metre is
+   the clearest possible signal that they are not really there.
+
+   A soft separation pass, run after everyone has moved. It is O(n^2)
+   over at most twenty actors, which is twenty times cheaper than any
+   spatial structure would be to build each frame, and it pushes rather
+   than blocks — the player always wins the exchange, so a crowd parts
+   around you instead of pinning you. */
+var SEP=0.62;
+function separate(){
+  if(!G.player)return;
+  var list=[G.player];
+  var i,j;
+  if(!Realm.inRealm()){
+    for(i=0;i<G.crowd.length;i++)list.push(G.crowd[i]);
+    if(G.npcs)for(i=0;i<G.npcs.length;i++)list.push(G.npcs[i]);
+  }
+  /* Two relaxation passes. One is not enough when three people arrive
+     at the same bench: resolving A against B puts A inside C, and the
+     second pass is what settles that. */
+  for(var pass=0;pass<2;pass++)
+  for(i=0;i<list.length;i++)for(j=i+1;j<list.length;j++){
+    var A=list[i],B=list[j];
+    var dx=B.pos[0]-A.pos[0], dz=B.pos[2]-A.pos[2];
+    var d2=dx*dx+dz*dz;
+    var r=SEP*(A.scale+B.scale)*0.5;
+    if(d2>=r*r)continue;
+    var d=Math.sqrt(d2);
+    if(d<1e-4){
+      /* exactly coincident: nudge apart along a fixed axis rather than
+         dividing by zero and shipping NaN positions */
+      dx=(j%2?1:-1)*0.01;dz=0.01;d=Math.hypot(dx,dz);
+    }
+    var push=(r-d)*0.55;
+    /* The player is index zero and does not get moved by anyone: being
+       shoved around by pathing NPCs feels like a bug even when it is
+       physically the fairer answer. */
+    if(i===0)shove(B,dx/d*push*2,dz/d*push*2);
+    else{shove(A,-dx/d*push,-dz/d*push);shove(B,dx/d*push,dz/d*push);}
+  }
+}
+/* Move an actor and take its wander target with it, so the patrol does
+   not spend the next second walking straight back into the person it
+   was just pushed off. */
+function shove(a,dx,dz){
+  a.pos[0]+=dx;a.pos[2]+=dz;
+  if(a.wander){a.wander[0]+=dx;a.wander[1]+=dz;}
+}
+
 /* ---------------- update ---------------- */
 App.onUpdate(function(dt,time){
   if(!G.ready)return;
@@ -17129,6 +17477,7 @@ App.onUpdate(function(dt,time){
   G.player.ik=true;
   G.player.update(dt);
   if(!Realm.inRealm())updateCrowd(dt);
+  separate();
 
   /* The camera follows the player's chest, not their feet, so a jump
      does not swing the whole view. */
