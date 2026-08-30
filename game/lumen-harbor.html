@@ -2461,16 +2461,27 @@ R.face=function(){
   };
 };
 
+/* Grass.
+
+   The old numbers went from a saturated mid green to a near-lime and
+   sat almost entirely in one hue, which over a hillside reads as
+   felt. Real turf is barely saturated at all — it is olive and khaki
+   and grey-green, with the bright green confined to the new growth —
+   and its variation is mostly in value rather than in hue. */
 R.grass=function(){
+  var DEEP=rgb('#3E5E30'), MID=rgb('#5C7C40'), DRY=rgb('#8A8E52');
   return function(u,v){
-    var base=mixv(rgb('#4C9B3A'),rgb('#89D465'),tileFbm(u,v,5,11,4));
+    var base=mixv(DEEP,MID,tileFbm(u,v,5,11,4));
     /* blade streaks: high-frequency stretched noise reads as grass at
        distance without any actual geometry */
     var blade=tileFbm(u*1.0,v*1.0,44,23,2);
-    base=mixv(base,rgb('#A9EC80'),blade*0.35);
-    var dry=tileFbm(u,v,2.5,41,3);
-    if(dry>0.66)base=mixv(base,rgb('#B4C46A'),(dry-0.66)*2.2);
-    var g=(M.hash2(u*SZ|0,v*SZ|0,77)-0.5)*22;
+    base=mixv(base,rgb('#7EA254'),blade*0.42);
+    /* patches that have gone over, and patches that have been shaded */
+    var dry=tileFbm(u,v,2.2,41,3);
+    if(dry>0.62)base=mixv(base,DRY,(dry-0.62)*1.9);
+    var shade=tileFbm(u,v,1.6,59,3);
+    if(shade<0.34)base=litv(base,-(0.34-shade)*46);
+    var g=(M.hash2(u*SZ|0,v*SZ|0,77)-0.5)*20;
     return litv(base,g);
   };
 };
@@ -2550,15 +2561,27 @@ R.planks=function(lo,hi,rows,seed){
   };
 };
 
+/* Bark.
+
+   The old version ran a clean sine of period 22 down the u axis for
+   its cracks, and a clean sine wrapped round a trunk is corduroy — a
+   regular stripe you can count, which is exactly what bark is not.
+   The cracks now follow warped noise, so they wander, fork and stop;
+   the ridges are broader and lower contrast; and the whole thing is
+   greyer, because a wood full of chocolate-brown trunks reads as a
+   toy. */
 R.bark=function(){
   return function(u,v){
     var warp=tileFbm(u,v,5,83,3);
-    var ridge=1-Math.abs(tileFbm(u*1.0,v*0.25,7,89,4)*2-1);
-    var base=mixv(rgb('#3E2E22'),rgb('#7A5C42'),ridge);
-    base=litv(base,(warp-0.5)*22);
-    var crack=Math.sin((u*22+warp*3)*Math.PI*2);
-    if(crack>0.86)base=litv(base,-38);
-    return litv(base,(M.hash2(u*SZ|0,v*SZ|0,91)-0.5)*16);
+    var ridge=1-Math.abs(tileFbm(u*1.4,v*0.30,6,89,4)*2-1);
+    var base=mixv(rgb('#4A4038'),rgb('#7E7264'),ridge);
+    base=litv(base,(warp-0.5)*16);
+    /* cracks along the grain, placed by noise rather than by period */
+    var seam=tileFbm(u*3.0,v*0.16,13,97,3);
+    if(seam>0.70)base=litv(base,-30*(seam-0.70)/0.30);
+    var lich=tileFbm(u,v,3.2,101,3);
+    if(lich>0.72)base=mixv(base,rgb('#8E9480'),(lich-0.72)*1.6);
+    return litv(base,(M.hash2(u*SZ|0,v*SZ|0,91)-0.5)*14);
   };
 };
 
@@ -2609,23 +2632,44 @@ R.panel=function(lo,hi,cells,seed,rivets){
   };
 };
 
+/* Paving.
+
+   The first version had a checker, a nine per cent tone jitter and a
+   uniform grout line, and over a plaza it read as graph paper: every
+   cell the same size, the same two colours, the same crisp black
+   cross every 1.8 metres. Three things fix that, and none of them is
+   more detail inside the tile.
+
+   A slab is laid, not printed: the tone range is wide enough that
+   neighbouring slabs are visibly different stones. Some of them have
+   been replaced at some point, so a few are markedly darker or paler
+   than the run. And the joint between them is not a drawn line — it is
+   a shadow with a soft shoulder, wider where the slabs have settled. */
 R.tilefloor=function(a,b,grout,cells){
   a=a||'#6A7686';b=b||'#828E9E';grout=grout||'#4A5462';cells=cells||4;
+  var A=rgb(a),B=rgb(b),G=rgb(grout);
   return function(u,v){
     var cx=Math.floor(u*cells),cy=Math.floor(v*cells);
     var fu=u*cells-cx,fv=v*cells-cy;
-    var e=0.035;
-    if(fu<e||fv<e||fu>1-e||fv>1-e)
-      return litv(rgb(grout),(M.hash2(u*SZ|0,v*SZ|0,127)-0.5)*10);
-    /* checker plus per-tile tone variance, so a plaza is not a grid of
-       identical squares */
-    var chk=((cx+cy)&1)?a:b;
+    /* the joint, with a per-slab width so the grid is not ruled */
+    var jw=0.026+M.hash2(cx,cy,911)*0.020;
+    var edge=Math.min(Math.min(fu,fv),Math.min(1-fu,1-fv));
+    var chk=((cx+cy)&1)?A:B;
     var tone=M.hash2(cx,cy,131);
-    var base=mixv(rgb(chk),litv(rgb(chk),22),tone);
-    base=litv(base,(tileFbm(u,v,14,137,3)-0.5)*12);
-    /* polished sheen streak */
-    var sh=Math.sin((fu+fv)*Math.PI);
-    base=litv(base,sh*6);
+    var base=mixv(litv(chk,-16),litv(chk,20),tone);
+    /* one slab in nine has been replaced and does not match */
+    var odd=M.hash2(cx,cy,577);
+    if(odd>0.90)base=litv(base,-26);
+    else if(odd<0.09)base=litv(base,22);
+    /* a slight warm/cool drift across the slab, and the grain in it */
+    base=mixv(base,litv(base,10),tileFbm(u,v,3.5,137,3));
+    base=litv(base,(tileFbm(u,v,17,139,3)-0.5)*13);
+    base=litv(base,(M.hash2(u*SZ|0,v*SZ|0,151)-0.5)*9);
+    if(edge<jw){
+      /* soft shoulder into the joint rather than a drawn line */
+      var t=M.smooth(M.clamp(edge/jw,0,1));
+      base=mixv(litv(G,(M.hash2(u*SZ|0,v*SZ|0,127)-0.5)*10),base,t*t);
+    }
     return base;
   };
 };
@@ -2644,15 +2688,18 @@ R.concrete=function(lo,hi,seed){
 };
 
 R.foliage=function(lo,hi,seed){
-  lo=lo||'#256B2C';hi=hi||'#79D257';
+  lo=lo||'#38672F';hi=hi||'#8CB85E';
   return function(u,v){
     /* clumped leaf masses, not uniform green */
     var clump=tileFbm(u,v,8,seed||151,4);
     var fine=tileFbm(u,v,30,(seed||151)+3,2);
     var base=mixv(rgb(lo),rgb(hi),clump*0.7+fine*0.3);
-    if(fine>0.74)base=mixv(base,rgb('#B4F08C'),(fine-0.74)*2.4);
-    if(clump<0.28)base=mixv(base,rgb('#1B4523'),(0.28-clump)*2.0);
-    return litv(base,(M.hash2(u*SZ|0,v*SZ|0,157)-0.5)*20);
+    if(fine>0.74)base=mixv(base,rgb('#C2D998'),(fine-0.74)*2.4);
+    /* The deep shade used to go almost black, and a canopy whose dark
+       half is black is a hole in the sky rather than the inside of a
+       tree. */
+    if(clump<0.28)base=mixv(base,rgb('#2C4A2A'),(0.28-clump)*2.0);
+    return litv(base,(M.hash2(u*SZ|0,v*SZ|0,157)-0.5)*18);
   };
 };
 
@@ -2828,9 +2875,12 @@ var LAYERS=[
   ['panel',   R.panel('#333B48','#69768A',4,113,true)],
   ['panelw',  R.panel('#5E6672','#9AA4B2',3,311,false)],
   ['concrete',R.concrete()],
-  ['tile',    R.tilefloor('#6A7686','#828E9E','#4A5462',7)],
-  ['tilepale',R.tilefloor('#9AA4B0','#B0B9C4','#6E7884',4)],
-  ['tiledark',R.tilefloor('#2E3846','#42505F','#1E2630',4)],
+  /* The plaza is warm stone, not blue concrete. A whole town square in
+     cold grey is the difference between somewhere to arrive and a
+     multi-storey car park. */
+  ['tile',    R.tilefloor('#7C7466','#8E8578','#4E4840',7)],
+  ['tilepale',R.tilefloor('#B4A894','#C6BAA6','#7E7364',4)],
+  ['tiledark',R.tilefloor('#3A3A40','#4C4C54','#242428',4)],
   ['roof',    R.roof()],
   ['road',    R.road()],
   ['foliage', R.foliage()],
@@ -3214,8 +3264,24 @@ out vec3 vWorld;
 out vec3 vNrm;
 out vec2 vUV;
 out vec3 vCol;
-out float vLayer;
-out float vLayer2;
+// Flat-qualified, and this is the whole fix for the coloured zigzag
+// that ran along every path edge on this island. (No backticks in
+// here: this shader is a JavaScript template literal, and a stray one
+// ends the string in the middle of the vertex stage.)
+//
+// These are indices into a texture array. The fragment shader has to
+// round them, because a fractional array index is undefined rather
+// than a blend — and a smooth-interpolated index between two vertices
+// that disagree sweeps the rounded value through *every layer between
+// them in the atlas*. At a paving-to-road edge that is brick, roof,
+// foliage and cherry blossom, one metre at a time, which is exactly
+// what the magenta sawtooth was.
+//
+// Interpolating an index was never meaningful. Flat, the whole
+// triangle takes the provoking vertex's layer, and only the blend
+// weight — which is meaningful to interpolate — varies across it.
+flat out float vLayer;
+flat out float vLayer2;
 out float vBlend;
 out float vEmis;
 
@@ -3251,6 +3317,10 @@ uniform sampler2DArray uAtlas;
 // step with the first two.
 uniform sampler2DArray uNorm;
 uniform float uBump;
+/* 1 on the ground, 0 on everything else. See the macro block in
+   main(): tinting a prop or a character by its world position would
+   make it change colour as it walked. */
+uniform float uMacro;
 uniform float uSpec;
 // Which texture-array layer means skin. One comparison per fragment
 // buys a second lighting model without a second shader or a second
@@ -3273,8 +3343,8 @@ in vec3 vWorld;
 in vec3 vNrm;
 in vec2 vUV;
 in vec3 vCol;
-in float vLayer;
-in float vLayer2;
+flat in float vLayer;
+flat in float vLayer2;
 in float vBlend;
 in float vEmis;
 
@@ -3309,6 +3379,24 @@ void main(){
   vec3 albedo = tex.rgb*vCol;
   float alpha = tex.a*uAlpha;
   if(alpha<0.02) discard;
+
+  // ---- macro variation ----
+  // Terrain UVs run in world units at 0.14, so every ground texture in
+  // this game repeats every seven metres. Over a three-hundred-metre
+  // island that reads as a bathroom floor however good the tile is,
+  // and no amount of detail inside the tile fixes it, because the
+  // thing the eye is picking up is the period, not the content. Two
+  // octaves of slow world-space noise multiplying the albedo break the
+  // period for the cost of no extra texture fetch. It also gives the
+  // island tonal range: patches of ground that are simply lighter or
+  // darker than their neighbours, which is most of what makes real
+  // ground look like ground.
+  if(uMacro>0.001){
+    float m1=cnoise2(vWorld.xz*0.0155);
+    float m2=cnoise2(vWorld.xz*0.0630+21.3);
+    float mv=clamp(m1*0.66+m2*0.34,0.0,1.0);
+    albedo*=mix(1.0,mix(0.80,1.16,mv),uMacro);
+  }
 
   vec3 gn = normalize(vNrm);
   vec3 v = normalize(uEye-vWorld);
@@ -4155,6 +4243,7 @@ function bindSceneUniforms(p){
   GL.u1f(p,'uToon',s.toon);
   GL.u1f(p,'uSkinLayer',LH.Tex.layer('skin'));
   GL.u1f(p,'uBump',s.bump);
+  GL.u1f(p,'uMacro',0);
   GL.u1f(p,'uFaceLayer',LH.Tex.layer('face'));
   GL.u3v(p,'uWind',s.wind);
   GL.u1f(p,'uWindTime',s.windTime);
@@ -9635,7 +9724,7 @@ function segDist(px,pz,ax,az,ay,bx,bz,by){
 var _res={y:0,mat:-1,matW:0,flat:0};
 function stamped(x,z){
   var h=baseHeight(x,z);
-  var mat=-1,matW=0,flat=0;
+  var mat=-1,matW=0,flat=0,bestW=-1;
   /* Districts and roads belong to Lumen Harbor. A private world is
      bare ground and whatever its owner has put on it. */
   if(profile.kind==='realm'){
@@ -9664,7 +9753,18 @@ function stamped(x,z){
        them merge into one grey mass covering the island. Paving is
        confined to roughly the pad radius plus a quarter of the ring. */
     var sw=M.smooth(M.clamp((w-0.68)/0.24,0,1));
-    if(sw>matW){matW=sw;mat=LH.Tex.layer(P[6]);}
+    /* Claim the material slot across the *whole* of the pad's
+       influence, not only where the paving is visible.
+
+       The pair of layer indices is interpolated across a triangle and
+       then rounded, so two vertices that disagree about which pair
+       they are blending give you a triangle blending, say, road
+       against cliff — and that is the one-metre sawtooth running along
+       every path edge on this island. Claiming the slot early costs
+       nothing: out there the weight is still zero, so the ground draws
+       pure. What it buys is that the pair stays constant across the
+       transition, and only the weight moves. */
+    if(w>bestW){bestW=w;matW=sw;mat=LH.Tex.layer(P[6]);}
     if(w>flat)flat=w;
   }
   /* Roads last: they cut across whatever they cross. */
@@ -9681,7 +9781,10 @@ function stamped(x,z){
     if(w2<=0)continue;
     h=M.lerp(h,sd.y-0.12,w2*0.92);
     var sw2=M.smooth(M.clamp((w2-0.55)/0.30,0,1));
-    if(sw2>matW){matW=sw2;mat=roadL;}
+    /* `>=` rather than `>`: roads cut across whatever they cross, so
+       where a road shoulder and a district edge claim the same ground
+       at equal strength the road wins. */
+    if(w2>=bestW){bestW=w2;matW=sw2;mat=roadL;}
     if(w2>flat)flat=w2;
   }
   _res.y=h;_res.mat=mat;_res.matW=matW;_res.flat=flat;
@@ -9765,9 +9868,21 @@ T.generate=function(){
     var hD=heights[Math.max(0,j-1)*N+i],hU=heights[Math.min(N-1,j+1)*N+i];
     var slope=Math.hypot(hR-hL,hU-hD)/(2*RES);
     var nat=naturalMat(heights[k],slope);
-    if(padW[k]>0.002&&padMat[k]>=0){
-      /* Inside a district: the paving is the primary and the natural
-         ground is what it fades into at the edge. */
+    if(padMat[k]>=0){
+      /* Inside a district *or anywhere it has influence*: the paving is
+         the primary and the natural ground is what it fades into.
+
+         The condition used to be `padW>0.002` — only where the paving
+         is actually visible — and that is what put the coloured
+         sawtooth along every path edge on this island. The layer index
+         is interpolated across a triangle and then rounded, so a
+         triangle whose two ends disagree about the primary sweeps the
+         rounded index through *every layer between them in the atlas*:
+         at a road-to-grass edge that is brick, roof, foliage and
+         blossom, one metre at a time. Claiming the slot across the
+         whole influence costs nothing — out there the weight is 1, so
+         it draws pure ground — and it keeps the pair constant so only
+         the weight moves. */
       mats[k]=padMat[k];
       matsB[k]=(nat.w>0.5)?nat.b:nat.a;
       matsW[k]=1-padW[k];
@@ -9937,17 +10052,36 @@ P.cache=cache;
 /* ---------------- vegetation ---------------- */
 /* A trunk that leans and forks. Straight cylinders read as telegraph
    poles; the lean is most of what sells a tree at distance. */
+/* A trunk.
+
+   Eight sides made every tree in the wood a visible octagon from ten
+   metres, and starting at full radius at ground level made it a pipe
+   pushed into the lawn. A trunk meets the ground in a flare — the
+   roots spreading out under the soil are what a tree stands on — and
+   that flare over the first twenty centimetres is most of what says
+   "grown here" rather than "placed here". */
 function trunk(b,h,r0,r1,lean,seed){
   var rng=M.rng(seed||7);
-  var secs=[],steps=6;
+  var secs=[],steps=7;
   var lx=0,lz=0;
+  /* the flare: two extra rings below the first, wider and lumpier */
+  for(var f=0;f<2;f++){
+    var ft=f/2;
+    var fr=r0*(1.62-ft*0.44);
+    var fp=Geo.circle(fr,11);
+    for(var q=0;q<fp.length;q++){
+      var bulge=1+(M.hash2(q,f,seed||7)-0.5)*0.30*(1-ft);
+      fp[q][0]*=bulge;fp[q][1]*=bulge;
+    }
+    secs.push({y:ft*h*0.030,pts:fp});
+  }
   for(var i=0;i<=steps;i++){
     var t=i/steps;
     lx+=(rng()-0.5)*lean*h*0.16;
     lz+=(rng()-0.5)*lean*h*0.16;
-    var pts=Geo.circle(M.lerp(r0,r1,t*t),8);
+    var pts=Geo.circle(M.lerp(r0,r1,t*t),11);
     for(var j=0;j<pts.length;j++){pts[j][0]+=lx;pts[j][1]+=lz;}
-    secs.push({y:t*h,pts:pts});
+    secs.push({y:h*0.030+t*h*0.970,pts:pts});
   }
   b.loft(secs,'#FFFFFF',{openTop:true,uvScale:2});
   return [lx,lz];
@@ -10000,7 +10134,7 @@ P.tree=function(kind,variant){
     if(kind==='pine'){
       b.mat('bark');
       var h=8.5*scale;
-      trunk(b,h,0.30*scale,0.10*scale,0.10,11+variant);
+      trunk(b,h,0.185*scale,0.065*scale,0.10,11+variant);
       b.mat('foliage');
       /* stacked skirts, each smaller and rotated, so the silhouette
          is ragged rather than a smooth cone */
@@ -10029,7 +10163,7 @@ P.tree=function(kind,variant){
     }else if(kind==='palm'){
       b.mat('bark');
       var ph=7.5*scale;
-      var tip=trunk(b,ph,0.24*scale,0.16*scale,0.42,13+variant);
+      var tip=trunk(b,ph,0.150*scale,0.105*scale,0.42,13+variant);
       b.mat('foliage');
       var n=8;
       for(var f=0;f<n;f++){
@@ -10060,7 +10194,7 @@ P.tree=function(kind,variant){
     }else if(kind==='dead'){
       b.mat('bark');
       var dh=6.0*scale;
-      var dt=trunk(b,dh,0.30*scale,0.09*scale,0.30,17+variant);
+      var dt=trunk(b,dh,0.185*scale,0.058*scale,0.30,17+variant);
       for(var br=0;br<5;br++){
         var ba=rng()*M.TAU,bt=0.4+rng()*0.5;
         b.push();
@@ -10081,8 +10215,14 @@ P.tree=function(kind,variant){
          because a species is one instanced mesh however complicated it
          is inside. */
       b.mat('bark');
+      /* Slimmer. A seven-metre broadleaf carried a trunk 0.72 m across
+         at the base before the placement scale multiplied it again,
+         and in a wood that is a row of columns rather than a row of
+         trees. Real proportion for this height is nearer a quarter of
+         that; the flare in `trunk` gives back the visual weight at the
+         bottom, which is where it belongs. */
       var bh=7.0*scale;
-      var bt2=trunk(b,bh*0.46,0.36*scale,0.20*scale,0.20,19+variant);
+      var bt2=trunk(b,bh*0.46,0.215*scale,0.135*scale,0.20,19+variant);
       var leafMat=kind==='blossom'?'foliagep':'foliage';
       function cluster(bb,r2,sz){
         sz=sz||1;
@@ -10098,8 +10238,14 @@ P.tree=function(kind,variant){
              nature and gains nothing from being round, and this mesh is
              instanced across a forest and drawn three times a frame —
              once for the image and once for each shadow cascade. */
-          bb.sphere(0,0,0,(0.66+r2()*0.46)*sz*scale,5,4,
-            q%2?'#FFFFFF':'#D6D6D6',{squash:0.80+r2()*0.24});
+          /* Tone per lobe, over a real range. Two shades alternating
+             gave a canopy that was one flat mass with a seam in it;
+             the light on a tree falls off from the outside of the
+             crown to the inside, and five steps of it read as depth
+             where two read as a decal. */
+          var LOBE=['#FFFFFF','#F0F0F0','#DEDEDE','#CACACA','#B6B6B6'];
+          bb.sphere(0,0,0,(0.66+r2()*0.46)*sz*scale,6,5,
+            LOBE[(r2()*LOBE.length)|0],{squash:0.78+r2()*0.28});
           bb.pop();
         }
         bb.mat('bark');
@@ -10111,14 +10257,14 @@ P.tree=function(kind,variant){
         b.push();
         b.rotate(0,(L/prim)*M.TAU+rng()*0.7,0);
         b.rotate(0.42+rng()*0.26,0,0);
-        limb(b,bh*0.30*(0.85+rng()*0.3),0.19*scale,0.11*scale,
+        limb(b,bh*0.30*(0.85+rng()*0.3),0.115*scale,0.068*scale,
              2,rng,cluster,'#FFFFFF');
         b.pop();
       }
       /* and one going more or less straight up, which is what stops
          the crown looking like a bowl */
       b.push();b.rotate(0,rng()*M.TAU,0);b.rotate(0.14,0,0);
-      limb(b,bh*0.34,0.17*scale,0.10*scale,2,rng,cluster,'#FFFFFF');
+      limb(b,bh*0.34,0.105*scale,0.062*scale,2,rng,cluster,'#FFFFFF');
       b.pop();
       b.pop();
     }
@@ -10427,15 +10573,48 @@ P.portal=function(){
       b.sphere(0,0,0,0.055,6,5,'#5BE8FF');b.pop();
       b.pop();
     }
-    /* the surface */
-    b.mat('neon',0.85);
-    b.push();b.translate(0,1.05,0);
-    b.loft([
-      {y:-1.0,pts:Geo.circle(1.85,18,1,0.10)},
-      {y: 0.0,pts:Geo.circle(2.02,18,1,0.10)},
-      {y: 1.9,pts:Geo.circle(1.20,18,1,0.10)}
-    ],'#2FBFE0',{openTop:true,openBottom:true});
-    b.pop();
+    /* The surface.
+
+       This used to be a stack of horizontal circles lofted up the Y
+       axis — which is a barrel two metres deep, not a doorway. Fully
+       emissive, one flat cyan, and sticking a metre out of the arch on
+       both sides, it read as a plastic wedge jammed in a stone ring,
+       and it was the first thing anybody saw in this game.
+
+       A portal is a membrane. It lives in the plane of the arch, it is
+       darkest in the middle where you are looking through it and
+       brightest at the rim where it meets the frame, and it is dished
+       rather than flat so the light on it moves as you walk past. */
+    /* The opening is a half-circle standing on a plinth, so the
+       membrane is half-rings, not discs. A full disc spends its lower
+       half buried in the plinth and poking out of the front of it,
+       and that stray lower half glowing under the arch is what turned
+       a doorway into a dome. */
+    var RG=8, R0=2.00, SEG=24;
+    var COLS=['#06202F','#0A3247','#10495C','#17667A','#1F8496',
+              '#2AA2B0','#37BEC6','#49D6D8'];
+    function halfRing(r0,r1,depth,col,flip){
+      var c=Geo.col3(col), base=b.n, i;
+      var nz=flip?-1:1;
+      for(i=0;i<=SEG;i++){
+        var a=Math.PI*(i/SEG), ca=Math.cos(a), sa=Math.sin(a);
+        b.vert(ca*r0,1.05+sa*r0,depth,0,0,nz,i/SEG,0,c);
+        b.vert(ca*r1,1.05+sa*r1,depth,0,0,nz,i/SEG,1,c);
+      }
+      for(i=0;i<SEG;i++){
+        var a0=base+i*2, b0=a0+1, c0=a0+2, d0=a0+3;
+        if(flip)b.quad(a0,c0,d0,b0); else b.quad(a0,b0,d0,c0);
+      }
+    }
+    for(var g=0;g<RG;g++){
+      var t=g/(RG-1);
+      /* dished: the middle sits back from the frame, so the light on
+         it moves as you walk past rather than sitting still */
+      var depth=-0.26+t*t*0.30;
+      b.mat('neon',0.10+t*t*0.44);
+      halfRing(R0*(g/RG),R0*((g+1)/RG),depth,COLS[g],false);
+      halfRing(R0*(g/RG),R0*((g+1)/RG),depth-0.014,COLS[g],true);
+    }
   },8);
 };
 
@@ -10459,19 +10638,37 @@ LH.Props=P;
 'use strict';
 var M=LH.M,Geo=LH.Geo,A={};
 
+/* A waterfront is a row of people's houses, and people paint them.
+
+   Every palette here used to sit within about fifteen per cent of a
+   neutral grey — four styles of pale stone under grey-blue roofs —
+   which is why the town read as a row of unfinished office blocks
+   whatever the lighting did. Real harbour fronts are the opposite:
+   ochre next to washed blue next to dark red, held together by the
+   fact that they share a roof material and a trim colour rather than
+   by all being the same colour. The trim and the base stay quiet
+   precisely so the walls can be loud. */
 var STYLES={
-  harbour:{ wall:'planks', wallCol:['#C8A87E','#B08A5E','#9C7A58','#D4BC96'],
-            trim:'planks', trimCol:'#6E5236', roof:'roof', roofCol:['#7E8CA0','#8E7A8A','#6E7E92'],
-            base:'stone', baseCol:'#C0C8D2' },
-  town:{    wall:'brickpale', wallCol:['#C4A98E','#B09678','#D0BCA2','#A88E72'],
-            trim:'planks', trimCol:'#5E4A38', roof:'roof', roofCol:['#B4666E','#9A6480','#C4807A'],
-            base:'stone', baseCol:'#C8CED8' },
-  modern:{  wall:'panelw', wallCol:['#C4CCD6','#DCE2EA','#AEB6C2','#EAEEF4'],
-            trim:'panel', trimCol:'#9AA4B0', roof:'panel', roofCol:['#A8B2C0','#BAC2CE'],
-            base:'concrete', baseCol:'#B0B8C2' },
-  industrial:{wall:'panel', wallCol:['#A2AAB6','#B8C0CA','#8E96A2'],
-            trim:'panel', trimCol:'#7A828E', roof:'panel', roofCol:['#8A929E','#98A0AC'],
-            base:'concrete', baseCol:'#9AA2AC' }
+  harbour:{ wall:'planks',
+            wallCol:['#C8934E','#A9583F','#6E8FA0','#D8B06A','#7C8F63','#B4643F'],
+            trim:'planks', trimCol:'#4A382A',
+            roof:'roof', roofCol:['#55606E','#6A5560','#48525E','#7A6250'],
+            base:'stone', baseCol:'#A8A296' },
+  town:{    wall:'brickpale',
+            wallCol:['#C46A54','#D8A860','#8E9A6E','#7E8CA8','#B45E6E','#E0C088'],
+            trim:'planks', trimCol:'#48372A',
+            roof:'roof', roofCol:['#8E4A46','#6E4450','#A85E4A','#5A4A56'],
+            base:'stone', baseCol:'#B0AA9E' },
+  modern:{  wall:'panelw',
+            wallCol:['#D6DCE0','#B8C4C8','#E4E0D4','#9EB0B6'],
+            trim:'panel', trimCol:'#5E6A72',
+            roof:'panel', roofCol:['#68727C','#7A848E'],
+            base:'concrete', baseCol:'#9AA0A4' },
+  industrial:{wall:'panel',
+            wallCol:['#8E7A5E','#6E7A80','#9A6A50','#7E8474'],
+            trim:'panel', trimCol:'#4E545A',
+            roof:'panel', roofCol:['#5A626A','#6A7278'],
+            base:'concrete', baseCol:'#8A8E90' }
 };
 A.STYLES=Object.keys(STYLES);
 
@@ -10966,6 +11163,35 @@ function dressPlaza(b){
     power:0.5,always:true});
   box(cx,y+0.42,cz,5.4,0.84,5.4,0,'fountain');
   W.boxes[W.boxes.length-1].walkable=false;
+
+  /* An inlay in the paving.
+
+     A disc of tile forty metres across with a fountain in the middle
+     of it reads as a car park with a fountain in the middle of it, and
+     no amount of work on the tile texture changes that — the problem
+     is that nothing has been *drawn* on the square. Two courses of
+     darker stone around the basin and eight spokes running out under
+     the furniture give the plaza a centre and a set of directions, and
+     cost one static mesh with no collision. */
+  var inl=Geo.build();
+  inl.mat('tiledark');
+  inl.push();inl.translate(cx,y+0.014,cz);
+  inl.annulus(0,0,0,4.20,4.95,44,'#9A9084');
+  inl.annulus(0,0,0,5.30,5.62,44,'#6E665C');
+  inl.annulus(0,0,0,17.60,18.10,56,'#7A7266');
+  for(var sp=0;sp<8;sp++){
+    var spa=sp/8*M.TAU+M.TAU/16;
+    inl.push();
+    inl.translate(Math.cos(spa)*11.5,0,Math.sin(spa)*11.5);
+    inl.rotate(0,-spa,0);
+    /* The chamfer radius has to stay under half the smallest extent —
+       a two-centimetre round on a one-centimetre slab turns the box
+       inside out. */
+    inl.chamfer(0,0,0,12.4,0.014,0.62,'#88806F',0.004,{noBand:true});
+    inl.pop();
+  }
+  inl.pop();
+  W.statics.push(inl.upload());
 
   /* Ring of benches, planters and lamps facing in. */
   /* Three concentric rings of furniture. A square this size with a
@@ -19140,7 +19366,9 @@ App.onDraw(function(dt,time){
   var p=R.beginOpaque();
   GL.uM4(p,'uModel',_id);
   GL.u1f(p,'uSpec',0.18+LH.Sky.wet*0.55);
+  GL.u1f(p,'uMacro',1);
   T.drawChunks(true);
+  GL.u1f(p,'uMacro',0);
   W.drawStatics();
   W.drawFalls(p,time);
   V.draw(true);

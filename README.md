@@ -747,6 +747,136 @@ inheriting it, which put a dark patch across the hips of every pair in
 the game and read as a second garment underneath. The shape is the
 body's; the shading is not.
 
+### The sawtooth along every path
+
+There was a coloured zigzag wherever paving met grass — a stepped,
+one-metre band of cream and magenta following the edge of every road
+and every district. It looked like a texture bug because it was one,
+and the cause is worth writing down because it is invisible from the
+code.
+
+Ground materials are indices into a texture array, stored per vertex
+and blended in pairs: a primary layer, a secondary, and a weight. The
+fragment shader has to round the index, because it arrives interpolated
+across the triangle and a fractional array index is undefined rather
+than a blend. That rounding is fine as long as both ends of a triangle
+agree on *which pair* they are blending. Where they disagree — one
+vertex says road-and-grass, the next says grass-and-cliff — the rounded
+index sweeps through **every layer that happens to sit between them in
+the atlas**. At a road-to-grass edge that is brick, then roof, then
+foliage, then blossom, one metre at a time. The magenta was cherry
+blossom, sampled by a hillside.
+
+Two things fix it. A pad or a road now claims the material slot across
+the whole of its influence rather than only where its paving is
+visible, so both ends of a boundary triangle agree about which pair
+they are blending — out at the edge the weight is 1, and the ground
+still draws pure grass.
+
+That is not enough on its own, because where two districts meet they
+still disagree, and the zigzag survived it. The real fix is one word:
+the layer indices are **flat**-qualified now. Interpolating an index
+was never meaningful — the shader rounds it anyway — so the whole
+triangle takes the provoking vertex's layer, and only the blend
+weight, which *is* meaningful to interpolate, varies across it. There
+is nothing left to sweep through.
+
+A small trap on the way: the shaders are JavaScript template literals,
+so the backticks in a comment saying "`flat`" ended the string in the
+middle of the vertex stage. The syntax check caught it; a browser
+would have shown a blank screen.
+
+What is left at a boundary is a one-metre staircase, because the
+primary now changes per triangle on a one-metre grid. That reads as a
+paving edge rather than as a bug, which is the whole difference, but
+it is a staircase and widening the weight ramps so the blend carries
+more of the change would soften it further.
+
+### Ground that is not a bathroom floor
+
+Terrain UVs run in world units at 0.14, so every ground texture in this
+game repeats every 7.1 metres. Over a 352-metre island that reads as
+tiling however good the tile is, because the thing the eye picks up is
+the period, not the content — and no amount of detail inside the tile
+addresses the period.
+
+Two octaves of slow world-space noise now multiply the terrain albedo.
+It costs no extra texture fetch, it is switched on by a uniform that is
+1 for the ground and 0 for everything else (a prop tinted by its world
+position would change colour as it was carried), and besides breaking
+the repeat it gives the island tonal range: patches simply lighter or
+darker than their neighbours, which is most of what makes real ground
+look like ground.
+
+The recipes underneath it changed too. Paving had a checker, a nine per
+cent tone jitter and a ruled grout line, which over a square reads as
+graph paper; slabs now vary widely in tone, one in nine has been
+replaced and does not match the run, the joint has a soft shoulder and
+a per-slab width, and the whole palette moved from cold blue-grey to
+warm stone — a town square in cold grey is the difference between
+somewhere to arrive and a multi-storey car park. Grass ran from a
+saturated mid-green to a near-lime, all in one hue, which over a
+hillside is felt; real turf is barely saturated and its variation is in
+value, so it is olive and khaki now with the bright green confined to
+new growth, and it has patches that have gone over and patches in
+shade.
+
+### The portal was a barrel
+
+The world gateway is the first thing anybody sees, and it was a stack
+of horizontal circles lofted up the Y axis — which is a barrel two
+metres deep, not a doorway. Fully emissive, one flat cyan, sticking a
+metre out of the arch front and back.
+
+A portal is a membrane: it lives in the plane of the arch, it is
+darkest in the middle where you are looking through it and brightest at
+the rim, and it is dished so the light on it moves as you walk past.
+The first attempt at that was a stack of flat annuli, which was better
+and still wrong — the opening is a half-circle standing on a plinth, so
+a full disc spends its lower half buried in the plinth and glowing out
+of the front of it. It is half-rings now, filling the opening and
+nothing else, at about half the emissive it had.
+
+### Trees, at the right size
+
+A seven-metre broadleaf carried a trunk 0.72 m across at the base
+before the placement scale multiplied it again by up to 1.4, so a wood
+was a row of columns. Trunks are down to about a third of that across
+every species — and they gained a root flare, two wider, lumpier rings
+over the first three per cent of the height, because a trunk that meets
+the ground at full radius is a pipe pushed into a lawn and the flare is
+most of what says "grown here". They went from eight sides to eleven,
+which is the difference between a tree and a visible octagon at ten
+metres.
+
+The bark ran a clean sine of period 22 around the trunk for its cracks,
+and a clean sine wrapped round a cylinder is corduroy — a stripe you can
+count. The cracks follow warped noise now, so they wander and fork and
+stop, the ridges are broader and lower in contrast, and the colour moved
+from chocolate to grey-brown with lichen in it. Canopy lobes were two
+alternating shades, which gives a flat mass with a seam in it; they take
+five now, and the deep shade in the foliage texture stopped going almost
+black — a canopy whose dark half is black is a hole in the sky rather
+than the inside of a tree.
+
+### A town somebody lives in
+
+Every building palette sat within about fifteen per cent of neutral
+grey: four styles of pale stone under grey-blue roofs, which is why the
+waterfront read as a row of unfinished office blocks whatever the light
+did. Real harbour fronts are the opposite — ochre beside washed blue
+beside dark red — held together by sharing a roof material and a trim
+colour rather than by all being the same colour. The trim and the base
+stay quiet now precisely so the walls can be loud.
+
+And the plaza has something drawn on it. A disc of tile forty metres
+across with a fountain in the middle reads as a car park with a
+fountain in the middle, and no work on the tile texture changes that,
+because the problem is that nothing had been *drawn* on the square. Two
+courses of darker stone around the basin, a ring at the edge and eight
+spokes running out under the furniture give it a centre and a set of
+directions, for one static mesh and no collision.
+
 ### The sky
 
 Twelve floating islands ring the harbour, three of them pouring water into
