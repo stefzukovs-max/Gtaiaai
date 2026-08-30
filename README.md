@@ -100,10 +100,11 @@ asks you to turn the device.
 
 ### The look
 
-The register is Growtopia and Club Penguin: bright, chunky, drawn. Three
-dials in `LH.Render.scene` carry it, and setting all three to zero
-restores the stylized-realism look exactly, which is what makes this an
-art direction rather than a rewrite.
+The world keeps a drawn quality — bright, chunky, inked — and the people
+standing in it do not: the bodies are anatomical, and skin is lit as
+skin. Three dials in `LH.Render.scene` carry the drawn half, and setting
+all three to zero gives back plain stylized realism, which is what makes
+this an art direction rather than a rewrite.
 
 | Dial | What it does |
 | --- | --- |
@@ -111,11 +112,100 @@ art direction rather than a rewrite.
 | `outline` | Inks silhouettes from a depth texture, keyed on the second derivative of depth — a floor at a grazing angle has a huge depth gradient but no curvature, so it does not outline itself. Line weight is in pixels, and the ink fades with distance because a forest inked at full strength is a field of scribble |
 | `saturation` | A straight chroma push after the tonemap |
 
-Proportions come from one table in `LH.Rig`, read by the skeleton, the
-limb meshes, the limb thickness, the head scale and the clothes over
-them — about four and a half heads tall rather than seven and a half.
-A sleeve length derived from the arm bone cannot end up longer than the
-arm inside it.
+The dials sit lower than they did — `toon` 0.55, `outline` 1.05 — since
+the bodies became anatomical, and skin opts out of banding entirely in
+the fragment shader regardless of where the dial is. Hard three-band cel
+on a human cheek turns a face into a poster.
+
+### The body
+
+The figure is one continuous **skinned** mesh from the collarbone down,
+built in the bind pose in world metres and bound to a twenty-two bone
+skeleton. It replaces nine rigid parts and eleven joint spheres, and
+that was the single biggest thing standing between this character and a
+believable one: rigid parts leave a seam at every joint, and the spheres
+that used to hide those seams are exactly what made the figure read as a
+toy. Skinned, an elbow creases, a shoulder rolls under its skin, and a
+knee keeps its volume through a bend.
+
+Proportions are human canon rather than a style. Six measurements fix
+the whole skeleton — hip joint 0.53 H, knee 0.285 H, shoulder 0.81 H,
+elbow 0.63 H, wrist 0.485 H, chin 0.87 H — and everything else is
+measured against those rather than against each other, so the figure is
+seven and a half heads at 1.80 m instead of four and a half.
+
+Three bones earn their place once the mesh is skinned rather than
+assembled. A **third spine segment**, because one segment bends a torso
+like a plank and three let a turn start at the hips and arrive at the
+shoulders. **Clavicles**, which used to be pivots to hang an arm from
+and now carry skin, so the deltoid follows the shoulder. And **toes**,
+because a foot that cannot roll cannot push off, and a walk without a
+push-off is a shuffle.
+
+Two conventions hold the geometry together. Every ring is a superellipse
+with independent front and back depth, because bodies are not made of
+ellipses — a back is flatter than a front, a rib cage squarer than a
+waist, a calf almost entirely behind the bone. And regions *overlap*
+rather than join: the leg's top ring sits up inside the pelvis, the
+deltoid buries a third of itself in the rib cage. Two solid surfaces
+that interpenetrate look exactly like one surface, and stitching a leg
+into a torso with matching ring counts is how a weekend disappears.
+
+Every garment is the body's own rings grown outward — 10 mm for a shirt,
+14 for trousers, 20 for a coat — and bound to the same bones. That is
+not a shortcut, it is the only construction that cannot clip: a sleeve
+built from its own profile passes through the arm inside it the first
+time the elbow goes past ninety degrees, and no amount of tuning fixes
+it. The two surfaces have to be the same surface, offset.
+
+### Skin
+
+Skin is a material, not a colour. It gets its own texture-array layer,
+near-white so the character's tint carries the tone, and the fragment
+shader recognises it with one comparison — which buys a second lighting
+model without a second shader or a second draw call. Three things give a
+face away and all three are cheap: light **wraps** further round it than
+round cloth, it **scatters** warm at the terminator where light went in
+and came back out somewhere else, and its **highlight** is broad and
+faint rather than tight.
+
+The scatter band is narrow on purpose. The first pass used one a third
+of a hemisphere wide and turned every face orange; scatter shows at the
+terminator, not across the whole lit side.
+
+### Gait
+
+A real gait cycle is not symmetric. Stance is about 62 per cent of it,
+swing the other 38, and inside stance there are four events that each
+leave a mark on the silhouette: heel strike, foot flat, heel off, toe
+off. Sines cannot produce those, which is why a sine walk reads as a
+march however carefully its amplitudes are tuned. Each joint is a
+piecewise curve through those events, simplified to the corners that
+survive at gameplay distance.
+
+The pelvis does three separate things that are easy to confuse: it rises
+twice a stride — highest at each mid-stance, lowest at each double
+support, which is the opposite of most first guesses — it *lists*, the
+swing-side hip dropping, and it rotates about the spine leading the
+swinging leg. The trunk counter-rotates against it, spread across all
+three spine segments. The head stays level while everything under it
+pitches, because gaze stabilisation is involuntary and universal, and a
+head that pitches with the chest is the most robotic thing a walk can
+do.
+
+Four sign conventions, stated once because getting one backwards
+produces a character that walks convincingly and wrongly, which is far
+harder to spot than one that walks badly: thigh +X swings the leg back,
+shin +X flexes the knee, foot +X lifts the toes, toe +X is what the heel
+lifting does.
+
+What it costs: 332 draw calls a frame became 526, because a skinned
+draw is placed by a bone palette and a palette belongs to one character
+in one pose, so every skinned mesh on every visible actor is its own
+call — about five each across twenty actors, doubled by the shadow pass.
+Triangles went up four per cent. Under the software rasteriser the
+regression harness runs on that is an eleven per cent frame cost; on a
+GPU it is draw-call overhead rather than fill.
 
 ### What makes it move
 

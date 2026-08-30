@@ -1016,7 +1016,19 @@ var GL={};
 var VSTRIDE=15, VBYTES=VSTRIDE*4;
 /* per-instance: mat4(16) + tint(4) */
 var ISTRIDE=20, IBYTES=ISTRIDE*4;
-GL.VSTRIDE=VSTRIDE;GL.ISTRIDE=ISTRIDE;
+/* per-vertex skinning, in its own buffer: four bone indices then four
+   weights. It lives apart from the interleaved vertex rather than in
+   it because terrain, props and architecture are the overwhelming
+   majority of the geometry in this game and none of them are skinned —
+   widening the shared vertex by eight floats would cost far more than
+   the bodies ever save. */
+var SSTRIDE=8, SBYTES=SSTRIDE*4;
+/* How many bones a skinned draw may address. The skeleton is 22; the
+   headroom is for anything a future rig adds without a shader edit.
+   GLES3 guarantees 256 vec4 of vertex uniform storage and this asks
+   for 128 of them, so it fits with room to spare. */
+var NBONES=32;
+GL.VSTRIDE=VSTRIDE;GL.ISTRIDE=ISTRIDE;GL.SSTRIDE=SSTRIDE;GL.NBONES=NBONES;
 
 var gl=null, canvas=null;
 var _prog=null,_vao=null,_tex=[null,null,null,null];
@@ -1107,13 +1119,18 @@ GL.u3v=function(p,n,v){var l=p.u[n];if(l)gl.uniform3f(l,v[0],v[1],v[2]);};
 GL.u4f=function(p,n,a,b,c,d){var l=p.u[n];if(l)gl.uniform4f(l,a,b,c,d);};
 GL.u4fv=function(p,n,v){var l=p.u[n];if(l)gl.uniform4fv(l,v);};
 GL.uM4=function(p,n,m){var l=p.u[n];if(l)gl.uniformMatrix4fv(l,false,m);};
+/* An array of mat4s, for the bone palette. Same call as uM4 — the
+   distinction is only that the caller is passing NB*16 floats — but it
+   is worth its own name so a reader of the draw loop can see that a
+   palette is going up rather than one transform. */
+GL.uBones=function(p,m){var l=p.u['uBones'];if(l)gl.uniformMatrix4fv(l,false,m);};
 GL.uM3=function(p,n,m){var l=p.u[n];if(l)gl.uniformMatrix3fv(l,false,m);};
 
 /* ---------------- meshes ---------------- */
 /* A mesh owns a VAO. `data` is the interleaved Float32Array from
    LH.Geo, `idx` a Uint16/Uint32Array. Optionally instanced: pass
    maxInstances and the VAO gets divisor-1 attributes 5..9. */
-GL.mesh=function(data,idx,maxInstances){
+GL.mesh=function(data,idx,maxInstances,skin){
   var vao=gl.createVertexArray();
   gl.bindVertexArray(vao);
 
@@ -1148,9 +1165,20 @@ GL.mesh=function(data,idx,maxInstances){
     gl.vertexAttribDivisor(9,1);
   }
 
+  var sbo=null;
+  if(skin){
+    sbo=gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER,sbo);
+    gl.bufferData(gl.ARRAY_BUFFER,skin,gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(10);
+    gl.vertexAttribPointer(10,4,gl.FLOAT,false,SBYTES,0);
+    gl.enableVertexAttribArray(11);
+    gl.vertexAttribPointer(11,4,gl.FLOAT,false,SBYTES,16);
+  }
+
   gl.bindVertexArray(null);
   return {
-    vao:vao,vbo:vbo,ebo:ebo,ibo:ibo,
+    vao:vao,vbo:vbo,ebo:ebo,ibo:ibo,sbo:sbo,skinned:!!skin,
     idata:idata,count:idx.length,
     itype:(idx instanceof Uint32Array)?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,
     instances:0,maxInstances:maxInstances||0,
@@ -1423,9 +1451,15 @@ function hexs(r,g,b){
 
 /* ---------------- the builder ---------------- */
 function Builder(){
-  this.v=[];        /* flat float list, 11 per vertex */
+  this.v=[];        /* flat float list, 15 per vertex */
   this.i=[];        /* index list */
   this.n=0;         /* vertex count */
+  /* Skinning, if this builder is making a body. `sk` is eight floats a
+     vertex — four bone indices then four weights — and stays empty for
+     the terrain, the props and everything else that is rigid. */
+  this.sk=[];
+  this.skinning=false;
+  this.sw=[0,0,0,0,1,0,0,0];
   this.stack=[];
   this.m=M.ident(M.m4());
   this.nm=new Float32Array(9);
@@ -1443,14 +1477,43 @@ Geo.build=function(){return new Builder();};
 
 Builder.prototype.push=function(){
   this.stack.push({m:new Float32Array(this.m),l:this.layer,e:this.emis,
-    l2:this.layer2,bl:this.blend});return this;
+    l2:this.layer2,bl:this.blend,sw:this.sw.slice()});return this;
 };
 Builder.prototype.pop=function(){
   var f=this.stack.pop();
   if(f){this.m.set(f.m);this.layer=f.l;this.emis=f.e;
-    this.layer2=f.l2;this.blend=f.bl;}
+    this.layer2=f.l2;this.blend=f.bl;this.sw=f.sw;}
   this._nmDirty=true;return this;
 };
+
+/* ---------------- skinning ----------------
+   Bind the vertices that follow to bones. Two influences covers almost
+   everything a limb needs — a cross-section between two joints belongs
+   to those two joints and nothing else — and four exists for the
+   shoulder and the hip, where the clavicle and the spine both have a
+   claim on the same skin.
+
+   Weights are normalised here rather than trusted, because a ring that
+   sums to 1.02 shows up as a body that inflates slightly wherever that
+   ring is, which is a maddening thing to find later. */
+Builder.prototype.skin=function(b0,w0,b1,w1,b2,w2,b3,w3){
+  b1=b1||0;w1=w1||0;b2=b2||0;w2=w2||0;b3=b3||0;w3=w3||0;
+  var t=w0+w1+w2+w3;
+  if(t<=0){w0=1;t=1;}
+  var k=1/t;
+  /* If anything was emitted before the first binding it has no skin
+     data, and the arrays would be off by that many vertices from here
+     on — every weight landing on the wrong vertex. Backfill it. */
+  if(!this.skinning){
+    for(var i=0;i<this.n;i++)this.sk.push(0,0,0,0,1,0,0,0);
+    this.skinning=true;
+  }
+  this.sw[0]=b0;this.sw[1]=b1;this.sw[2]=b2;this.sw[3]=b3;
+  this.sw[4]=w0*k;this.sw[5]=w1*k;this.sw[6]=w2*k;this.sw[7]=w3*k;
+  return this;
+};
+/* Bind everything that follows rigidly to one bone. */
+Builder.prototype.bone=function(b){return this.skin(b,1);};
 /* Pick a material by name from LH.Tex. Emissive is 0..1 and is added
    straight to the lit result, so neon reads at night. */
 Builder.prototype.mat=function(name,emis){
@@ -1500,6 +1563,10 @@ Builder.prototype.vert=function(x,y,z,nx,ny,nz,u,vv,c){
   var l=Math.sqrt(tx*tx+ty*ty+tz*tz)||1;
   this.v.push(px,py,pz,tx/l,ty/l,tz/l,u,vv,c[0],c[1],c[2],
     this.layer,this.emis,this.layer2,this.blend);
+  if(this.skinning){
+    var w=this.sw;
+    this.sk.push(w[0],w[1],w[2],w[3],w[4],w[5],w[6],w[7]);
+  }
   return this.n++;
 };
 Builder.prototype.tri=function(a,b,c){this.i.push(a,b,c);return this;};
@@ -1789,9 +1856,16 @@ Geo.roundRect=function(w,d,r,n){
   return out.slice(0,n);
 };
 
-/* `sections` is [{y, pts:[[x,z]...], scale?, col?}]. Normals come from
-   the surface itself — the ring tangent crossed with the rise to the
-   next ring — so a taper lights correctly instead of like a cylinder. */
+/* `sections` is [{y, pts:[[x,z]...], scale?, col?, skin?}]. Normals come
+   from the surface itself — the ring tangent crossed with the rise to
+   the next ring — so a taper lights correctly instead of like a
+   cylinder.
+
+   `skin` is [bone,weight,...] up to four pairs, applied before the ring
+   is emitted. Per ring rather than per loft is the whole point: a limb
+   is one loft whose rings hand over from one bone to the next as they
+   cross the joint, and that hand-over is what makes a knee bend like a
+   knee instead of shearing. */
 Builder.prototype.loft=function(sections,c,o){
   o=o||{};
   var col=col3(c),n=sections[0].pts.length,rings=sections.length;
@@ -1805,6 +1879,7 @@ Builder.prototype.loft=function(sections,c,o){
   var uvScale=o.uvScale||1;
   for(j=0;j<rings;j++){
     var S=sections[j],pts=S.pts,cc=S.col?col3(S.col):col;
+    if(S.skin)this.skin.apply(this,S.skin);
     var sc=S.scale===undefined?1:S.scale;
     /* rise toward the neighbouring ring, used for the normal's tilt */
     var prev=sections[Math.max(0,j-1)],next=sections[Math.min(rings-1,j+1)];
@@ -1847,6 +1922,7 @@ Builder.prototype.loft=function(sections,c,o){
   if(!openFar){
     var top=sections[rings-1],tsc=top.scale===undefined?1:top.scale;
     var tcol=top.col?col3(top.col):col;
+    if(top.skin)this.skin.apply(this,top.skin);
     var tc=this.vert(0,top.y,0,0,ny,0,.5,.5,tcol),t0=this.n;
     for(i=0;i<n;i++)this.vert(top.pts[i][0]*tsc,top.y,top.pts[i][1]*tsc,0,ny,0,
       top.pts[i][0]+.5,top.pts[i][1]+.5,tcol);
@@ -1857,6 +1933,7 @@ Builder.prototype.loft=function(sections,c,o){
   if(!openNear){
     var bo=sections[0],bsc=bo.scale===undefined?1:bo.scale;
     var bcol=bo.col?col3(bo.col):col;
+    if(bo.skin)this.skin.apply(this,bo.skin);
     var bc=this.vert(0,bo.y,0,0,-ny,0,.5,.5,bcol),b0=this.n;
     for(i=0;i<n;i++)this.vert(bo.pts[i][0]*bsc,bo.y,bo.pts[i][1]*bsc,0,-ny,0,
       bo.pts[i][0]+.5,bo.pts[i][1]+.5,bcol);
@@ -1989,7 +2066,17 @@ Builder.prototype.upload=function(maxInstances){
   var GL=LH.GL;
   var data=new Float32Array(this.v);
   var idx=this.n>65535?new Uint32Array(this.i):new Uint16Array(this.i);
-  var mesh=GL.mesh(data,idx,maxInstances);
+  var skin=null;
+  if(this.skinning){
+    /* Belt and braces: Builder.skin backfills, so this should already
+       hold. A short array here would put every weight on the wrong
+       vertex from that point on, which is not a thing to discover by
+       looking at it. */
+    while(this.sk.length<this.n*8)this.sk.push(0,0,0,0,1,0,0,0);
+    this.sk.length=this.n*8;
+    skin=new Float32Array(this.sk);
+  }
+  var mesh=GL.mesh(data,idx,maxInstances,skin);
   var b=this.bounds();
   mesh.bmin=b.min;mesh.bmax=b.max;
   var cx=(b.min[0]+b.max[0])/2,cy=(b.min[1]+b.max[1])/2,cz=(b.min[2]+b.max[2])/2;
@@ -2433,6 +2520,11 @@ var LAYERS=[
   ['road',    R.road()],
   ['foliage', R.foliage()],
   ['foliagep',R.foliage('#5A2646','#D473A8',313)],   /* blossom */
+  /* Skin is a material, not just a colour. It is near-white so the
+     character's own tint carries the tone, and it exists mainly so the
+     fragment shader can recognise it: skin is the one surface in this
+     world that should not be cel-banded and should scatter light. */
+  ['skin',    R.solid('#F0F0F0','#FFFFFF',7,401,3)],
   ['fabric',  R.fabric()],
   ['fabricw', R.fabric('#D8C0C6','#FBF2F4',317)],
   ['glass',   R.glass()],
@@ -2655,6 +2747,28 @@ vec3 windOffset(vec3 local,vec3 world,float layer){
 }
 `;
 
+/* ---------------- skinning ----------------
+   Linear blend skinning, four influences per vertex. The palette holds
+   worldBone * inverseBind, so a vertex authored in the rest pose lands
+   in world space with one multiply and no per-draw CPU work beyond
+   filling the palette.
+
+   Both the colour pass and the depth pass include this, and they must
+   stay identical: a body that deforms while its shadow holds the rest
+   pose is a worse artefact than no shadow at all. */
+var SKIN=`
+layout(location=10) in vec4 aBone;
+layout(location=11) in vec4 aWeight;
+uniform mat4 uBones[`+LH.GL.NBONES+`];
+uniform int uSkinned;
+mat4 skinMatrix(){
+  return aWeight.x*uBones[int(aBone.x)]
+       + aWeight.y*uBones[int(aBone.y)]
+       + aWeight.z*uBones[int(aBone.z)]
+       + aWeight.w*uBones[int(aBone.w)];
+}
+`;
+
 var STD_VS=`#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPos;
@@ -2672,7 +2786,7 @@ uniform vec4 uTint;
 // Scrolls the texture on a surface. Waterfalls, conveyors, anything
 // that has to flow without moving.
 uniform vec2 uUVScroll;
-`+WIND+`
+`+WIND+SKIN+`
 out vec3 vWorld;
 out vec3 vNrm;
 out vec2 vUV;
@@ -2683,7 +2797,8 @@ out float vBlend;
 out float vEmis;
 
 void main(){
-  mat4 mdl = (uInstanced==1) ? aModel : uModel;
+  mat4 mdl = (uSkinned==1) ? skinMatrix()
+           : ((uInstanced==1) ? aModel : uModel);
   vec4 wp = mdl*vec4(aPos,1.0);
   wp.xyz += windOffset(aPos,wp.xyz,aMat.x);
   vWorld = wp.xyz;
@@ -2709,6 +2824,10 @@ precision highp sampler2DShadow;
 `+COMMON+LIGHTING+SHADOW+`
 uniform sampler2DArray uAtlas;
 uniform float uSpec;
+// Which texture-array layer means skin. One comparison per fragment
+// buys a second lighting model without a second shader or a second
+// draw call.
+uniform float uSkinLayer;
 uniform float uTime;
 uniform float uAlpha;
 // Lit windows and neon should not blow out at noon. One global scale,
@@ -2768,20 +2887,50 @@ void main(){
 
   float sh = shadowAt(vWorld,n,l);
   float ndl = wrapDiffuse(n,l,0.35);
+  // Skin, and everything else. A face is the one surface a viewer has
+  // spent their whole life reading, and the three things that give it
+  // away are all cheap: light wraps further round it than round cloth,
+  // it glows warm at the terminator where light has gone in and come
+  // back out, and its highlight is broad and faint rather than tight.
+  float isSkin = 1.0 - step(0.5, abs(vLayer-uSkinLayer));
+  float skinNdl = wrapDiffuse(n,l,0.66);
+
   // Shadow gets banded too. Leaving the PCF gradient smooth under a
   // banded terminator puts a soft edge next to a hard one on the same
   // surface, and the eye reads that as a bug rather than a style.
   sh *= cloudShadow(vWorld.xz);
-  float shT = mix(sh, smoothstep(0.30,0.52,sh)*0.78+0.22, uToon);
-  vec3 direct = uSunCol*toonify(ndl)*shT;
+  float band = uToon*(1.0-isSkin);
+  float shT = mix(sh, smoothstep(0.30,0.52,sh)*0.78+0.22, band);
+  float lit = mix(mix(ndl,cel(ndl),band), skinNdl, isSkin);
+  vec3 direct = uSunCol*lit*shT;
   vec3 ambient = hemi(n);
 
   // Blinn specular, killed in shadow so wet-looking highlights don't
   // float on surfaces the sun cannot see.
   vec3 h = normalize(l+v);
   float spec = pow(saturate(dot(n,h)), 32.0)*uSpec*sh*step(0.0,dot(n,l));
+  spec = mix(spec, pow(saturate(dot(n,h)),16.0)*0.085*sh*step(0.0,dot(n,l)),
+             isSkin);
 
   vec3 col = albedo*(direct+ambient+pointLights(vWorld,n)) + uSunCol*spec;
+
+  // Subsurface: a narrow warm band either side of the terminator, where
+  // light entered the skin and came back out somewhere else. It is a
+  // fake — the real effect needs a diffusion profile — but it is the
+  // fake that matters, because it is the band an ear or a nostril or
+  // the edge of a jaw lights up with when the sun is behind it.
+  if(isSkin>0.5){
+    float t = dot(n,l);
+    // Narrow on purpose. The first pass at this used a band a third of
+    // a hemisphere wide and turned every face orange: scatter shows at
+    // the terminator, not across the whole lit side.
+    float band2 = saturate(1.0-abs(t-0.04)*6.5);
+    col += albedo*uSunCol*vec3(0.17,0.042,0.026)*band2*sh;
+    // and a little through the thin parts — an ear, a nostril, the
+    // edge of a jaw — seen with the sun behind them
+    float trans = saturate(dot(-l,v))*saturate(0.35-t)*0.5;
+    col += albedo*uSunCol*vec3(0.26,0.068,0.045)*trans*sh;
+  }
 
   // Rim light picked out of the sky colour: separates a character from
   // the background without a outline pass.
@@ -2804,9 +2953,10 @@ layout(location=5) in mat4 aModel;
 uniform mat4 uLightVP;
 uniform mat4 uModel;
 uniform int uInstanced;
-`+WIND+`
+`+WIND+SKIN+`
 void main(){
-  mat4 mdl=(uInstanced==1)?aModel:uModel;
+  mat4 mdl=(uSkinned==1)?skinMatrix()
+          :((uInstanced==1)?aModel:uModel);
   vec4 wp=mdl*vec4(aPos,1.0);
   wp.xyz+=windOffset(aPos,wp.xyz,aMat.x);
   gl_Position=uLightVP*wp;
@@ -3371,7 +3521,11 @@ R.scene={
      tonemap. All three at zero gives back the old stylized-realism
      look exactly, which is what makes this a setting and not a
      rewrite. */
-  toon:1.0,
+  /* Down from 1.0 with the realistic bodies: hard three-band cel on a
+     human face turns a cheek into a poster. The world keeps most of its
+     drawn quality at this setting, and skin opts out of banding
+     entirely in the shader regardless. */
+  toon:0.55,
   /* Occlusion strength, the sample radius in metres, and a depth bias
      that stops a surface shadowing itself. */
   /* Weather the world can feel. `wind` is a direction times a
@@ -3392,11 +3546,11 @@ R.scene={
      aliasing filtered off; four is a soft one that starts to leak
      under thin geometry. */
   shadowSoft:2.6,
-  outline:1.6,
+  outline:1.05,
   inkWidth:1.35,
   inkNear:24,
   inkFar:150,
-  saturation:0.30
+  saturation:0.12
 };
 
 R.vp=M.m4();R.view=M.m4();R.proj=M.m4();R.invVP=M.m4();R.invProj=M.m4();
@@ -3500,6 +3654,7 @@ function bindSceneUniforms(p){
   GL.u3v(p,'uEye',R.eye);
   GL.u1f(p,'uExposure',s.exposure);
   GL.u1f(p,'uToon',s.toon);
+  GL.u1f(p,'uSkinLayer',LH.Tex.layer('skin'));
   GL.u3v(p,'uWind',s.wind);
   GL.u1f(p,'uWindTime',s.windTime);
   GL.u2f(p,'uLeaf',LH.Tex.layer('foliage'),LH.Tex.layer('foliagep'));
@@ -4041,7 +4196,7 @@ LH.Cam=Cam;
 /* ============================================================
    LH.Rig — skeleton and animation.
 
-   Seventeen bones in a parent-child hierarchy, posed every frame by
+   Twenty-two bones in a parent-child hierarchy, posed every frame by
    an animation state machine that crossfades between clips.
 
    The clips are functions of phase, not keyframe tables. That is a
@@ -4050,9 +4205,13 @@ LH.Cam=Cam;
    parameters, so the same clip covers walking, sprinting, wading
    and carrying something heavy without any extra data.
 
-   Parts are rigid per bone with a joint sphere at each pivot rather
-   than skinned. At this stylisation the joint reads as an elbow, and
-   it saves a skinning shader and the bone-weight data behind it.
+   The body is one continuous skinned mesh, not a bag of rigid parts.
+   That was the single biggest thing standing between this figure and
+   a believable one: rigid parts leave a visible seam at every joint,
+   and the joint spheres that used to hide those seams are exactly what
+   made the character read as a toy. Skinning means an elbow creases,
+   a shoulder rolls under its skin, and a knee keeps its volume through
+   a bend, none of which a hinge of two cylinders can do.
    ============================================================ */
 (function(){
 'use strict';
@@ -4065,51 +4224,90 @@ var M=LH.M,Rig={};
    eight-head fashion-plate that would fight the sandbox proportions,
    and nowhere near the three-head chibi we are moving away from. */
 /* ---------------- proportions ----------------
-   The cartoon silhouette lives here, in one table, rather than in a
-   hundred literals spread across the skeleton and the model code.
-   Bones read it directly; LH.Body reads it through Rig.P for limb
-   lengths, limb thickness and head scale; the garments read the same
-   numbers so a sleeve cannot end up longer than the arm inside it.
+   Human canon, not a style. Every number is a fraction of a 1.80 m
+   figure taken from the standing measurements anatomy actually uses,
+   with the ankle at zero:
 
-   The register is Club Penguin, not anatomy: a head about a fifth of
-   the body, short thick legs, arms that stop at the hip. Realistic
-   proportions were roughly seven and a half heads tall — this is
-   about four and a half, which is the range every toy-shaped
-   character in the genre sits in. */
+     hip joint   0.53 H     elbow       0.63 H
+     knee        0.285 H    wrist       0.485 H
+     shoulder    0.81 H     chin        0.87 H
+
+   Those six numbers fix the whole skeleton, and the rest of the file
+   is measured against them rather than against each other, so a change
+   of height stays proportional instead of drifting limb by limb.
+
+   The previous table was the Club Penguin register: four and a half
+   heads tall, a head a fifth of the body, arms that stopped at the
+   hip. This is seven and a half. The toon look is still reachable —
+   it moved into the shading dials, where scene.toon, scene.outline and
+   scene.saturation still do what they did — but the body underneath
+   them is now built to human measure. */
 var P={
-  hipY:0.86, spine:0.10, chest:0.22, neck:0.16, headUp:0.19,
-  shoulderX:0.195, shoulderY:0.12, armOut:0.085,
-  armUp:0.23, armLo:0.21,
-  hipX:0.105, thigh:0.40, shin:0.40,
-  /* Geometry multipliers. headScale is applied about the head bone, so
-     raising it grows the skull in place rather than lifting it off the
-     neck; limbFat thickens arms and legs and the clothes over them by
-     the same factor, which is what keeps a sleeve outside its arm. */
-  headScale:1.45, limbFat:1.20, handScale:1.30, footScale:1.12
+  height:1.80,
+  /* bone-to-bone offsets, metres */
+  hipY:0.955,                     /* hip joint: 0.53 H */
+  spine:0.115, spine2:0.120, chest:0.135,
+  neck:0.115,                     /* chest -> base of neck   1.440 */
+  headUp:0.105,                   /* base of neck -> atlas   1.545 */
+  shoulderX:0.040, shoulderY:0.132, shoulderZ:0.014,
+  armOut:0.132,                   /* clavicle -> shoulder joint */
+  armUp:0.335, armLo:0.262,       /* elbow 1.122, wrist 0.860 */
+  hipX:0.092,
+  thigh:0.440, shin:0.440,        /* knee 0.515, ankle 0.075 */
+  toeF:0.112, toeD:0.046,         /* ball of the foot, forward and down */
+  /* Geometry multipliers. headScale is the ratio between the head mesh,
+     which is authored 0.273 tall in its own space, and a real head of
+     0.235 — so hair and hats authored against that same space keep
+     fitting without being re-measured. */
+  headScale:0.86, limbFat:1.00, handScale:1.00, footScale:1.00,
+  /* Girths, as radii at the widest point of each region. Used by the
+     body builder and by every garment that has to sit outside it. */
+  neckR:0.061, chestW:0.176, chestD:0.108, waistW:0.145, waistD:0.098,
+  hipW:0.168, hipD:0.112,
+  armR:0.049, elbowR:0.040, wristR:0.030,
+  thighR:0.084, kneeR:0.058, calfR:0.056, ankleR:0.038
 };
 Rig.P=P;
 
+/* ---------------- skeleton ----------------
+   Twenty-two bones. What changed from the seventeen it replaces, and
+   why each one earns its keep once the mesh is skinned rather than
+   assembled from rigid parts:
+
+     spine2      A single spine segment bends the torso as one plank.
+                 Three segments let a turn start at the hips and arrive
+                 at the shoulders, which is most of what makes a walk
+                 read as a person rather than a mannequin.
+     shoulderL/R These were pivots to hang an arm from. They are now
+                 clavicles: they carry skin, they rise and roll when the
+                 arm goes up, and the deltoid follows them.
+     toeL/R      A foot that cannot roll cannot push off, and a walk
+                 without a push-off is a shuffle.
+*/
 var BONES=[
   /* name,         parent,      offset x,y,z */
-  ['hips',        -1,           0,          P.hipY,       0],
-  ['spine',        0,           0,          P.spine,      0],
-  ['chest',        1,           0,          P.chest,      0],
-  ['neck',         2,           0,          P.neck,       0],
-  ['head',         3,           0,          P.headUp,     0],
-  ['shoulderL',    2,           P.shoulderX, P.shoulderY, 0],
-  ['armL',         5,           P.armOut,   0,            0],
-  ['forearmL',     6,           0,         -P.armUp,      0],
-  ['handL',        7,           0,         -P.armLo,      0],
-  ['shoulderR',    2,          -P.shoulderX, P.shoulderY, 0],
-  ['armR',         9,          -P.armOut,   0,            0],
-  ['forearmR',    10,           0,         -P.armUp,      0],
-  ['handR',       11,           0,         -P.armLo,      0],
-  ['thighL',       0,           P.hipX,    -0.06,         0],
-  ['shinL',       13,           0,         -P.thigh,      0],
-  ['footL',       14,           0,         -P.shin,       0],
-  ['thighR',       0,          -P.hipX,    -0.06,         0],
-  ['shinR',       16,           0,         -P.thigh,      0],
-  ['footR',       17,           0,         -P.shin,       0]
+  ['hips',        -1,           0,           P.hipY,        0],
+  ['spine',        0,           0,           P.spine,       0],
+  ['spine2',       1,           0,           P.spine2,      0],
+  ['chest',        2,           0,           P.chest,       0],
+  ['neck',         3,           0,           P.neck,        0],
+  ['head',         4,           0,           P.headUp,      0],
+  ['shoulderL',    3,           P.shoulderX, P.shoulderY,   P.shoulderZ],
+  ['armL',         6,           P.armOut,    0,             0],
+  ['forearmL',     7,           0,          -P.armUp,       0],
+  ['handL',        8,           0,          -P.armLo,       0],
+  ['shoulderR',    3,          -P.shoulderX, P.shoulderY,   P.shoulderZ],
+  ['armR',        10,          -P.armOut,    0,             0],
+  ['forearmR',    11,           0,          -P.armUp,       0],
+  ['handR',       12,           0,          -P.armLo,       0],
+  ['thighL',       0,           P.hipX,     -0.010,         0],
+  ['shinL',       14,           0,          -P.thigh,       0],
+  ['footL',       15,           0,          -P.shin,        0],
+  ['toeL',        16,           0,          -P.toeD,        P.toeF],
+  ['thighR',       0,          -P.hipX,     -0.010,         0],
+  ['shinR',       18,           0,          -P.thigh,       0],
+  ['footR',       19,           0,          -P.shin,        0],
+  ['toeR',        20,           0,          -P.toeD,        P.toeF]
 ];
 
 var NB=BONES.length;
@@ -4121,6 +4319,53 @@ for(var i=0;i<NB;i++){
 }
 Rig.NB=NB;Rig.NAME=NAME;Rig.PARENT=PARENT;Rig.REST=REST;
 Rig.BONE=function(n){return NAME[n];};
+
+/* ---------------- bind pose ----------------
+   The rest-pose world matrix of every bone, and its inverse. The body
+   mesh is authored in this space — in the T-pose, in metres, where the
+   figure actually stands — so a vertex is bound to a bone by nothing
+   more than saying which bone, and the inverse bind takes it back into
+   that bone's local frame at draw time.
+
+   Computed once, at module load, because it is a property of the
+   skeleton rather than of any character standing in it. */
+var BIND=new Float32Array(NB*16), INVBIND=new Float32Array(NB*16);
+(function(){
+  var lm=M.m4(),t=M.v3(),sc=M.v3(1,1,1),tmp=M.m4();
+  for(var i=0;i<NB;i++){
+    M.set3(t,REST[i*3],REST[i*3+1],REST[i*3+2]);
+    M.fromTRS(lm,t,0,0,0,sc);
+    var dst=BIND.subarray(i*16,i*16+16);
+    var par=PARENT[i];
+    if(par<0)dst.set(lm);
+    else{
+      M.mul(tmp,BIND.subarray(par*16,par*16+16),lm);
+      dst.set(tmp);
+    }
+    M.invert(INVBIND.subarray(i*16,i*16+16),dst);
+  }
+})();
+Rig.BIND=BIND;Rig.INVBIND=INVBIND;
+/* Where a bone sits in the bind pose, for anything authoring geometry
+   against the skeleton. */
+Rig.bindPos=function(out,bone){
+  var b=(typeof bone==='number')?bone:NAME[bone];
+  out[0]=BIND[b*16+12];out[1]=BIND[b*16+13];out[2]=BIND[b*16+14];
+  return out;
+};
+
+/* The palette a skinned draw needs: worldBone * inverseBind, packed
+   flat for one uniformMatrix4fv. */
+var _pal=M.m4();
+Rig.skinPalette=function(out,mats){
+  for(var i=0;i<NB;i++){
+    var m=mats[i];
+    if(!m){out.set(INVBIND.subarray(i*16,i*16+16),i*16);continue;}
+    M.mul(_pal,m,INVBIND.subarray(i*16,i*16+16));
+    out.set(_pal,i*16);
+  }
+  return out;
+};
 
 /* A Pose is a flat rotation array plus a few whole-body channels.
    Keeping it flat means blending two poses is one loop over floats
@@ -4184,83 +4429,182 @@ var sin=Math.sin,cos=Math.cos,PI=Math.PI,TAU=M.TAU;
 function ease(t){return t*t*(3-2*t);}
 function bell(t){return sin(t*PI);}
 
+/* ---------------- sign conventions ----------------
+   Worth stating once, because getting one of them backwards produces a
+   character that walks convincingly and wrongly, which is much harder
+   to spot than one that walks badly.
+
+     thigh  +X = the leg swings BACK   (hip extension)
+     shin   +X = the knee FLEXES       (heel toward the seat)
+     foot   +X = the toes go UP        (dorsiflexion)
+     toe    +X = the toes extend       (what the heel lifting does)
+
+   Every one of them is verifiable from the geometry: a bone points
+   down its own -Y, and a positive rotation about X carries -Y toward
+   -Z, which is backwards. */
+
+/* Spread a trunk rotation over the three spine segments. A single
+   segment turning by the whole amount is a hinge in the middle of a
+   person's back; sharing it out is the difference between a torso and
+   a lever. */
+function trunk(p,rx,ry,rz){
+  p.add('spine', rx*0.28, ry*0.24, rz*0.30);
+  p.add('spine2',rx*0.32, ry*0.32, rz*0.32);
+  p.add('chest', rx*0.40, ry*0.44, rz*0.38);
+}
+
 C.idle=function(p,ph,pr){
   p.clear();
   var t=ph*TAU;
-  /* Breathing drives the chest and, a beat later, the shoulders. */
+  /* Breathing drives the chest and, a beat later, the clavicles. Real
+     quiet breathing is about twelve a minute and moves the sternum a
+     centimetre; the numbers here are that, scaled to what reads. */
   var br=sin(t)*0.5+0.5;
-  p.set('chest',-0.03-br*0.030,0,0);
-  p.set('spine',0.012+br*0.012,0,0);
-  p.set('neck',0.02-br*0.02,0,0);
-  /* A slow weight shift on a different period from the breath, so the
-     two never sync up and the loop stops being obvious. */
-  var sw=sin(ph*TAU*0.37);
-  p.rootRoll=sw*0.020;
-  p.rootYaw=sw*0.045;
-  p.rootY=-Math.abs(sw)*0.012+br*0.006;
-  p.set('hips',0,-sw*0.05,sw*0.03);
-  /* Arms hang with a natural outward flare and a slight lag. */
-  var lag=sin((ph-0.08)*TAU*0.37);
-  p.set('armL',0.05,0,0.13+lag*0.02);
-  p.set('armR',0.05,0,-0.13-lag*0.02);
-  p.set('forearmL',-0.16-br*0.02,0,0.05);
-  p.set('forearmR',-0.16-br*0.02,0,-0.05);
-  p.set('handL',0,0,0.10);
-  p.set('handR',0,0,-0.10);
-  /* Weight on alternating legs rather than a symmetric stance. */
-  p.set('thighL',-0.02+sw*0.03,0,0.035);
-  p.set('thighR',-0.02-sw*0.03,0,-0.035);
-  p.set('shinL',0.05-sw*0.02,0,0);
-  p.set('shinR',0.05+sw*0.02,0,0);
-  p.set('head',0.02,sw*0.10,0);
+  trunk(p,-0.030-br*0.026,0,0);
+  p.set('neck',0.016-br*0.016,0,0);
+  p.add('shoulderL',-br*0.020,0,-br*0.016);
+  p.add('shoulderR',-br*0.020,0, br*0.016);
+
+  /* Postural sway. Nobody stands still: a standing body is a slow
+     inverted pendulum correcting itself, and two sines on
+     incommensurate periods reproduce that better than any noise
+     function, because the correction really is roughly periodic. */
+  var sw=sin(ph*TAU*0.37), sw2=sin(ph*TAU*0.23+1.1);
+  p.rootRoll=sw*0.018+sw2*0.008;
+  p.rootYaw=sw*0.040+sw2*0.016;
+  p.rootLean=0.020+sw2*0.010;
+  p.rootY=-Math.abs(sw)*0.010+br*0.005;
+  p.set('hips',0,-sw*0.045,sw*0.026);
+
+  /* Arms hang with the elbow slightly bent and the forearm pronated,
+     so the palms face the thighs. Perfectly straight arms with the
+     palms forward is the anatomical position, and nobody has ever
+     stood in it voluntarily. */
+  var lag=sin((ph-0.10)*TAU*0.37);
+  p.set('armL', 0.045+lag*0.012,0, 0.075+lag*0.014);
+  p.set('armR', 0.045+lag*0.012,0,-0.075-lag*0.014);
+  p.set('forearmL',-0.24-br*0.020, 0.34, 0.030);
+  p.set('forearmR',-0.24-br*0.020,-0.34,-0.030);
+  p.set('handL',0.04, 0.10, 0.06);
+  p.set('handR',0.04,-0.10,-0.06);
+
+  /* Weight on alternating legs. The loaded leg straightens and its hip
+     rises; the free leg softens at the knee and turns out a little. */
+  var wl=sw*0.5+0.5;
+  p.set('thighL',-0.010+sw*0.026,-sw*0.02, 0.030+wl*0.010);
+  p.set('thighR',-0.010-sw*0.026,-sw*0.02,-0.030-(1-wl)*0.010);
+  p.set('shinL',0.030+(1-wl)*0.055,0,0);
+  p.set('shinR',0.030+wl*0.055,0,0);
+  p.set('footL',-0.010-(1-wl)*0.030,0,0);
+  p.set('footR',-0.010-wl*0.030,0,0);
+  p.set('head',0.016,sw*0.085,-sw*0.010);
   return p;
 };
 
-/* One clip covers walking through sprinting. `sp` is 0 at a slow walk
-   and 1 at a full run, and every amplitude scales off it, which is why
-   there is no visible pop as the player accelerates. */
+/* ---------------- gait ----------------
+   One clip covers walking through sprinting. `sp` is 0 at a slow walk
+   and 1 at a full run.
+
+   The important change from a pair of sines is that a real gait cycle
+   is not symmetric. Stance takes about 62 per cent of it and swing the
+   other 38, and inside stance there are four events that each leave a
+   mark on the silhouette: heel strike, foot flat, heel off, toe off.
+   Sines cannot produce those, which is why a sine walk always reads as
+   a march no matter how carefully the amplitudes are tuned. Each joint
+   below is a piecewise curve through those events, taken from the
+   standard sagittal gait plots and simplified to the corners that
+   survive at gameplay distance.
+
+   u is one leg's own phase: 0 at heel strike, 0.62 at toe off. */
+var STANCE=0.62;
+
+function hipCurve(u,sp){
+  var flex=0.46+sp*0.36;          /* thigh forward at heel strike */
+  var ext=0.24+sp*0.20;           /* thigh back at toe off        */
+  if(u<STANCE)return M.lerp(flex,-ext,u/STANCE);
+  return M.lerp(-ext,flex,ease((u-STANCE)/(1-STANCE)));
+}
+function kneeCurve(u,sp){
+  var load=0.14+sp*0.20;          /* absorbing the landing        */
+  var swing=0.98+sp*0.52;         /* the fold that clears the toe */
+  if(u<0.15)return M.lerp(0.04,load,ease(u/0.15));
+  if(u<0.40)return M.lerp(load,0.03,ease((u-0.15)/0.25));
+  if(u<STANCE)return M.lerp(0.03,0.52+sp*0.24,ease((u-0.40)/(STANCE-0.40)));
+  if(u<0.80)return M.lerp(0.52+sp*0.24,swing,ease((u-STANCE)/(0.80-STANCE)));
+  return M.lerp(swing,0.04,ease((u-0.80)/0.20));
+}
+function ankleCurve(u,sp){
+  var push=0.34+sp*0.20;          /* plantarflexion at toe off    */
+  if(u<0.08)return M.lerp(0.10,-0.07,u/0.08);
+  if(u<0.45)return M.lerp(-0.07,0.17,(u-0.08)/0.37);
+  if(u<STANCE)return M.lerp(0.17,-push,ease((u-0.45)/(STANCE-0.45)));
+  if(u<0.80)return M.lerp(-push,0.15,ease((u-STANCE)/(0.80-STANCE)));
+  return M.lerp(0.15,0.10,(u-0.80)/0.20);
+}
+function toeCurve(u,sp){
+  var ext=0.50+sp*0.30;
+  if(u<0.42)return 0;
+  if(u<STANCE)return M.lerp(0,ext,ease((u-0.42)/(STANCE-0.42)));
+  return M.lerp(ext,0,ease(M.clamp((u-STANCE)/0.16,0,1)));
+}
+/* Vertical travel of the pelvis. Two rises per stride, highest at each
+   mid-stance and lowest at each double support, which is the opposite
+   of what a first guess usually puts there. */
+function pelvisRise(u){return -cos(u*2*TAU)*0.5+0.5;}
+
 C.locomote=function(p,ph,pr){
   p.clear();
   var sp=pr&&pr.speed!==undefined?M.clamp(pr.speed,0,1):0;
-  var t=ph*TAU;
-  var swing=0.55+sp*0.52;
-  var lift=0.35+sp*0.68;
-  var lean=0.06+sp*0.30;
+  var uL=ph%1, uR=(ph+0.5)%1;
 
-  /* Legs: thigh swings on the fundamental, knee bends on a phase-shifted
-     rectified sine so it straightens on the drive and folds on the return. */
-  var lp=sin(t),rp=sin(t+PI);
-  p.set('thighL',lp*swing,0,0.03);
-  p.set('thighR',rp*swing,0,-0.03);
-  var kL=Math.max(0,-sin(t-0.5))*lift+0.06;
-  var kR=Math.max(0,-sin(t+PI-0.5))*lift+0.06;
-  p.set('shinL',kL,0,0);
-  p.set('shinR',kR,0,0);
-  /* Ankle rolls through the step: toe-off then heel-strike. */
-  p.set('footL',-lp*0.32+kL*0.30,0,0);
-  p.set('footR',-rp*0.32+kR*0.30,0,0);
+  p.set('thighL',-hipCurve(uL,sp),0, 0.030);
+  p.set('thighR',-hipCurve(uR,sp),0,-0.030);
+  p.set('shinL',kneeCurve(uL,sp),0,0);
+  p.set('shinR',kneeCurve(uR,sp),0,0);
+  p.set('footL',ankleCurve(uL,sp),0,0);
+  p.set('footR',ankleCurve(uR,sp),0,0);
+  p.set('toeL',toeCurve(uL,sp),0,0);
+  p.set('toeR',toeCurve(uR,sp),0,0);
 
-  /* Hips rise twice per cycle and roll toward the supporting leg. */
-  p.rootY=(Math.abs(sin(t))*0.055-0.028)*(0.5+sp);
-  p.rootRoll=cos(t)*(0.03+sp*0.05);
-  p.set('hips',0,cos(t)*(0.05+sp*0.09),0);
-  /* Chest counter-rotates against the hips — the thing that makes a walk
-     look like a person rather than a marching toy. */
-  p.set('chest',-lean*0.5,-cos(t)*(0.07+sp*0.13),0);
+  /* --- pelvis ---
+     Three separate motions that are easy to confuse with each other:
+     it rises twice a stride, it LISTS — the swing-side hip drops — and
+     it rotates about the spine, leading the swinging leg. */
+  var rise=pelvisRise(uL);
+  p.rootY=(rise-0.5)*(0.040+sp*0.040);
+  /* the list follows the stance leg, so it is a half-cycle sine */
+  var stance=sin(ph*TAU);
+  p.rootRoll=stance*(0.035+sp*0.030);
+  p.set('hips',0,-stance*(0.055+sp*0.075),0);
+
+  /* --- trunk ---
+     Counter-rotation against the pelvis, spread over the spine, plus
+     the forward lean that speed demands. A runner's lean is not a
+     style choice: without it the ground reaction pushes them over
+     backwards. */
+  var lean=0.05+sp*0.30;
+  trunk(p,lean*0.55,stance*(0.090+sp*0.130),-stance*(0.020+sp*0.030));
   p.rootLean=lean;
-  p.set('spine',lean*0.25,0,0);
-  /* Head stays level while the body pitches under it. */
-  p.set('neck',-lean*0.55,0,0);
-  p.set('head',-lean*0.20,cos(t)*0.03,0);
+  /* The head stays level while everything under it pitches. Gaze
+     stabilisation is involuntary and universal, and a head that pitches
+     with the chest is the single most robotic thing a walk can do. */
+  p.set('neck',-lean*0.62,-stance*0.05,0);
+  p.set('head',-lean*0.26,-stance*0.03,0);
 
-  /* Arms oppose the legs, with the forearm trailing a quarter phase. */
-  var aL=rp*(0.42+sp*0.55),aR=lp*(0.42+sp*0.55);
-  p.set('armL',aL,0,0.11-sp*0.04);
-  p.set('armR',aR,0,-0.11+sp*0.04);
-  p.set('forearmL',-0.22-sp*0.55-Math.max(0,rp)*(0.20+sp*0.42),0,0.04);
-  p.set('forearmR',-0.22-sp*0.55-Math.max(0,lp)*(0.20+sp*0.42),0,-0.04);
-  p.set('handL',0.05,0,0.08);
-  p.set('handR',0.05,0,-0.08);
+  /* --- arms ---
+     Opposite the legs. The shoulder swings, the elbow holds a bend
+     that deepens with speed, and the forearm flexes further on the
+     forward half of the swing than the back half. */
+  var aL=hipCurve(uR,sp),aR=hipCurve(uL,sp);
+  var amp=0.62+sp*0.42, bend=0.30+sp*0.85;
+  p.set('armL', aL*amp,0, 0.085-sp*0.030);
+  p.set('armR', aR*amp,0,-0.085+sp*0.030);
+  p.add('shoulderL',-Math.max(0,aL)*0.10,0,0);
+  p.add('shoulderR',-Math.max(0,aR)*0.10,0,0);
+  p.set('forearmL',-bend-Math.max(0,aL)*(0.28+sp*0.50), 0.22, 0.04);
+  p.set('forearmR',-bend-Math.max(0,aR)*(0.28+sp*0.50),-0.22,-0.04);
+  p.set('handL',0.05, 0.08, 0.06);
+  p.set('handR',0.05,-0.08,-0.06);
   return p;
 };
 
@@ -4880,123 +5224,230 @@ Body.cache=cache;
 var LIT='#FFFFFF', MID='#D2D2D2', LOW='#A8A8A8', DARK='#7C7C7C', DEEP='#585858';
 
 /* ---------------- head ----------------
-   Built as a loft rather than a sphere so the cranium, cheekbone and
-   jaw can each have their own width. A sphere with a face stuck on it
-   is the single clearest tell of programmer-art character work. */
+   Fourteen cross-sections from under the chin to the crown, then the
+   features sculpted on top of them. A head is not a sphere with a face
+   applied: the skull is widest at the parietals and narrows at the
+   temples, the occiput projects further back than the forehead does
+   forward, and the whole face plane sits ahead of the cranium. Those
+   three facts are most of what makes a profile read as a person.
+
+   The landmark heights are the ones the rest of the file measures
+   against — chin -0.118, jaw -0.078, cheek -0.036, eyeline 0.005,
+   brow 0.048, crown 0.158 — and they are held fixed on purpose, so the
+   eleven hairstyles, ten hats and five face accessories that were
+   authored against the old skull still land on this one.
+
+   All of it is in the head's own space and scaled by P.headScale at
+   the end. Real dimensions, for anything measured here: the head is
+   0.237 tall, 0.150 across and 0.186 front to back. */
+function headSect(hw,hf,hb,n,ex){
+  return sect(hw,hf,hb,n,ex);
+}
+/* Push the surface in — or out, with a negative amount — around a
+   direction. An eye socket is a dent; a brow ridge and a cheekbone are
+   the same operation with the sign flipped, which is a great deal less
+   work than modelling either of them. */
+function dent(pts,dx,dz,amt,width){
+  var l0=Math.hypot(dx,dz)||1;dx/=l0;dz/=l0;
+  for(var i=0;i<pts.length;i++){
+    var x=pts[i][0],z=pts[i][1],l=Math.hypot(x,z)||1;
+    var d=(x/l)*dx+(z/l)*dz;
+    var w=(d-(1-width))/width;
+    if(w<=0)continue;
+    if(w>1)w=1;
+    var kf=1-amt*w*w*(3-2*w);
+    pts[i][0]*=kf;pts[i][1]*=kf;
+  }
+  return pts;
+}
+
 Body.head=function(){
   return part('head',function(b){
-    b.mat('blank');
+    b.mat('skin');
     b.push();b.scale(P.headScale,P.headScale,P.headScale);
-    var n=14;
-    /* cross-sections from under the chin up over the crown */
-    var secs=[
-      {y:-0.118,pts:Geo.roundRect(0.076,0.090,0.033,n)},  /* chin    */
-      {y:-0.078,pts:Geo.roundRect(0.126,0.144,0.050,n)},  /* jaw     */
-      {y:-0.036,pts:Geo.roundRect(0.166,0.180,0.063,n)},  /* cheek   */
-      {y: 0.005,pts:Geo.roundRect(0.185,0.196,0.076,n)},  /* eyeline */
-      {y: 0.048,pts:Geo.roundRect(0.192,0.200,0.087,n)},  /* brow    */
-      {y: 0.094,pts:Geo.roundRect(0.185,0.196,0.089,n)},
-      {y: 0.131,pts:Geo.roundRect(0.152,0.163,0.076,n)},
-      {y: 0.155,pts:Geo.roundRect(0.091,0.100,0.046,n)}   /* crown   */
-    ];
-    /* Push the face forward: a head whose front and back are the same
-       curve reads as a ball, not a skull. */
-    for(var i=0;i<secs.length;i++){
-      var f=M.clamp((secs[i].y+0.11)/0.25,0,1);
-      for(var j=0;j<secs[i].pts.length;j++){
-        if(secs[i].pts[j][1]>0)secs[i].pts[j][1]*=1.0+0.16*f;
-      }
+    var n=22;
+    function R(y,hw,hf,hb,ex,col){
+      return {y:y,pts:headSect(hw,hf,hb,n,ex),col:col||null};
     }
+    var secs=[
+      R(-0.118,0.034,0.058,0.038,2.7,MID),   /* chin point            */
+      R(-0.100,0.048,0.070,0.056,2.7),
+      R(-0.078,0.062,0.078,0.072,2.8),       /* jaw                   */
+      R(-0.056,0.072,0.088,0.082,2.7),       /* mouth line            */
+      R(-0.036,0.080,0.094,0.092,2.5),       /* cheek / zygomatic     */
+      R(-0.014,0.085,0.098,0.098,2.4),
+      R( 0.005,0.087,0.099,0.101,2.3),       /* eyeline               */
+      R( 0.030,0.088,0.100,0.104,2.3),
+      R( 0.048,0.089,0.103,0.106,2.3),       /* brow ridge            */
+      R( 0.072,0.088,0.099,0.108,2.2),       /* forehead              */
+      R( 0.100,0.085,0.090,0.108,2.2),
+      R( 0.126,0.081,0.079,0.100,2.2),
+      R( 0.147,0.066,0.063,0.078,2.1),
+      R( 0.158,0.040,0.038,0.046,2.0)        /* crown                 */
+    ];
+    /* Sockets, temples and cheekbones, applied to the rings that carry
+       them. The eye direction is 34 degrees off centre, which is where
+       an eye actually sits on a head this wide. */
+    var ex=Math.sin(0.60),ez=Math.cos(0.60);
+    dent(secs[5].pts, ex,ez,0.030,0.42);dent(secs[5].pts,-ex,ez,0.030,0.42);
+    dent(secs[6].pts, ex,ez,0.055,0.44);dent(secs[6].pts,-ex,ez,0.055,0.44);
+    dent(secs[7].pts, ex,ez,0.038,0.44);dent(secs[7].pts,-ex,ez,0.038,0.44);
+    /* temples, pulled in just above the eyeline */
+    dent(secs[8].pts, 1,0.10,0.045,0.30);dent(secs[8].pts,-1,0.10,0.045,0.30);
+    dent(secs[9].pts, 1,0.05,0.038,0.30);dent(secs[9].pts,-1,0.05,0.038,0.30);
+    /* cheekbones out, jaw angle out — negative dents */
+    dent(secs[4].pts, 0.92,0.39,-0.045,0.36);dent(secs[4].pts,-0.92,0.39,-0.045,0.36);
+    dent(secs[2].pts, 0.90,0.20,-0.030,0.34);dent(secs[2].pts,-0.90,0.20,-0.030,0.34);
+    /* brow ridge forward, and the glabella between the brows */
+    dent(secs[8].pts, ex,ez,-0.050,0.40);dent(secs[8].pts,-ex,ez,-0.050,0.40);
     b.loft(secs,LIT,{openBottom:false});
 
-    /* Brow ridge, kept almost entirely inside the skull so it only
-       shades the eye sockets. An earlier version stood proud of the
-       face and read as a plank bolted across the eyes — the eyebrows
-       are a separate tinted part and they do the actual reading. */
-    b.push();b.translate(0,0.046,0.074);b.rotate(-0.20,0,0);
-    b.chamfer(0,0,0,0.150,0.015,0.038,MID,0.006,{noBand:true});b.pop();
-    /* nose — a wedge, not a cone */
-    /* Nose: a wedge running down the face, widening to the tip. */
-    b.push();b.translate(0,-0.006,0.086);b.rotate(0.10,0,0);
+    /* ---- nose ----
+       Bridge, dorsum, tip, alae. Built as its own little loft rather
+       than a wedge: the width has to grow from the root to the tip and
+       a wedge cannot do that without shearing. */
+    b.push();
     b.loft([
-      {y: 0.052,pts:[[0.011,-0.004],[0.011,0.018],[-0.011,0.018],[-0.011,-0.004]]},
-      {y: 0.006,pts:[[0.016,-0.004],[0.016,0.030],[-0.016,0.030],[-0.016,-0.004]]},
-      {y:-0.034,pts:[[0.023,-0.004],[0.023,0.040],[-0.023,0.040],[-0.023,-0.004]]}
-    ],MID,{openTop:true,openBottom:true});
+      {y:-0.038,pts:headSect(0.026,0.104,0.020,12,2.4),col:MID},
+      {y:-0.030,pts:headSect(0.024,0.118,0.020,12,2.4)},
+      {y:-0.016,pts:headSect(0.020,0.116,0.020,12,2.3)},
+      {y: 0.006,pts:headSect(0.016,0.109,0.020,12,2.2)},
+      {y: 0.030,pts:headSect(0.014,0.103,0.020,12,2.2)},
+      {y: 0.050,pts:headSect(0.014,0.100,0.020,12,2.2),col:MID}
+    ],LIT,{openTop:true,openBottom:true});
     b.pop();
-    b.push();b.translate(0,-0.038,0.116);
-    b.sphere(0,0,0,0.019,8,6,MID,{squash:0.66});b.pop();
-    /* ears */
+    /* alae, and the septum between them */
     for(var e=-1;e<=1;e+=2){
-      b.push();b.translate(e*0.092,-0.006,-0.006);b.rotate(0,0,e*0.16);
-      /* scale before the sphere, not after: a transform applied after
-         the geometry is emitted does nothing at all */
-      b.scale(0.38,1,0.78);
-      b.sphere(0,0,0,0.029,8,6,MID,{squash:1.40});
+      b.push();b.translate(e*0.021,-0.033,0.096);b.rotate(0,e*0.30,0);
+      b.scale(0.80,0.86,1.0);
+      b.sphere(0,0,0,0.017,9,7,LIT);b.pop();
+      b.push();b.translate(e*0.017,-0.041,0.100);
+      b.sphere(0,0,0,0.007,6,5,DEEP);b.pop();   /* nostril */
+    }
+    b.push();b.translate(0,-0.038,0.106);
+    b.sphere(0,0,0,0.010,8,6,LIT,{squash:0.8});b.pop();
+
+    /* ---- mouth ----
+       A vermilion border that stands a little proud, a groove between
+       the lips, and a philtrum above. Lips that are only a painted
+       line disappear the moment the light moves. */
+    /* Lips take the skin tint like everything else here, so they are
+       shaded rather than coloured: a touch darker than the cheek, which
+       is what a vermilion border does under a light from above. A face
+       whose mouth is exactly the value of its chin has no mouth. */
+    b.push();b.translate(0,-0.052,0.080);b.rotate(-0.08,0,0);
+    b.scale(1.0,0.46,0.40);
+    b.sphere(0,0,0,0.026,12,9,MID);b.pop();
+    b.push();b.translate(0,-0.064,0.079);b.rotate(0.10,0,0);
+    b.scale(1.0,0.54,0.42);
+    b.sphere(0,0,0,0.024,12,9,MID);b.pop();
+    b.push();b.translate(0,-0.058,0.092);
+    b.chamfer(0,0,0,0.040,0.003,0.006,DARK,0.0015,{noBand:true});b.pop();
+    /* philtrum: two ridges, not a groove — a groove needs geometry the
+       other way round and reads as a scar */
+    for(var q=-1;q<=1;q+=2){
+      b.push();b.translate(q*0.005,-0.045,0.093);
+      b.chamfer(0,0,0,0.0035,0.012,0.005,MID,0.001,{noBand:true});b.pop();
+    }
+
+    /* ---- eyelids ----
+       Skin over the top and bottom of each eyeball, leaving the almond
+       opening that is all a real eye ever shows. These belong to the
+       head rather than to Body.eyes because they are skin: they take
+       the skin tint, and an eye part tinted white cannot. */
+    for(var k=-1;k<=1;k+=2){
+      b.push();b.translate(k*0.0370,0.0165,0.0805);b.rotate(-0.18,k*-0.22,0);
+      b.scale(1.10,1.00,0.62);
+      b.sphere(0,0,0,0.0176,12,9,LIT);b.pop();
+      b.push();b.translate(k*0.0370,-0.0135,0.0800);b.rotate(0.22,k*-0.22,0);
+      b.scale(1.06,0.86,0.58);
+      b.sphere(0,0,0,0.0172,12,9,LIT);b.pop();
+      /* the fold above the lid, which is what gives an eye an age */
+      b.push();b.translate(k*0.0370,0.0248,0.0770);b.rotate(-0.34,k*-0.22,0);
+      b.scale(1.10,0.50,0.70);
+      b.sphere(0,0,0,0.0168,10,8,MID);b.pop();
+    }
+
+    /* ---- ears ----
+       Set back from the eyeline, tilted, with a raised helix around a
+       hollow. The lobe is a separate small mass or the ear reads as a
+       leaf stuck to the skull. */
+    for(var s2=-1;s2<=1;s2+=2){
+      b.push();b.translate(s2*0.077,-0.008,-0.014);
+      b.rotate(0,s2*0.34,s2*0.12);
+      b.scale(0.40,1.0,1.0);
+      b.sphere(0,0,0,0.030,10,8,LIT,{squash:1.28});
+      /* helix */
+      for(var h=0;h<8;h++){
+        var a=(-0.9+h/7*4.2);
+        b.push();
+        b.translate(0.030,Math.cos(a)*0.030,Math.sin(a)*0.026);
+        b.sphere(0,0,0,0.0085,5,4,LIT);
+        b.pop();
+      }
+      b.push();b.translate(0.010,-0.034,0.002);
+      b.sphere(0,0,0,0.013,8,6,LIT,{squash:1.1});b.pop();
       b.pop();
     }
-    /* lips: a shallow shelf, enough to catch a shadow */
-    b.push();b.translate(0,-0.056,0.100);
-    b.chamfer(0,0,0,0.054,0.015,0.015,DARK,0.005,{noBand:true});b.pop();
     b.pop();
   });
 };
 
-/* Eyes are their own part so they can be tinted per player without
-   dragging the whole head's colour with them. */
+/* ---------------- eyes ----------------
+   A human eyeball is 24 mm across and the pupils sit 63 mm apart. At
+   this head's scale that is a radius of 0.0145 and a separation of
+   0.037 either side of centre — an order smaller than the cartoon eyes
+   they replace, and the single biggest reason the old head read as a
+   doll. The socket is already a dent in the skull, so the eye only
+   has to fill it. */
+var EYE_X=0.0370, EYE_Y=0.0040, EYE_Z=0.0830, EYE_R=0.0145, EYE_TILT=-0.22;
+
 Body.eyes=function(){
   return part('eyes',function(b){
     b.mat('blank');
     b.push();b.scale(P.headScale,P.headScale,P.headScale);
     for(var s=-1;s<=1;s+=2){
-      var x=s*0.046;
-      /* Socket, then eyeball. Both are pulled back so their front
-         sits flush with the face rather than standing off it — a
-         sphere centred on the surface reads as a bug's eye. */
-      /* The face plane sits at about z = 0.105 at the eyeline. Each
-         layer has to end just in front of the one behind it: a socket
-         whose own front surface is ahead of the eyeball hides the
-         eyeball completely, which is what the first attempt did. */
-      b.push();b.translate(x,0.008,0.072);b.rotate(0,s*-0.14,0);
-      b.sphere(0,0,0,0.036,10,8,DEEP,{squash:0.64});
+      /* the socket's shadow, then the white */
+      b.push();b.translate(s*EYE_X,EYE_Y,EYE_Z-0.006);b.rotate(0,s*EYE_TILT,0);
+      b.sphere(0,0,0,EYE_R*1.32,10,8,DEEP,{squash:0.80});
       b.pop();
-      b.push();b.translate(x,0.008,0.087);b.rotate(0,s*-0.14,0);
-      b.sphere(0,0,0,0.0248,10,8,LIT,{squash:0.76});
+      b.push();b.translate(s*EYE_X,EYE_Y,EYE_Z);b.rotate(0,s*EYE_TILT,0);
+      b.sphere(0,0,0,EYE_R,12,9,LIT);
+      b.pop();
+      /* lash line: the upper lid's edge, always present. Without it an
+         eye reads as a bead sitting on the face. */
+      b.push();b.translate(s*EYE_X,EYE_Y+0.0105,EYE_Z+0.006);
+      b.rotate(-0.30,s*EYE_TILT,s*0.10);
+      b.chamfer(0,0,0,0.030,0.0035,0.010,DEEP,0.0012,{noBand:true});
       b.pop();
     }
     b.pop();
   });
 };
-/* The iris carries the player's eye colour, so it is a separate tint. */
 Body.iris=function(){
   return part('iris',function(b){
     b.mat('blank');
     b.push();b.scale(P.headScale,P.headScale,P.headScale);
     for(var s=-1;s<=1;s+=2){
-      var x=s*0.050;
-      b.push();b.translate(x,0.008,0.1015);b.rotate(0,s*-0.14,0);
-      b.sphere(0,0,0,0.0132,10,8,LIT,{squash:0.95});
-      /* pupil and a single specular glint — the glint is what makes a
-         stylised eye look alive rather than glassy */
-      b.sphere(0,0,0.005,0.0066,8,6,'#101010');
-      b.sphere(0.005,0.006,0.008,0.0032,6,5,'#FFFFFF');
+      b.push();b.translate(s*EYE_X,EYE_Y,EYE_Z+EYE_R*0.86);
+      b.rotate(0,s*EYE_TILT,0);
+      b.sphere(0,0,0,0.0062,10,8,LIT,{squash:0.72});
+      b.sphere(0,0,0.0022,0.0029,8,6,'#0A0A0C');
+      b.sphere(0.0022,0.0026,0.0038,0.0014,6,5,'#FFFFFF');
       b.pop();
     }
     b.pop();
   });
 };
-
-/* Eyelids. Parked up inside the brow ridge when the eye is open — the
-   skull is solid and the depth test hides them — and slid down over
-   the eye to close it. Cheaper and steadier than squashing the eyeball,
-   which distorts the iris on the way. */
 Body.lids=function(){
   return part('lids',function(b){
-    b.mat('blank');
+    b.mat('skin');
     b.push();b.scale(P.headScale,P.headScale,P.headScale);
     for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*0.048,0.012,0.083);b.rotate(0.10,s*-0.14,0);
-      b.chamfer(0,0,0,0.086,0.062,0.030,LIT,0.014,{noBand:true});
+      b.push();b.translate(s*EYE_X,EYE_Y+0.010,EYE_Z-0.001);
+      b.rotate(0.12,s*EYE_TILT,0);
+      b.scale(1.0,1.0,0.62);
+      b.sphere(0,0,0,EYE_R*1.22,12,9,LIT);
       b.pop();
     }
     b.pop();
@@ -5008,316 +5459,477 @@ Body.brows=function(){
     b.mat('blank');
     b.push();b.scale(P.headScale,P.headScale,P.headScale);
     for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*0.052,0.042,0.099);b.rotate(0,s*-0.16,s*0.10);
-      b.chamfer(0,0,0,0.056,0.013,0.014,LIT,0.004,{noBand:true});
+      /* Three tapered lobes along an arc: a brow is thickest at the
+         inner end and thins as it turns down at the temple, and a
+         single straight bar reads as a sticker. */
+      for(var i=0;i<3;i++){
+        var t=i/2;
+        b.push();
+        b.translate(s*(EYE_X-0.013+t*0.028),0.0345-t*t*0.007,EYE_Z+0.014-t*0.010);
+        b.rotate(0,s*(EYE_TILT-t*0.30),s*(0.10-t*0.34));
+        b.scale(1.0,0.52,0.62);
+        b.sphere(0,0,0,0.0125-t*0.0026,8,6,i?MID:LIT);
+        b.pop();
+      }
+    }
+    b.pop();
+  });
+};
+
+/* ============================================================
+   The figure — one continuous skinned mesh.
+
+   Everything from the collarbone down is built here, in the bind pose,
+   in world metres, and bound to the skeleton ring by ring. There are
+   no separate upper-arm and forearm meshes any more and no joint
+   spheres to hide the gap between them, because there is no gap: the
+   rings either side of an elbow share their weight between the two
+   bones, so the surface creases instead of shearing.
+
+   Two conventions hold the whole thing together.
+
+   First, every ring is a `sect` — a superellipse with independent
+   front and back depth. Bodies are not made of ellipses. The back is
+   flatter than the front, a rib cage is squarer than a waist, a calf
+   is nearly all behind the bone, and a shin is a flat plane over
+   bone. One exponent and two depths per ring says all of that.
+
+   Second, regions overlap rather than joining. The leg's top ring sits
+   up inside the pelvis; the deltoid buries a third of itself in the
+   rib cage. Two solid surfaces that interpenetrate look exactly like
+   one surface, and trying to stitch a leg into a torso with matching
+   ring counts is how a weekend disappears.
+   ============================================================ */
+var B=LH.Rig.NAME;
+
+/* A skinned part is never instanced: its vertices are placed by a bone
+   palette that belongs to one character, so there is nothing to batch. */
+function skinPart(key,fn){
+  var hit=cache[key];
+  if(hit)return hit;
+  var b=Geo.build();
+  fn(b);
+  var mesh=b.upload(0);
+  mesh.key=key;
+  cache[key]=mesh;
+  return mesh;
+}
+Body.skinPart=skinPart;
+
+function sect(hw,hf,hb,n,ex){
+  var out=[],e=2/(ex===undefined?2.2:ex);
+  for(var i=0;i<n;i++){
+    var a=i/n*M.TAU,ca=Math.cos(a),sa=Math.sin(a);
+    var hd=sa>=0?hf:hb;
+    out.push([(ca<0?-1:1)*hw*Math.pow(Math.abs(ca),e),
+              (sa<0?-1:1)*hd*Math.pow(Math.abs(sa),e)]);
+  }
+  return out;
+}
+Body.sect=sect;
+
+/* Girth multipliers for the three builds. Only the soft tissue moves —
+   the skeleton is the same length in all three, because a heavier
+   person is not a taller one and scaling the bones would make them
+   one. */
+function girth(build){
+  return build==='bulk'?1.13:(build==='slim'?0.90:1.0);
+}
+Body.girth=girth;
+
+/* ---------------- torso ----------------
+   Thirteen rings from the crotch to the base of the neck. The numbers
+   that matter are the three turning points: the iliac crest at 0.955
+   is the widest the hips get, the waist at 1.070 is the narrowest the
+   body gets, and the nipple line at 1.325 is the widest the rib cage
+   gets. Everything between them is interpolation. */
+function torsoRings(g,n,inf){
+  inf=inf||0;
+  function r(y,hw,hf,hb,ex,skin){
+    return {y:y,pts:sect(hw*g+inf,hf*g+inf,hb*g+inf,n,ex),skin:skin};
+  }
+  return [
+    r(0.795,0.106,0.080,0.088,2.3,[B.hips,1]),
+    r(0.872,0.140,0.100,0.110,2.4,[B.hips,1]),
+    r(0.955,0.160,0.112,0.120,2.4,[B.hips,1]),
+    /* Glutes and the small of the back are added below, as dents with
+       the sign flipped: a back that runs straight from the waist to the
+       thigh is the clearest tell of a shop mannequin, and it is two
+       rings' worth of work to fix. */
+    r(1.020,0.148,0.106,0.106,2.4,[B.hips,0.55,B.spine,0.45]),
+    r(1.070,0.138,0.100,0.098,2.3,[B.spine,1]),
+    r(1.130,0.143,0.104,0.100,2.3,[B.spine,0.50,B.spine2,0.50]),
+    r(1.190,0.152,0.110,0.104,2.4,[B.spine2,1]),
+    r(1.260,0.160,0.115,0.108,2.5,[B.spine2,0.50,B.chest,0.50]),
+    r(1.325,0.164,0.118,0.110,2.6,[B.chest,1]),
+    r(1.395,0.156,0.110,0.106,2.6,[B.chest,1]),
+    r(1.440,0.140,0.096,0.100,2.5,[B.chest,0.80,B.neck,0.20]),
+    r(1.490,0.106,0.072,0.080,2.3,[B.chest,0.50,B.neck,0.50]),
+    r(1.524,0.072,0.054,0.058,2.1,[B.neck,1])
+  ];
+}
+function torsoRingsShaped(g,n,inf){
+  var R=torsoRings(g,n,inf);
+  dent(R[1].pts,0,-1,-0.16,0.66);   /* glutes                 */
+  dent(R[2].pts,0,-1,-0.11,0.60);
+  dent(R[4].pts,0,-1, 0.07,0.55);   /* lumbar curve, inward   */
+  dent(R[8].pts,0, 1,-0.05,0.50);   /* sternum forward        */
+  dent(R[10].pts,1,0,-0.05,0.34);   /* trapezius, out at the  */
+  dent(R[10].pts,-1,0,-0.05,0.34);  /* top of each shoulder   */
+  return R;
+}
+
+/* ---------------- a limb ----------------
+   Rings down a bone axis. Given as [y, radius, frontDepth, backDepth,
+   exponent, skin] with the radius standing in for the half-width. */
+function limbLoft(b,x,rings,n,g,inf,o){
+  inf=inf||0;
+  b.push();b.translate(x,0,0);
+  var secs=[];
+  for(var i=0;i<rings.length;i++){
+    var R=rings[i];
+    secs.push({y:R[0],pts:sect(R[1]*g+inf,R[2]*g+inf,R[3]*g+inf,n,R[4]),
+               skin:R[5],col:R[6]||null});
+  }
+  b.loft(secs,LIT,o||{});
+  b.pop();
+}
+/* Keep the rings between two heights, and add an end ring at the cut so
+   a garment finishes on a hem rather than halfway through a ring. */
+function span(rings,lo,hi){
+  var out=[];
+  for(var i=0;i<rings.length;i++){
+    var R=rings[i];
+    if(R[0]<lo-0.0001||R[0]>hi+0.0001)continue;
+    out.push(R);
+  }
+  return out;
+}
+/* A ring interpolated at an arbitrary height, so a hem can land where
+   the design wants it instead of where a ring happens to be. */
+function ringAt(rings,y){
+  var lo=rings[0],hi=rings[rings.length-1];
+  for(var i=0;i<rings.length-1;i++){
+    if(y>=rings[i][0]&&y<=rings[i+1][0]){lo=rings[i];hi=rings[i+1];break;}
+  }
+  var t=(hi[0]===lo[0])?0:(y-lo[0])/(hi[0]-lo[0]);
+  function L(a,c){return a+(c-a)*t;}
+  return [y,L(lo[1],hi[1]),L(lo[2],hi[2]),L(lo[3],hi[3]),L(lo[4],hi[4]),
+          t<0.5?lo[5]:hi[5]];
+}
+
+/* ---------------- arm ----------------
+   Deltoid on top, biceps belly above the elbow, the forearm's own
+   belly just below it, then the taper into a wrist that is nearly
+   flat. The two rings either side of 1.122 are the elbow: they hand
+   the surface from the upper arm to the forearm across four
+   centimetres, which is about how much skin a real elbow recruits. */
+function armRings(side){
+  var L=B.shoulderL,A=B.armL,F=B.forearmL,H=B.handL;
+  if(side<0){L=B.shoulderR;A=B.armR;F=B.forearmR;H=B.handR;}
+  return [
+    [0.868,0.030,0.026,0.026,2.0,[F,0.55,H,0.45]],   /* wrist        */
+    [0.930,0.036,0.031,0.033,2.1,[F,1]],
+    [1.010,0.042,0.037,0.041,2.2,[F,1]],
+    [1.082,0.046,0.041,0.046,2.2,[A,0.15,F,0.85]],   /* forearm belly*/
+    [1.122,0.040,0.038,0.041,2.1,[A,0.50,F,0.50]],   /* elbow        */
+    [1.162,0.042,0.040,0.041,2.1,[A,0.75,F,0.25]],
+    [1.250,0.047,0.045,0.046,2.1,[A,1]],             /* biceps       */
+    [1.340,0.052,0.050,0.050,2.1,[A,1]],
+    [1.412,0.063,0.060,0.059,2.1,[L,0.25,A,0.75]],   /* deltoid belly*/
+    [1.462,0.062,0.058,0.058,2.2,[L,0.60,A,0.40]],
+    [1.496,0.046,0.043,0.043,2.2,[L,0.85,A,0.15]],
+    [1.516,0.020,0.019,0.019,2.2,[L,1]]              /* rounded top  */
+  ];
+}
+
+/* ---------------- leg ----------------
+   The asymmetries are the point. A thigh is deeper than it is wide at
+   the top and the other way round above the knee; a calf sits almost
+   entirely behind the bone, which is why the back depth at 0.420 is
+   half again the front. */
+function legRings(side){
+  var T=side>0?B.thighL:B.thighR, S=side>0?B.shinL:B.shinR;
+  var F=side>0?B.footL:B.footR;
+  return [
+    [0.075,0.038,0.034,0.040,2.1,[S,0.55,F,0.45]],   /* ankle        */
+    [0.140,0.041,0.036,0.046,2.1,[S,1]],
+    [0.240,0.048,0.040,0.058,2.2,[S,1]],
+    [0.340,0.056,0.043,0.070,2.2,[S,1]],
+    [0.420,0.059,0.044,0.074,2.2,[S,1]],             /* calf belly   */
+    [0.480,0.058,0.048,0.066,2.2,[S,1]],
+    [0.515,0.058,0.052,0.056,2.2,[T,0.45,S,0.55]],   /* knee         */
+    [0.552,0.061,0.056,0.058,2.2,[T,0.72,S,0.28]],
+    [0.600,0.066,0.060,0.062,2.2,[T,1]],
+    [0.700,0.076,0.070,0.074,2.3,[T,1]],
+    [0.820,0.087,0.080,0.090,2.4,[T,1]],
+    [0.912,0.095,0.086,0.100,2.4,[T,1]],             /* upper thigh  */
+    [0.968,0.092,0.082,0.096,2.4,[B.hips,0.45,T,0.55]],
+    [1.030,0.040,0.036,0.040,2.2,[B.hips,1]]         /* cap, buried  */
+  ];
+}
+
+/* ---------------- hand ----------------
+   Four fingers and a thumb, rigid to the hand bone. Fingers do not
+   articulate: at the distance a player ever sees them the silhouette
+   is the whole of it, and four separated digits read as a hand where
+   a mitten reads as a glove. `side` mirrors the thumb without a
+   negative scale, which would invert every triangle it touched. */
+function handMesh(b,side){
+  var H=side>0?B.handL:B.handR;
+  var x=side*0.172;
+  b.bone(H);
+  /* palm: wider than it is deep, and tapering toward the knuckles */
+  b.push();b.translate(x,0,0);
+  b.loft([
+    {y:0.858,pts:sect(0.030,0.016,0.016,10,2.4)},
+    {y:0.836,pts:sect(0.038,0.019,0.019,10,2.6)},
+    {y:0.800,pts:sect(0.042,0.019,0.019,10,2.8)},
+    {y:0.772,pts:sect(0.040,0.017,0.017,10,2.8)}
+  ],LIT,{});
+  b.pop();
+  /* four fingers, longest in the middle */
+  var len=[0.062,0.070,0.066,0.054];
+  for(var i=0;i<4;i++){
+    var fx=x+side*(-0.028+i*0.019);
+    b.push();b.translate(fx,0.772,0.002);
+    b.rotate(0,0,side*(-0.05+i*0.035));
+    b.loft([
+      {y:0,pts:sect(0.0095,0.0085,0.0085,8,2.2)},
+      {y:-len[i]*0.55,pts:sect(0.0090,0.0080,0.0080,8,2.2)},
+      {y:-len[i],pts:sect(0.0070,0.0062,0.0062,8,2.2)}
+    ],LIT,{});
+    b.pop();
+  }
+  /* thumb, set forward and out of the plane of the fingers */
+  b.push();b.translate(x-side*0.036,0.828,0.012);
+  b.rotate(0.30,0,side*0.72);
+  b.loft([
+    {y:0,pts:sect(0.014,0.013,0.013,8,2.2)},
+    {y:-0.030,pts:sect(0.012,0.011,0.011,8,2.2)},
+    {y:-0.058,pts:sect(0.0085,0.0080,0.0080,8,2.2)}
+  ],LIT,{});
+  b.pop();
+}
+
+/* ---------------- foot ----------------
+   Bare. Heel, instep and ball are the foot bone; everything past the
+   ball is the toe bone, so a push-off actually bends where a foot
+   bends. */
+function footMesh(b,side){
+  var F=side>0?B.footL:B.footR, T=side>0?B.toeL:B.toeR;
+  var x=side*0.092;
+  /* Laid on its side, so the loft's own y runs backward along the foot
+     and each section's depth becomes height. That also means the whole
+     thing is built around y=0 rather than around the ankle at 0.075,
+     and it has to be lifted back up — without this the soles sit three
+     centimetres under the ground and the ankle floats above the foot. */
+  b.push();b.translate(x,0.040,0);
+  b.push();b.rotate(-Math.PI/2,0,0);
+  b.loft([
+    {y:0.070,pts:sect(0.036,0.052,0.030,10,2.4),skin:[F,1]},   /* heel  */
+    {y:0.020,pts:sect(0.041,0.062,0.030,10,2.6),skin:[F,1]},
+    {y:-0.040,pts:sect(0.043,0.058,0.030,10,2.8),skin:[F,1]},  /* arch  */
+    {y:-0.090,pts:sect(0.047,0.046,0.032,10,3.0),skin:[F,0.75,T,0.25]},
+    {y:-0.118,pts:sect(0.048,0.038,0.032,10,3.0),skin:[F,0.45,T,0.55]}, /* ball */
+    {y:-0.165,pts:sect(0.044,0.026,0.028,10,2.8),skin:[T,1]},
+    {y:-0.192,pts:sect(0.032,0.018,0.020,10,2.6),skin:[T,1]}   /* toes  */
+  ],LIT,{});
+  b.pop();
+  b.pop();
+}
+
+/* Exposed so the cosmetics module can build coats and aprons from the
+   same rings the body and the shirt are built from. A coat that is not
+   an offset copy of the torso under it will clip through that torso
+   the first time the character bends, and no amount of tuning fixes
+   it — the two surfaces have to be the same surface. */
+Body.torsoShell=shellRings;
+Body.armRings=armRings;
+Body.legRings=legRings;
+Body.limbLoft=limbLoft;
+Body.ringAt=ringAt;
+Body.bones=B;
+
+/* One mesh for the whole body below the jaw. */
+Body.figure=function(build){
+  build=build||'base';
+  return skinPart('figure:'+build,function(b){
+    b.mat('skin');
+    var g=girth(build),n=20;
+    b.loft(torsoRingsShaped(g,n),LIT,{});
+    /* neck: its own short loft so the head can turn on it */
+    b.push();
+    b.loft([
+      {y:1.500,pts:sect(0.066*g,0.052*g,0.056*g,12,2.1),skin:[B.neck,1]},
+      {y:1.545,pts:sect(0.060*g,0.048*g,0.052*g,12,2.0),skin:[B.neck,0.70,B.head,0.30]},
+      {y:1.588,pts:sect(0.057*g,0.048*g,0.049*g,12,2.0),skin:[B.head,1]},
+      {y:1.612,pts:sect(0.050*g,0.044*g,0.044*g,12,2.0),skin:[B.head,1]}
+    ],LIT,{});
+    b.pop();
+    for(var s=1;s>=-1;s-=2){
+      limbLoft(b,s*0.172,armRings(s),12,g);
+      limbLoft(b,s*0.092,legRings(s),14,g);
+      handMesh(b,s);
+      footMesh(b,s);
+    }
+  });
+};
+
+/* ---------------- garments ----------------
+   Every garment is the body's own rings, grown outward by a millimetre
+   or twelve and bound to the same bones. That is not a shortcut: it is
+   the only construction that cannot clip. A sleeve built from its own
+   profile will pass through the arm inside it the first time the elbow
+   passes ninety degrees, and no amount of tuning fixes that — the two
+   surfaces have to be the same surface, offset.
+
+   Inflation by garment, in metres:
+     0.010  a shirt over skin
+     0.014  trousers, which hang rather than cling
+     0.018  an outer layer over a shirt
+     0.022  a boot over a foot
+*/
+
+/* The torso rings a garment needs, cut to a hem and a neckline and
+   grown outward. */
+function shellRings(g,n,inf,lo,hi){
+  var all=torsoRingsShaped(g,n,inf);
+  var out=[];
+  for(var i=0;i<all.length;i++){
+    if(all[i].y<lo-0.0001||all[i].y>hi+0.0001)continue;
+    out.push(all[i]);
+  }
+  return out;
+}
+
+var SHIRT_HEM={tee:0.868,jacket:0.840,hoodie:0.855,crop:1.150};
+var SHIRT_NECK={tee:1.470,jacket:1.470,hoodie:1.470,crop:1.470};
+
+Body.shirt=function(style,sleeve,build){
+  style=SHIRT_HEM[style]?style:'tee';
+  sleeve=sleeve||'short';
+  build=build||'base';
+  return skinPart('shirt:'+style+':'+sleeve+':'+build,function(b){
+    b.mat('fabric');
+    var g=girth(build),n=20,inf=0.011;
+    var secs=shellRings(g,n,inf,SHIRT_HEM[style],SHIRT_NECK[style]);
+    /* a collar band, drawn in a shade so the neckline reads as an edge
+       rather than as the place the mesh stopped */
+    secs.push({y:1.492,pts:sect(0.100*g+inf,0.068*g+inf,0.076*g+inf,n,2.3),
+               skin:[B.chest,0.5,B.neck,0.5],col:MID});
+    b.loft(secs,LIT,{openTop:true,openBottom:true,uvScale:2});
+
+    /* sleeves: the arm's own rings from the shoulder down to the cuff */
+    var cuff=sleeve==='long'?0.878:1.240;
+    for(var s=1;s>=-1;s-=2){
+      var rings=armRings(s);
+      var keep=[];
+      for(var i=0;i<rings.length;i++)
+        if(rings[i][0]>=cuff-0.0001)keep.push(rings[i]);
+      if(sleeve!=='none'&&keep.length>1){
+        keep.unshift(ringAt(rings,cuff));
+        limbLoft(b,s*0.172,keep,12,g,0.009,{openTop:false,openBottom:true,uvScale:2});
+      }
+    }
+
+    if(style==='jacket'){
+      /* lapels and a front seam */
+      b.bone(B.chest);
+      for(var q=-1;q<=1;q+=2){
+        b.push();b.translate(q*0.052,1.360,0.118*g+inf);b.rotate(0.10,0,q*0.28);
+        b.chamfer(0,0,0,0.062,0.150,0.018,MID,0.008,{noBand:true});b.pop();
+      }
+      b.push();b.translate(0,1.230,0.118*g+inf);
+      b.chamfer(0,0,0,0.014,0.320,0.016,DEEP,0.005,{noBand:true});b.pop();
+    }
+    if(style==='hoodie'){
+      /* the hood rides the neck, not the head: a hood pinned to a skull
+         swings with every glance and reads as a helmet */
+      b.skin(B.neck,0.65,B.chest,0.35);
+      b.push();b.translate(0,1.520,-0.070);b.rotate(-0.28,0,0);
+      b.sphere(0,0,0,0.108,12,9,MID,{squash:0.78});b.pop();
+      b.bone(B.chest);
+      b.push();b.translate(0,1.230,0.120*g+inf);
+      b.chamfer(0,0,0,0.170,0.056,0.020,MID,0.010,{noBand:true});b.pop();
+    }
+  });
+};
+
+/* Trousers: the seat from the torso, the legs from the legs. The seam
+   between them is buried, so nothing has to line up. */
+Body.trousers=function(leg,build){
+  leg=leg==='shorts'?'shorts':'long';
+  build=build||'base';
+  return skinPart('trousers:'+leg+':'+build,function(b){
+    b.mat('fabric');
+    var g=girth(build),inf=0.014;
+    var seat=shellRings(g,18,inf,0.795,1.075);
+    /* waistband, a shade darker, so the top of the trousers is an edge */
+    seat.push({y:1.100,pts:sect(0.140*g+inf,0.102*g+inf,0.100*g+inf,18,2.3),
+               skin:[B.spine,1],col:MID});
+    b.loft(seat,LIT,{openTop:true,openBottom:true,uvScale:2});
+    var hem=leg==='shorts'?0.660:0.098;
+    for(var s=1;s>=-1;s-=2){
+      var rings=legRings(s);
+      var keep=[];
+      for(var i=0;i<rings.length;i++)
+        if(rings[i][0]>=hem-0.0001&&rings[i][0]<=1.031)keep.push(rings[i]);
+      keep.unshift(ringAt(rings,hem));
+      limbLoft(b,s*0.092,keep,14,g,inf,{openTop:true,openBottom:true,uvScale:2});
+    }
+  });
+};
+
+/* Shoes: the foot's own sections plus a sole that stands proud of it,
+   which is the difference between a shoe and a painted foot. */
+Body.shoes=function(style,build){
+  style=(style==='boot')?'boot':'shoe';
+  build=build||'base';
+  return skinPart('shoes:'+style+':'+build,function(b){
+    b.mat('fabric');
+    var g=girth(build);
+    for(var s=1;s>=-1;s-=2){
+      var F=s>0?B.footL:B.footR, T=s>0?B.toeL:B.toeR;
+      b.push();b.translate(s*0.092,0.044,0);
+      b.push();b.rotate(-Math.PI/2,0,0);
+      /* upper */
+      b.loft([
+        {y:0.086,pts:sect(0.044,0.062,0.026,12,2.4),skin:[F,1]},
+        {y:0.020,pts:sect(0.050,0.072,0.026,12,2.6),skin:[F,1]},
+        {y:-0.040,pts:sect(0.052,0.066,0.026,12,2.8),skin:[F,1]},
+        {y:-0.095,pts:sect(0.056,0.052,0.028,12,3.0),skin:[F,0.7,T,0.3]},
+        {y:-0.125,pts:sect(0.057,0.043,0.028,12,3.0),skin:[F,0.4,T,0.6]},
+        {y:-0.175,pts:sect(0.052,0.030,0.026,12,2.8),skin:[T,1]},
+        {y:-0.205,pts:sect(0.038,0.020,0.020,12,2.6),skin:[T,1]}
+      ],LIT,{});
+      b.pop();
+      /* sole: a flat slab under the whole footprint, in a darker shade */
+      b.skin(F,0.7,T,0.3);
+      b.push();b.translate(0,-0.030,0.008);
+      b.chamfer(0,0,0,0.106,0.026,0.272,DARK,0.009);b.pop();
+      if(style==='boot'){
+        /* the shaft, up the ankle, and a turned cuff */
+        b.skin(s>0?B.shinL:B.shinR,0.55,F,0.45);
+        b.push();b.translate(0,-0.044,0);
+        b.loft([
+          {y:0.084,pts:sect(0.052,0.046,0.052,12,2.3)},
+          {y:0.148,pts:sect(0.055,0.048,0.056,12,2.3)},
+          {y:0.198,pts:sect(0.062,0.054,0.062,12,2.3)}
+        ],LIT,{openTop:true,openBottom:true});
+        b.loft([
+          {y:0.198,pts:sect(0.066,0.058,0.066,12,2.3),col:MID},
+          {y:0.230,pts:sect(0.063,0.056,0.063,12,2.3),col:MID}
+        ],MID,{openTop:true,openBottom:true});
+        b.pop();
+      }
       b.pop();
     }
-    b.pop();
-  });
-};
-
-/* ---------------- torso ---------------- */
-Body.chest=function(kind){
-  kind=kind||'base';
-  return part('chest:'+kind,function(b){
-    b.mat('blank');
-    var n=16;
-    var bulk=kind==='bulk'?1.10:(kind==='slim'?0.93:1.0);
-    /* The chest bone sits at 1.36 m and the hips mesh tops out at
-       1.07 m, so this loft has to reach down past its own bone to
-       close the abdomen — otherwise the figure has a hole at the
-       waist that clothing does not cover either. */
-    var secs=[
-      {y:-0.31,pts:Geo.roundRect(0.252*bulk,0.158*bulk,0.062,n)},  /* pelvis   */
-      {y:-0.22,pts:Geo.roundRect(0.268*bulk,0.164*bulk,0.066,n)},  /* belly    */
-      {y:-0.12,pts:Geo.roundRect(0.278*bulk,0.170*bulk,0.068,n)},  /* waist    */
-      {y:-0.02,pts:Geo.roundRect(0.290*bulk,0.176*bulk,0.070,n)},
-      {y: 0.04,pts:Geo.roundRect(0.318*bulk,0.188*bulk,0.078,n)},  /* ribs     */
-      {y: 0.09,pts:Geo.roundRect(0.360*bulk,0.206*bulk,0.086,n)},  /* pecs     */
-      /* The shoulder bones sit at chest-space y = 0.13, i.e. 1.49 m.
-         The loft has to peak there and fall away, because the chin is
-         at 1.565 m — an earlier version topped out at 1.66 and the
-         torso quietly ate the character's jaw. */
-      {y: 0.13,pts:Geo.roundRect(0.386*bulk,0.208*bulk,0.092,n)},  /* shoulder */
-      {y: 0.163,pts:Geo.roundRect(0.300*bulk,0.180*bulk,0.078,n)},
-      {y: 0.186,pts:Geo.roundRect(0.176,0.148,0.060,n)}            /* neck base*/
-    ];
-    b.loft(secs,LIT,{});
-    /* Collarbone shelf and a shallow sternum line: two small pieces of
-       geometry that stop the chest reading as a barrel. */
-    b.push();b.translate(0,0.140,0.068);
-    b.chamfer(0,0,0,0.246,0.015,0.028,MID,0.007,{noBand:true});b.pop();
-    b.push();b.translate(0,0.055,0.098);
-    b.chamfer(0,0,0,0.013,0.120,0.014,LOW,0.005,{noBand:true});b.pop();
-    /* shoulder blades */
-    for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*0.104,0.078,-0.086);b.rotate(0,0,s*0.2);
-      b.chamfer(0,0,0,0.106,0.120,0.018,MID,0.010,{noBand:true});b.pop();
-    }
-  });
-};
-
-Body.neck=function(){
-  return part('neck',function(b){
-    b.mat('blank');
-    b.loft([
-      {y:-0.06,pts:Geo.circle(0.072,10,1.10,1.0)},
-      {y: 0.00,pts:Geo.circle(0.062,10,1.04,1.0)},
-      {y: 0.06,pts:Geo.circle(0.058,10,1.00,1.0)}
-    ],MID,{openTop:true,openBottom:true});
-  });
-};
-
-Body.hips=function(){
-  return part('hips',function(b){
-    b.mat('blank');
-    var n=14;
-    b.loft([
-      {y:-0.14,pts:Geo.roundRect(0.240,0.170,0.070,n)},
-      {y:-0.06,pts:Geo.roundRect(0.296,0.190,0.082,n)},
-      {y: 0.02,pts:Geo.roundRect(0.302,0.186,0.084,n)},
-      {y: 0.09,pts:Geo.roundRect(0.276,0.172,0.076,n)}
-    ],LIT,{});
-  });
-};
-
-/* ---------------- limbs ---------------- */
-Body.upperArm=function(){
-  return part('upperArm',function(b){
-    b.mat('blank');
-    b.limb(P.armUp,0.062*FAT,0.050*FAT,LIT,{seg:10,bulge:0.10});
-  });
-};
-Body.forearm=function(){
-  return part('forearm',function(b){
-    b.mat('blank');
-    b.limb(P.armLo,0.052*FAT,0.038*FAT,LIT,{seg:10,bulge:0.06});
-  });
-};
-Body.hand=function(){
-  return part('hand',function(b){
-    b.mat('blank');
-    b.push();b.scale(P.handScale,P.handScale,P.handScale);
-    /* palm plus a mitten of fingers and a separate thumb — at the size
-       a hand occupies on screen, five modelled fingers are wasted
-       triangles, but a visible thumb is the difference between a hand
-       and a paddle */
-    b.push();b.translate(0,-0.042,0);
-    b.chamfer(0,0,0,0.048,0.072,0.070,LIT,0.020);b.pop();
-    b.push();b.translate(0,-0.098,0.006);b.rotate(0.10,0,0);
-    b.chamfer(0,0,0,0.044,0.056,0.062,MID,0.022);b.pop();
-    b.push();b.translate(0.030,-0.048,0.028);b.rotate(0,0,-0.5);
-    b.chamfer(0,0,0,0.024,0.048,0.026,MID,0.010);b.pop();
-    b.pop();
-  });
-};
-Body.thigh=function(){
-  return part('thigh',function(b){
-    b.mat('blank');
-    b.limb(P.thigh,0.092*FAT,0.068*FAT,LIT,{seg:12,bulge:0.08,steps:8});
-  });
-};
-Body.shin=function(){
-  return part('shin',function(b){
-    b.mat('blank');
-    b.limb(P.shin,0.070*FAT,0.046*FAT,LIT,{seg:10,bulge:0.10,steps:8});
-    /* calf mass sits behind and high */
-    b.push();b.translate(0,-0.12,-0.030);
-    b.sphere(0,0,0,0.052*FAT,10,8,MID,{squash:1.8});b.pop();
-  });
-};
-Body.foot=function(style){
-  style=style||'shoe';
-  return part('foot:'+style,function(b){
-    b.mat('blank');
-    b.scale(P.footScale,P.footScale,P.footScale);
-    if(style==='bare'){
-      b.push();b.translate(0,-0.030,0.036);
-      b.chamfer(0,0,0,0.082,0.056,0.190,LIT,0.024);b.pop();
-      return;
-    }
-    /* sole */
-    b.push();b.translate(0,-0.046,0.040);
-    b.chamfer(0,0,0,0.098,0.030,0.230,DARK,0.012);b.pop();
-    /* upper */
-    b.push();b.translate(0,-0.010,0.026);
-    b.loft([
-      {y:-0.020,pts:Geo.roundRect(0.094,0.216,0.034,12)},
-      {y: 0.026,pts:Geo.roundRect(0.092,0.196,0.036,12)},
-      {y: 0.058,pts:Geo.roundRect(0.084,0.136,0.034,12)}
-    ],LIT,{});
-    b.pop();
-    /* ankle collar and a toe cap, so a boot reads as a boot */
-    b.push();b.translate(0,0.040,-0.024);
-    b.chamfer(0,0,0,0.090,0.052,0.076,MID,0.018);b.pop();
-    b.push();b.translate(0,-0.018,0.128);
-    b.chamfer(0,0,0,0.086,0.044,0.052,MID,0.016);b.pop();
-    if(style!=='boot')return;
-    /* A boot is a shaft and a turned cuff. It has to stop at the
-       ankle: the shaft rides the foot bone, and anything taller
-       swings through the shin the first time the leg bends. */
-    b.push();b.translate(0,0.062,-0.020);
-    b.loft([
-      {y:0,    pts:Geo.roundRect(0.092,0.116,0.038,12)},
-      {y:0.052,pts:Geo.roundRect(0.096,0.120,0.040,12)},
-      {y:0.078,pts:Geo.roundRect(0.106,0.132,0.044,12)}
-    ],LIT,{openTop:true,openBottom:true});
-    b.pop();
-    b.push();b.translate(0,0.138,-0.020);
-    b.loft([
-      {y:0,    pts:Geo.roundRect(0.112,0.138,0.046,12)},
-      {y:0.030,pts:Geo.roundRect(0.108,0.134,0.044,12)}
-    ],MID,{openTop:true,openBottom:true});
-    b.pop();
-    /* heel block, and a strap across the instep */
-    b.push();b.translate(0,-0.052,-0.048);
-    b.chamfer(0,0,0,0.086,0.036,0.078,DARK,0.010);b.pop();
-    b.push();b.translate(0,0.020,0.042);
-    b.chamfer(0,0,0,0.100,0.020,0.030,DARK,0.008,{noBand:true});b.pop();
   });
 };
 /* What the wardrobe offers for feet. `bare` is deliberately last —
    it is the fallback, not a look anyone picks first. */
 Body.SHOES=['shoe','boot','bare'];
-
-/* ---------------- garments ----------------
-   Garments are slightly inflated copies of the body parts they cover.
-   Building them from the same profiles guarantees they never clip
-   through, which is the failure mode that makes layered clothing
-   look cheap. */
-function inflate(pts,amt){
-  var out=[];
-  for(var i=0;i<pts.length;i++){
-    var x=pts[i][0],z=pts[i][1];
-    var l=Math.hypot(x,z)||1;
-    out.push([x+x/l*amt,z+z/l*amt]);
-  }
-  return out;
-}
-
-Body.shirt=function(style){
-  style=style||'tee';
-  return part('shirt:'+style,function(b){
-    b.mat('fabric');
-    var n=16,inf=0.014;
-    var lowY=style==='crop'?0.06:-0.27;
-    var secs=[
-      {y:lowY,   pts:inflate(Geo.roundRect(
-         style==='crop'?0.312:0.264,style==='crop'?0.186:0.166,0.066,n),inf+0.004)},
-      {y:-0.12,  pts:inflate(Geo.roundRect(0.280,0.172,0.068,n),inf)},
-      {y:-0.02,  pts:inflate(Geo.roundRect(0.292,0.178,0.070,n),inf)},
-      {y: 0.04,  pts:inflate(Geo.roundRect(0.320,0.190,0.078,n),inf)},
-      {y: 0.09,  pts:inflate(Geo.roundRect(0.362,0.208,0.086,n),inf)},
-      {y: 0.13,  pts:inflate(Geo.roundRect(0.388,0.210,0.092,n),inf)},
-      {y: 0.163, pts:inflate(Geo.roundRect(0.302,0.182,0.078,n),inf)},
-      {y: 0.184, pts:inflate(Geo.roundRect(0.192,0.156,0.062,n),inf)}
-    ];
-    b.loft(secs,LIT,{openTop:true,uvScale:2});
-    if(style==='jacket'){
-      /* lapels and a front seam */
-      b.mat('fabric');
-      for(var s=-1;s<=1;s+=2){
-        b.push();b.translate(s*0.050,0.085,0.112);b.rotate(0.12,0,s*0.30);
-        b.chamfer(0,0,0,0.066,0.130,0.018,MID,0.008,{noBand:true});b.pop();
-      }
-      b.push();b.translate(0,0.020,0.114);
-      b.chamfer(0,0,0,0.014,0.200,0.016,DEEP,0.005,{noBand:true});b.pop();
-      /* Collar. It stops at 0.176 in chest space (1.539 m) — anything
-         taller and the jacket eats the jaw. */
-      b.push();b.translate(0,0.150,0.026);
-      b.loft([
-        {y:0,    pts:inflate(Geo.roundRect(0.200,0.164,0.064,14),0.010)},
-        {y:0.026,pts:inflate(Geo.roundRect(0.216,0.176,0.070,14),0.016)}
-      ],MID,{openTop:true,openBottom:true});
-      b.pop();
-    }
-    if(style==='hoodie'){
-      b.mat('fabric');
-      b.push();b.translate(0,0.170,-0.076);b.rotate(-0.30,0,0);
-      b.sphere(0,0,0,0.132,12,9,MID,{squash:0.72});b.pop();
-      b.push();b.translate(0,-0.030,0.116);
-      b.chamfer(0,0,0,0.188,0.066,0.020,MID,0.010,{noBand:true});b.pop();
-    }
-  });
-};
-
-Body.sleeve=function(which){
-  return part('sleeve:'+which,function(b){
-    b.mat('fabric');
-    /* Derived from the arm bone rather than written out: a sleeve that
-       is longer than the arm inside it is the one clothing bug you
-       cannot see until someone raises their hand. */
-    var len=which==='long'?P.armUp+0.01:P.armUp*0.58;
-    b.limb(len,0.074*FAT,(which==='long'?0.052:0.064)*FAT,LIT,
-      {seg:10,steps:5,joint:false,uvScale:2});
-    /* shoulder cap, so the deltoid does not show a ring of skin */
-    b.sphere(0,0.006,0,0.072*FAT,10,7,LIT);
-    /* a cuff, so the sleeve ends in something rather than stopping */
-    b.push();b.translate(0,-len,0);
-    b.loft([
-      {y:-0.014,pts:Geo.circle((which==='long'?0.050:0.062)*FAT,10)},
-      {y: 0.010,pts:Geo.circle((which==='long'?0.052:0.064)*FAT,10)}
-    ],MID,{openTop:true,openBottom:true});
-    b.pop();
-  });
-};
-
-Body.pants=function(style){
-  style=style||'long';
-  return part('pants:'+style,function(b){
-    b.mat('fabric');
-    var n=14;
-    /* the seat, over the hips bone */
-    b.loft([
-      {y:-0.15,pts:inflate(Geo.roundRect(0.244,0.172,0.070,n),0.016)},
-      {y:-0.06,pts:inflate(Geo.roundRect(0.298,0.192,0.082,n),0.014)},
-      {y: 0.03,pts:inflate(Geo.roundRect(0.304,0.188,0.084,n),0.014)},
-      {y: 0.075,pts:inflate(Geo.roundRect(0.286,0.178,0.078,n),0.012)}
-    ],LIT,{openTop:true,uvScale:2});
-    /* waistband */
-    b.push();b.translate(0,0.072,0);
-    b.loft([
-      {y:0,    pts:inflate(Geo.roundRect(0.288,0.180,0.078,n),0.020)},
-      {y:0.032,pts:inflate(Geo.roundRect(0.290,0.182,0.078,n),0.020)}
-    ],MID,{openTop:true,openBottom:true});
-    b.pop();
-  });
-};
-
-/* Lower leg, for anything that reaches past the knee. Split from the
-   thigh piece because they ride different bones. */
-Body.legwearLower=function(style){
-  return part('legwearLower:'+style,function(b){
-    b.mat('fabric');
-    var len=P.shin-0.02;
-    b.limb(len,0.090*FAT,0.058*FAT,LIT,{seg:10,steps:5,joint:false,uvScale:2});
-    /* cover the knee: the shin's own joint sphere sits at this bone's
-       origin and pokes through anything cut flush */
-    b.sphere(0,0.010,0,0.086*FAT,10,7,LIT);
-    b.push();b.translate(0,-len,0);
-    b.loft([
-      {y:-0.014,pts:Geo.circle(0.060*FAT,10)},
-      {y: 0.014,pts:Geo.circle(0.062*FAT,10)}
-    ],MID,{openTop:true,openBottom:true});
-    b.pop();
-  });
-};
-
-Body.legwear=function(style){
-  return part('legwear:'+style,function(b){
-    b.mat('fabric');
-    var len=style==='shorts'?P.thigh*0.48:P.thigh+0.04;
-    b.limb(len,0.112*FAT,(style==='shorts'?0.100:0.080)*FAT,LIT,
-      {seg:12,steps:6,joint:false,uvScale:2});
-    b.sphere(0,0.010,0,0.108*FAT,12,8,LIT);
-    b.push();b.translate(0,-len,0);
-    b.loft([
-      {y:-0.016,pts:Geo.circle((style==='shorts'?0.096:0.078)*FAT,12)},
-      {y: 0.012,pts:Geo.circle((style==='shorts'?0.098:0.080)*FAT,12)}
-    ],MID,{openTop:true,openBottom:true});
-    b.pop();
-  });
-};
 
 /* ---------------- hair ---------------- */
 var HAIR_BUILD={
@@ -5599,8 +6211,8 @@ var HAT_BUILD={
     ],LIT,{openBottom:true});
     b.push();b.translate(0,0.014,0);
     b.loft([
-      {y:0,     pts:Geo.circle(0.300,16,1.0,1.06)},
-      {y:0.016, pts:Geo.circle(0.296,16,1.0,1.06)}
+      {y:0,     pts:Geo.circle(0.212,16,1.0,1.06)},
+      {y:0.016, pts:Geo.circle(0.208,16,1.0,1.06)}
     ],MID,{});
     b.pop();
     b.push();b.translate(0,0.100,0);
@@ -5684,15 +6296,15 @@ var HAT_BUILD={
        like a parasol. */
     b.push();b.translate(0,0.026,0);
     b.loft([
-      {y:0,     pts:triBrim(0.245,24)},
-      {y:0.020, pts:triBrim(0.241,24)}
+      {y:0,     pts:triBrim(0.196,24)},
+      {y:0.020, pts:triBrim(0.192,24)}
     ],MID,{});
     b.pop();
     /* the three cocked corners, turned up against the crown */
     for(var k=0;k<3;k++){
       var a=k/3*M.TAU+Math.PI;
       b.push();
-      b.translate(Math.sin(a)*0.206,0.050,Math.cos(a)*0.206);
+      b.translate(Math.sin(a)*0.166,0.050,Math.cos(a)*0.166);
       b.rotate(0,a,0);
       b.rotate(-0.62,0,0);
       b.chamfer(0,0.046,0,0.190,0.098,0.020,LIT,0.014,{noBand:true});
@@ -5904,19 +6516,19 @@ var ACC_BUILD={
   specs:function(b){
     b.mat('panel');
     for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*0.047,0.008,0.110);b.rotate(0,s*-0.14,0);
-      ringOf(b,0.036,14,0.0080,LIT);
+      b.push();b.translate(s*0.038,0.004,0.101);b.rotate(0,s*-0.20,0);
+      ringOf(b,0.027,14,0.0055,LIT);
       b.mat('glass');
-      b.push();b.translate(0,0,-0.006);
-      b.sphere(0,0,0,0.033,10,8,MID,{squash:0.10});b.pop();
+      b.push();b.translate(0,0,-0.005);
+      b.sphere(0,0,0,0.025,10,8,MID,{squash:0.10});b.pop();
       b.mat('panel');
       /* temple arm, back past the ear */
-      b.push();b.translate(s*0.036,0.006,-0.034);b.rotate(0,s*0.42,0);
-      b.chamfer(0,0,0,0.008,0.008,0.112,MID,0.003,{noBand:true});b.pop();
+      b.push();b.translate(s*0.048,0.006,-0.026);b.rotate(0,s*0.30,0);
+      b.chamfer(0,0,0,0.007,0.006,0.110,MID,0.0022,{noBand:true});b.pop();
       b.pop();
     }
-    b.push();b.translate(0,0.012,0.112);
-    b.chamfer(0,0,0,0.024,0.008,0.008,MID,0.003,{noBand:true});b.pop();
+    b.push();b.translate(0,0.008,0.100);
+    b.chamfer(0,0,0,0.022,0.005,0.006,MID,0.0018,{noBand:true});b.pop();
     b.mat('blank');
   },
   /* Goggles ride on the forehead, not over the eyes. Someone who has
@@ -5931,27 +6543,27 @@ var ACC_BUILD={
     ],MID,{openTop:true,openBottom:true});
     b.mat('panel');
     for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*0.046,0.002,0.092);b.rotate(0,s*-0.16,0);
+      b.push();b.translate(s*0.040,0.002,0.086);b.rotate(0,s*-0.20,0);
       b.push();b.rotate(Math.PI/2,0,0);
-      b.cylinder(0,0,0,0.042,0.039,0.038,12,LIT,{open:true});
+      b.cylinder(0,0,0,0.033,0.030,0.032,12,LIT,{open:true});
       b.pop();
       b.mat('crystal',0.14);
-      b.push();b.translate(0,0,0.014);
-      b.sphere(0,0,0,0.037,10,8,LIT,{squash:0.16});b.pop();
+      b.push();b.translate(0,0,0.012);
+      b.sphere(0,0,0,0.029,10,8,LIT,{squash:0.16});b.pop();
       b.mat('panel');
       b.pop();
     }
     /* the bridge strap between the cups */
-    b.push();b.translate(0,0.002,0.090);
-    b.chamfer(0,0,0,0.034,0.020,0.020,MID,0.006,{noBand:true});b.pop();
+    b.push();b.translate(0,0.002,0.086);
+    b.chamfer(0,0,0,0.028,0.016,0.016,MID,0.005,{noBand:true});b.pop();
     b.pop();
     b.mat('blank');
   },
   eyepatch:function(b){
     b.mat('fabric');
-    b.push();b.translate(-0.046,0.010,0.098);b.rotate(0,0.16,0.10);
+    b.push();b.translate(-0.039,0.005,0.092);b.rotate(0,0.20,0.10);
     b.scale(1.0,1.12,0.34);
-    b.sphere(0,0,0,0.044,10,8,DEEP);
+    b.sphere(0,0,0,0.034,10,8,DEEP);
     b.pop();
     /* the cord: two straps running back over the skull, not a ring —
        a full band reads as a blindfold from the side */
@@ -5964,8 +6576,8 @@ var ACC_BUILD={
   earrings:function(b){
     b.mat('gold');
     for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*0.100,-0.042,-0.008);b.rotate(0,Math.PI/2,0);
-      ringOf(b,0.024,12,0.0060,LIT);
+      b.push();b.translate(s*0.086,-0.040,-0.012);b.rotate(0,Math.PI/2,0);
+      ringOf(b,0.019,12,0.0048,LIT);
       b.pop();
     }
     b.mat('blank');
@@ -6137,333 +6749,364 @@ Cos.wings=function(style){
   return part('wings:'+style,function(b){
     b.mat('blank');
     /* both sides from one description */
-    b.push();b.translate(0.070,0.150,-0.104);b.rotate(0.10,-0.30,0);
+    /* Chest-bone space, and that bone moved when the skeleton became
+       anatomical: it now sits at 1.325 m with the shoulder line 13 cm
+       above it, so the mount is lower and further back than the numbers
+       these wings were first written against. */
+    b.push();b.translate(0.058,0.058,-0.128);b.rotate(0.10,-0.30,0);
     WING_BUILD[style](b);b.pop();
-    b.push();b.translate(-0.070,0.150,-0.104);b.rotate(0.10,0.30,0);
+    b.push();b.translate(-0.058,0.058,-0.128);b.rotate(0.10,0.30,0);
     b.scale(-1,1,1);
     WING_BUILD[style](b);b.pop();
   },96);
 };
 
-/* ---------------- capes ---------------- */
-Cos.cape=function(style){
-  style=style||'plain';
-  return part('cape:'+style,function(b){
-    b.mat('fabric');
-    /* Lofted with a widening, rippling hem. The ripple is what stops a
-       cape reading as a flat sheet of cardboard hanging off the neck. */
-    var n=16,secs=[];
-    var steps=9;
-    for(var i=0;i<=steps;i++){
-      var t=i/steps;
-      var y=0.28-t*0.86;
-      var w=M.lerp(0.30,0.60,Math.pow(t,0.85));
-      var d=M.lerp(0.16,0.30,t);
-      var pts=Geo.roundRect(w,d,0.07,n);
-      /* keep only the back half — a cape does not wrap the chest */
-      for(var j=0;j<pts.length;j++){
-        if(pts[j][1]>0)pts[j][1]*=0.16;
-        else pts[j][1]-=0.055*t;
-        /* scallop the hem */
-        pts[j][0]*=1+Math.sin(j*2.4)*0.055*t;
-        pts[j][1]*=1+Math.cos(j*2.4)*0.070*t;
-      }
-      secs.push({y:y,pts:pts,col:i<2?MID:(i>steps-2?LOW:LIT)});
-    }
-    b.push();b.translate(0,0,-0.020);
-    b.loft(secs,LIT,{openTop:true,openBottom:true,uvScale:1.6});
-    b.pop();
-    /* clasp across the collarbone */
-    b.mat(style==='royal'?'gold':'panel');
-    b.push();b.translate(0,0.262,0.060);
-    b.chamfer(0,0,0,0.150,0.026,0.030,LIT,0.010,{noBand:true});
-    b.sphere(0,0,0.020,0.026,10,8,MID);
-    b.pop();
-  },64);
-};
-
-Cos.backpack=function(style){
-  style=style||'satchel';
-  return part('back:'+style,function(b){
-    b.mat('fabric');
-    b.push();b.translate(0,0.130,-0.150);
-    b.chamfer(0,0,0,0.260,0.320,0.140,LIT,0.030);
-    b.mat('panel');
-    b.push();b.translate(0,-0.070,0.010);
-    b.chamfer(0,0,0,0.270,0.110,0.150,MID,0.024);b.pop();
-    b.mat('fabric');
-    b.push();b.translate(0,0.130,0.076);
-    b.chamfer(0,0,0,0.230,0.090,0.020,DARK,0.008,{noBand:true});b.pop();
-    b.pop();
-    /* shoulder straps */
-    for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*0.090,0.180,0.020);b.rotate(0.16,0,0);
-      b.chamfer(0,0,0,0.048,0.240,0.150,MID,0.014);b.pop();
-    }
-  },48);
-};
-
 /* ---------------- occupational layers ----------------
    A coat, a harness, an apron. These are what actually tell you what
-   somebody does: the colour of a shirt is a preference, but a chest
-   full of clipped-on quarry hardware is a job. They ride the chest
-   bone alongside the shirt, so they lean and turn with the torso.
+   somebody does: the colour of a shirt is a preference, a chest full of
+   clipped-on quarry hardware is a job.
 
-   Chest space, for anything added here: the shirt runs y -0.27 to
-   0.184, the shoulders sit near x +/-0.20, the hip line is about
-   y -0.27 and the knee is about y -0.72.
-   ============================================================ */
+   All of them are skinned, in the bind pose, in world metres, built
+   from the same rings as the body and the shirt underneath. A coat
+   that rode the chest bone rigidly — which is how these were built
+   before the figure was skinned — swings its whole skirt from the
+   sternum, so a character walking looks like a bell being rung. A
+   skinned skirt hangs off the pelvis and stays where a skirt stays.
 
-/* Every measurement below is a half-extent against the shirt, which is
-   the thing an overlay has to clear. Geo.roundRect is given a FULL
-   width and depth, so a shirt ring written as roundRect(0.388,0.210)
-   reaches x 0.194 — the first draft of this file read those as radii
-   and built a coat that fitted neatly inside the shirt, visible only
-   as a collar and a stripe. The shirt's outer half-widths, by height:
+   Heights worth knowing, all in world metres with the ankle at zero:
+     ankle 0.075   knee 0.515   hip joint 0.955   waist 1.070
+     nipple 1.325  shoulder 1.457  base of neck 1.475 */
+var Bn=Body.bones;
+var OVER_INF=0.020;              /* an outer layer, over a shirt */
 
-     y -0.27 : 0.150      y  0.04 : 0.174      y  0.163 : 0.165
-     y -0.12 : 0.154      y  0.09 : 0.195      y  0.184 : 0.110
-     y -0.02 : 0.160      y  0.13 : 0.208   (front face at z 0.119)
-
-   The thigh reaches x 0.239 with the knee near y -0.72, which is what
-   sets how wide a coat skirt has to be to swing clear of the legs. */
-
-/* A coat skirt: long at the back and sides, cut away at the front so
-   the legs have somewhere to go. Everything below the waist is a
-   rigid part of the chest bone, and a closed hem swings through the
-   thighs on the second stride. */
-function coatSkirt(b,y0,y1,w0,w1,d0,d1,front,col){
-  var n=16,steps=7,secs=[];
+/* The body of a coat: the torso shell from a hem to the collar. */
+function coatBody(b,g,n,lo,hi){
+  var secs=Body.torsoShell(g,n,OVER_INF,lo,hi);
+  b.loft(secs,LIT,{openTop:true,openBottom:true,uvScale:2});
+  return secs;
+}
+/* The skirt below it. Bound to the pelvis and the lumbar spine rather
+   than to the legs, because that is what a coat does: it hangs from
+   the hips and the legs move inside it. */
+function coatSkirt(b,y0,y1,w0,w1,d0,d1,front,n){
+  var steps=7,secs=[];
   for(var i=0;i<=steps;i++){
     var t=i/steps;
     var y=M.lerp(y0,y1,t);
-    var pts=Geo.roundRect(M.lerp(w0,w1,t),M.lerp(d0,d1,t),0.070,n);
+    var pts=Body.sect(M.lerp(w0,w1,t),M.lerp(d0,d1,t),M.lerp(d0,d1,t)*1.06,n,2.4);
     for(var j=0;j<pts.length;j++){
       if(pts[j][1]>0){
-        /* the front is drawn in toward the body as the skirt falls,
-           which is what opens the coat */
-        var k=M.lerp(1.0,front,t);
-        pts[j][0]*=M.lerp(1.0,0.80,t);
-        pts[j][1]*=k;
+        /* the front closes in as the skirt falls, which is what opens
+           a coat and gives the legs somewhere to go */
+        pts[j][0]*=M.lerp(1.0,0.86,t);
+        pts[j][1]*=M.lerp(1.0,front,t);
       }
     }
-    secs.push({y:y,pts:pts,col:i===0?MID:(i>steps-2?LOW:col||LIT)});
+    secs.push({y:y,pts:pts,
+      skin:t<0.25?[Bn.spine,0.5,Bn.hips,0.5]:[Bn.hips,1],
+      col:i===0?MID:(i>steps-2?LOW:LIT)});
   }
   b.loft(secs,LIT,{openTop:true,openBottom:true,uvScale:1.8});
 }
+/* Coat sleeves: the arm's own rings again, grown further than the
+   shirt's so the shirt fits inside. A coat with bare arms is a
+   waistcoat, and neither of these two is a waistcoat. */
+function coatSleeves(b,g,cuff,inf){
+  for(var s=1;s>=-1;s-=2){
+    var rings=Body.armRings(s),keep=[];
+    for(var i=0;i<rings.length;i++)
+      if(rings[i][0]>=cuff-0.0001)keep.push(rings[i]);
+    keep.unshift(Body.ringAt(rings,cuff));
+    Body.limbLoft(b,s*0.172,keep,12,g,inf,
+      {openTop:false,openBottom:true,uvScale:2});
+  }
+}
 
-/* A standing collar, turned up. It has to start above y 0.172, where
-   the shirt has already narrowed toward its own neck opening — lower
-   than that and the collar is inside the shoulder. */
+/* A standing collar, turned up around the neck. */
 function standCollar(b,y,w,d,h,col){
-  b.push();b.translate(0,y,0);
-  var lo=Geo.roundRect(w,d,0.070,14), hi=Geo.roundRect(w+0.040,d+0.056,0.076,14);
-  for(var j=0;j<hi.length;j++)if(hi[j][1]>0)hi[j][1]*=1.28;
-  b.loft([{y:0,pts:lo},{y:h,pts:hi}],col||MID,{openTop:true,openBottom:true});
-  b.pop();
+  var lo=Body.sect(w,d,d*1.06,14,2.2), hi=Body.sect(w+0.026,d+0.032,d*1.06+0.020,14,2.2);
+  for(var j=0;j<hi.length;j++)if(hi[j][1]>0)hi[j][1]*=1.24;
+  b.loft([{y:y,pts:lo,skin:[Bn.chest,0.55,Bn.neck,0.45]},
+          {y:y+h,pts:hi,skin:[Bn.neck,1]}],col||MID,
+         {openTop:true,openBottom:true});
 }
 
 var OVER_BUILD={
   /* Harbourmaster's oilskin: heavy, long, storm collar, brass at the
      shoulder. It is the tallest silhouette in the game on purpose. */
-  oilskin:function(b){
+  oilskin:function(b,g){
     b.mat('fabric');
-    coatSkirt(b,-0.24,-0.78,0.400,0.560,0.260,0.330,0.34,LIT);
-    b.loft([
-      {y:-0.24,pts:Geo.roundRect(0.380,0.250,0.086,16)},
-      {y:-0.02,pts:Geo.roundRect(0.400,0.260,0.090,16)},
-      {y: 0.09,pts:Geo.roundRect(0.470,0.276,0.100,16)},
-      {y: 0.15,pts:Geo.roundRect(0.430,0.262,0.096,16)}
-    ],LIT,{openTop:true,openBottom:true,uvScale:2});
-    standCollar(b,0.172,0.280,0.240,0.100,MID);
+    coatBody(b,g,20,1.010,1.500);
+    coatSleeves(b,g,0.884,0.022);
+    coatSkirt(b,1.030,0.560,0.196,0.268,0.130,0.170,0.62,20);
+    standCollar(b,1.482,0.104,0.076,0.078,MID);
     /* storm flap down the right of the chest */
-    b.push();b.translate(0.070,-0.030,0.136);b.rotate(0,0,0.05);
-    b.chamfer(0,0,0,0.150,0.380,0.024,MID,0.012,{noBand:true});b.pop();
+    b.skin(Bn.chest,1);
+    b.push();b.translate(0.058,1.290,0.150);b.rotate(0,0,0.05);
+    b.chamfer(0,0,0,0.120,0.300,0.022,MID,0.010,{noBand:true});b.pop();
     b.mat('gold');
     for(var i=0;i<3;i++){
-      b.push();b.translate(0.132,0.080-i*0.120,0.150);
-      b.sphere(0,0,0,0.020,8,6,LIT,{squash:0.6});b.pop();
+      b.push();b.translate(0.106,1.380-i*0.098,0.162);
+      b.sphere(0,0,0,0.016,8,6,LIT,{squash:0.6});b.pop();
     }
-    /* the rank bar at the shoulder */
-    b.push();b.translate(0.190,0.134,0.010);b.rotate(0,0,-0.28);
-    b.chamfer(0,0,0,0.130,0.026,0.110,LIT,0.010,{noBand:true});b.pop();
+    /* the rank bar across the shoulder */
+    b.skin(Bn.shoulderL,0.8,Bn.chest,0.2);
+    b.push();b.translate(0.150,1.472,0.010);b.rotate(0,0,-0.22);
+    b.chamfer(0,0,0,0.110,0.022,0.086,LIT,0.008,{noBand:true});b.pop();
     b.mat('panel');
-    b.push();b.translate(0,-0.250,0.010);
+    b.skin(Bn.spine,1);
+    b.push();
     b.loft([
-      {y:0,    pts:Geo.roundRect(0.412,0.276,0.088,14)},
-      {y:0.060,pts:Geo.roundRect(0.412,0.276,0.088,14)}
+      {y:1.052,pts:Body.sect(0.156,0.116,0.118,16,2.3)},
+      {y:1.104,pts:Body.sect(0.156,0.116,0.118,16,2.3)}
     ],MID,{openTop:true,openBottom:true});
     b.pop();
   },
   /* Warden's longcoat: same family, different intent. Narrower, belted,
      one shoulder plated. */
-  longcoat:function(b){
+  longcoat:function(b,g){
     b.mat('fabric');
-    coatSkirt(b,-0.26,-0.70,0.392,0.530,0.256,0.310,0.26,LIT);
-    b.loft([
-      {y:-0.26,pts:Geo.roundRect(0.370,0.246,0.084,16)},
-      {y:-0.04,pts:Geo.roundRect(0.392,0.256,0.088,16)},
-      {y: 0.09,pts:Geo.roundRect(0.462,0.272,0.098,16)},
-      {y: 0.15,pts:Geo.roundRect(0.424,0.258,0.094,16)}
-    ],LIT,{openTop:true,openBottom:true,uvScale:2});
-    standCollar(b,0.172,0.276,0.236,0.112,MID);
+    coatBody(b,g,20,0.990,1.500);
+    coatSleeves(b,g,0.884,0.021);
+    coatSkirt(b,1.010,0.640,0.190,0.250,0.126,0.158,0.56,20);
+    standCollar(b,1.482,0.102,0.074,0.090,MID);
     /* asymmetric closure — the diagonal is the whole silhouette */
-    b.push();b.translate(-0.040,-0.020,0.136);b.rotate(0,0,-0.22);
-    b.chamfer(0,0,0,0.180,0.400,0.022,MID,0.010,{noBand:true});b.pop();
+    b.skin(Bn.chest,0.6,Bn.spine2,0.4);
+    b.push();b.translate(-0.036,1.250,0.148);b.rotate(0,0,-0.20);
+    b.chamfer(0,0,0,0.150,0.330,0.020,MID,0.009,{noBand:true});b.pop();
     b.mat('panel');
-    b.push();b.translate(0,-0.238,0.006);
+    b.skin(Bn.spine,1);
+    b.push();
     b.loft([
-      {y:0,    pts:Geo.roundRect(0.402,0.268,0.086,14)},
-      {y:0.052,pts:Geo.roundRect(0.402,0.268,0.086,14)}
+      {y:1.048,pts:Body.sect(0.152,0.114,0.116,16,2.3)},
+      {y:1.094,pts:Body.sect(0.152,0.114,0.116,16,2.3)}
     ],MID,{openTop:true,openBottom:true});
     b.pop();
-    b.push();b.translate(0,-0.212,0.146);
-    b.chamfer(0,0,0,0.088,0.070,0.030,LIT,0.010);b.pop();
+    b.push();b.translate(0,1.072,0.126);
+    b.chamfer(0,0,0,0.072,0.058,0.026,LIT,0.008);b.pop();
     /* the pauldron, right shoulder only */
-    b.push();b.translate(0.212,0.120,0.000);b.rotate(0,0,-0.34);
+    b.skin(Bn.shoulderR,0.75,Bn.armR,0.25);
+    b.push();b.translate(-0.176,1.452,0.000);b.rotate(0,0,0.30);
     b.scale(1.0,0.66,1.10);
-    b.sphere(0,0,0,0.132,12,9,LIT);
-    b.pop();
-    b.push();b.translate(0.220,0.064,0.000);b.rotate(0,0,-0.30);
+    b.sphere(0,0,0,0.096,12,9,LIT);b.pop();
+    b.push();b.translate(-0.184,1.404,0.000);b.rotate(0,0,0.26);
     b.scale(1.0,0.40,1.02);
-    b.sphere(0,0,0,0.126,12,9,MID);
-    b.pop();
+    b.sphere(0,0,0,0.092,12,9,MID);b.pop();
   },
   /* Quarry harness. Straps, clips, and a coil of rope over one
      shoulder — the rope is what sells it from behind. */
-  harness:function(b){
+  harness:function(b,g){
     b.mat('fabric');
+    b.skin(Bn.chest,0.7,Bn.spine2,0.3);
     for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*0.086,-0.020,0.006);b.rotate(0,0,s*0.20);
-      b.chamfer(0,0,0,0.062,0.400,0.264,LIT,0.014,{noBand:true});b.pop();
+      b.push();b.translate(s*0.070,1.300,0.004);b.rotate(0,0,s*0.18);
+      b.chamfer(0,0,0,0.050,0.330,0.250,LIT,0.012,{noBand:true});b.pop();
     }
-    b.push();b.translate(0,-0.060,0.004);
+    b.skin(Bn.spine2,1);
+    b.push();
     b.loft([
-      {y:0,    pts:Geo.roundRect(0.430,0.268,0.090,14)},
-      {y:0.060,pts:Geo.roundRect(0.430,0.268,0.090,14)}
+      {y:1.176,pts:Body.sect(0.176,0.130,0.126,16,2.4)},
+      {y:1.226,pts:Body.sect(0.176,0.130,0.126,16,2.4)}
     ],MID,{openTop:true,openBottom:true});
     b.pop();
     b.mat('panel');
-    b.push();b.translate(0,-0.030,0.140);
-    b.chamfer(0,0,0,0.110,0.086,0.030,LIT,0.012);b.pop();
+    b.skin(Bn.chest,1);
+    b.push();b.translate(0,1.290,0.152);
+    b.chamfer(0,0,0,0.090,0.070,0.026,LIT,0.010);b.pop();
     for(var i=0;i<3;i++){
-      b.push();b.translate(-0.150+i*0.030,-0.076,0.136);
-      b.chamfer(0,0,0,0.026,0.052,0.026,MID,0.006);b.pop();
+      b.push();b.translate(-0.116+i*0.026,1.230,0.146);
+      b.chamfer(0,0,0,0.022,0.044,0.022,MID,0.005);b.pop();
     }
     /* the coil, over the left shoulder and round the back */
     b.mat('fabric');
-    b.push();b.translate(-0.170,0.020,-0.090);b.rotate(0.30,0,0.42);
+    b.skin(Bn.chest,0.6,Bn.shoulderL,0.4);
+    b.push();b.translate(-0.140,1.340,-0.110);b.rotate(0.30,0,0.42);
     for(var k=0;k<16;k++){
       var a=k/16*M.TAU;
-      b.push();b.translate(Math.cos(a)*0.120,Math.sin(a)*0.120,(k%2)*0.024);
-      b.sphere(0,0,0,0.026,6,5,k%2?LIT:MID);b.pop();
+      b.push();b.translate(Math.cos(a)*0.098,Math.sin(a)*0.098,(k%2)*0.020);
+      b.sphere(0,0,0,0.021,6,5,k%2?LIT:MID);b.pop();
     }
     b.pop();
   },
   /* Registry stole. Narrow, exact, fringed — it should look issued
      rather than chosen. */
-  stole:function(b){
+  stole:function(b,g){
     b.mat('fabric');
     for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*0.078,-0.030,0.132);b.rotate(0,0,s*0.10);
-      b.chamfer(0,0,0,0.074,0.420,0.020,LIT,0.008,{noBand:true});b.pop();
-      b.push();b.translate(s*0.078,-0.030,-0.132);b.rotate(0,0,s*0.10);
-      b.chamfer(0,0,0,0.074,0.420,0.020,MID,0.008,{noBand:true});b.pop();
-      b.push();b.translate(s*0.150,0.132,0.006);b.rotate(0,0,s*0.30);
+      b.skin(Bn.chest,0.75,Bn.spine2,0.25);
+      b.push();b.translate(s*0.062,1.270,0.152);b.rotate(0,0,s*0.08);
+      b.chamfer(0,0,0,0.060,0.360,0.018,LIT,0.007,{noBand:true});b.pop();
+      b.push();b.translate(s*0.062,1.270,-0.148);b.rotate(0,0,s*0.08);
+      b.chamfer(0,0,0,0.060,0.360,0.018,MID,0.007,{noBand:true});b.pop();
+      b.skin(Bn.shoulderL===undefined?Bn.chest:(s>0?Bn.shoulderL:Bn.shoulderR),0.6,
+             Bn.chest,0.4);
+      b.push();b.translate(s*0.116,1.452,0.006);b.rotate(0,0,s*0.26);
       b.scale(1.0,0.34,1.06);
-      b.sphere(0,0,0,0.104,10,8,LIT);b.pop();
-      /* fringe */
+      b.sphere(0,0,0,0.084,10,8,LIT);b.pop();
+      b.skin(Bn.chest,0.5,Bn.spine2,0.5);
       for(var f=0;f<4;f++){
-        b.push();b.translate(s*0.078-0.026+f*0.018,-0.244,0.132);
-        b.cylinder(0,0,0,0.006,0.003,0.048,5,MID);b.pop();
+        b.push();b.translate(s*0.062-0.022+f*0.015,1.086,0.152);
+        b.cylinder(0,0,0,0.005,0.0025,0.040,5,MID);b.pop();
       }
     }
     b.mat('gold');
-    b.push();b.translate(0,0.070,0.146);
-    b.chamfer(0,0,0,0.070,0.030,0.018,LIT,0.006,{noBand:true});
-    b.sphere(0,-0.032,0.006,0.024,10,8,LIT,{squash:0.7});b.pop();
+    b.skin(Bn.chest,1);
+    b.push();b.translate(0,1.386,0.166);
+    b.chamfer(0,0,0,0.058,0.026,0.016,LIT,0.005,{noBand:true});
+    b.sphere(0,-0.026,0.006,0.020,10,8,LIT,{squash:0.7});b.pop();
   },
   /* Market apron: bib, waist tie, and a pocket band that stands off
-     the front. The skirt is a front panel rather than a full ring —
-     an apron that wraps all the way round is a smock. */
-  apron:function(b){
+     the front. */
+  apron:function(b,g){
     b.mat('fabric');
-    b.push();b.translate(0,-0.030,0.132);
-    b.chamfer(0,0,0,0.260,0.400,0.026,LIT,0.014,{noBand:true});b.pop();
-    b.push();b.translate(0,-0.240,0.126);
-    b.extrude([[-0.152,0.010],[0.152,0.010],[0.190,-0.330],[-0.190,-0.330]],
-      0.026,LIT);
-    b.pop();
+    b.skin(Bn.chest,0.6,Bn.spine2,0.4);
+    b.push();b.translate(0,1.276,0.152);
+    b.chamfer(0,0,0,0.210,0.320,0.022,LIT,0.012,{noBand:true});b.pop();
     for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*0.100,0.096,0.126);b.rotate(0,0,s*0.30);
-      b.chamfer(0,0,0,0.040,0.190,0.020,MID,0.008,{noBand:true});b.pop();
+      b.push();b.translate(s*0.082,1.400,0.140);b.rotate(0,0,s*0.28);
+      b.chamfer(0,0,0,0.034,0.150,0.018,MID,0.007,{noBand:true});b.pop();
     }
-    b.push();b.translate(0,-0.222,0.006);
+    /* the skirt, front only, hanging from the waist tie */
+    b.skin(Bn.hips,0.65,Bn.spine,0.35);
+    b.push();b.translate(0,0.920,0.146);
+    b.extrude([[-0.122,0.140],[0.122,0.140],[0.152,-0.190],[-0.152,-0.190]],
+      0.022,LIT);
+    b.pop();
+    b.skin(Bn.spine,1);
+    b.push();
     b.loft([
-      {y:0,    pts:Geo.roundRect(0.400,0.264,0.086,14)},
-      {y:0.048,pts:Geo.roundRect(0.400,0.264,0.086,14)}
+      {y:1.062,pts:Body.sect(0.152,0.114,0.114,16,2.3)},
+      {y:1.104,pts:Body.sect(0.152,0.114,0.114,16,2.3)}
     ],MID,{openTop:true,openBottom:true});
     b.pop();
     /* the pocket, and something in it */
-    b.push();b.translate(0,-0.150,0.152);
-    b.chamfer(0,0,0,0.230,0.120,0.040,MID,0.014);b.pop();
+    b.skin(Bn.hips,0.65,Bn.spine,0.35);
+    b.push();b.translate(0,1.000,0.170);
+    b.chamfer(0,0,0,0.190,0.100,0.034,MID,0.012);b.pop();
     b.mat('planks');
-    b.push();b.translate(-0.062,-0.106,0.164);b.rotate(0,0,0.18);
-    b.cylinder(0,0,0,0.012,0.010,0.090,6,LIT);b.pop();
+    b.push();b.translate(-0.050,1.046,0.182);b.rotate(0,0,0.18);
+    b.cylinder(0,0,0,0.010,0.008,0.072,6,LIT);b.pop();
   },
   /* Tool belt, sitting on the hip line with weight hanging off it. */
-  toolbelt:function(b){
+  toolbelt:function(b,g){
     b.mat('fabric');
-    b.push();b.translate(0,-0.250,0);
+    b.skin(Bn.hips,0.7,Bn.spine,0.3);
+    b.push();
     b.loft([
-      {y:0,    pts:Geo.roundRect(0.400,0.262,0.086,16)},
-      {y:0.070,pts:Geo.roundRect(0.400,0.262,0.086,16)}
+      {y:0.980,pts:Body.sect(0.176,0.128,0.134,16,2.4)},
+      {y:1.044,pts:Body.sect(0.176,0.128,0.134,16,2.4)}
     ],LIT,{openTop:true,openBottom:true});
     b.pop();
     b.mat('panel');
-    b.push();b.translate(0,-0.216,0.140);
-    b.chamfer(0,0,0,0.078,0.062,0.028,MID,0.010);b.pop();
+    b.push();b.translate(0,1.012,0.140);
+    b.chamfer(0,0,0,0.064,0.050,0.024,MID,0.008);b.pop();
     /* pouches at the hips, tools hanging behind them */
-    for(var s2=-1;s2<=1;s2+=2){
+    for(var s=-1;s<=1;s+=2){
       b.mat('fabric');
-      b.push();b.translate(s2*0.222,-0.286,0.036);b.rotate(0,s2*0.24,0);
-      b.chamfer(0,0,0,0.110,0.140,0.098,LIT,0.020);
-      b.push();b.translate(0,0.078,0.010);
-      b.chamfer(0,0,0,0.116,0.030,0.104,MID,0.010);b.pop();
+      b.push();b.translate(s*0.176,0.946,0.032);b.rotate(0,s*0.24,0);
+      b.chamfer(0,0,0,0.090,0.116,0.080,LIT,0.016);
+      b.push();b.translate(0,0.064,0.008);
+      b.chamfer(0,0,0,0.096,0.024,0.086,MID,0.008);b.pop();
       b.pop();
       b.mat('panel');
-      b.push();b.translate(s2*0.234,-0.330,-0.076);b.rotate(0.20,0,s2*0.10);
-      b.cylinder(0,0,0,0.017,0.013,0.180,7,MID);b.pop();
+      b.push();b.translate(s*0.186,0.900,-0.076);b.rotate(0.20,0,s*0.10);
+      b.cylinder(0,0,0,0.014,0.011,0.150,7,MID);b.pop();
     }
     /* a rag through the belt */
     b.mat('fabric');
-    b.push();b.translate(-0.126,-0.300,0.126);b.rotate(0.10,0,0.24);
-    b.chamfer(0,0,0,0.070,0.140,0.026,MID,0.012,{noBand:true});b.pop();
+    b.push();b.translate(-0.100,0.930,0.130);b.rotate(0.10,0,0.24);
+    b.chamfer(0,0,0,0.058,0.116,0.022,MID,0.010,{noBand:true});b.pop();
   },
-  /* Plate on both shoulders, nothing else — for anyone who should read
-     as armoured without wearing a coat. */
-  pauldron:function(b){
+  /* Plate on both shoulders, nothing else. */
+  pauldron:function(b,g){
     b.mat('panel');
     for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*0.210,0.122,0.000);b.rotate(0,0,s*0.34);
+      b.skin(s>0?Bn.shoulderL:Bn.shoulderR,0.75,s>0?Bn.armL:Bn.armR,0.25);
+      b.push();b.translate(s*0.176,1.452,0.000);b.rotate(0,0,s*0.30);
       b.scale(1.0,0.62,1.08);
-      b.sphere(0,0,0,0.128,12,9,LIT);b.pop();
-      b.push();b.translate(s*0.218,0.068,0.000);b.rotate(0,0,s*0.30);
+      b.sphere(0,0,0,0.094,12,9,LIT);b.pop();
+      b.push();b.translate(s*0.182,1.406,0.000);b.rotate(0,0,s*0.26);
       b.scale(1.0,0.38,1.00);
-      b.sphere(0,0,0,0.122,12,9,MID);b.pop();
+      b.sphere(0,0,0,0.090,12,9,MID);b.pop();
     }
-    b.push();b.translate(0,0.104,0.128);
-    b.chamfer(0,0,0,0.220,0.070,0.040,MID,0.014);b.pop();
+    b.skin(Bn.chest,1);
+    b.push();b.translate(0,1.420,0.140);
+    b.chamfer(0,0,0,0.180,0.056,0.032,MID,0.012);b.pop();
   },
-  none:function(b){}
+  none:function(b,g){}
 };
 Cos.OVERLAYS=Object.keys(OVER_BUILD);
-Cos.overlay=function(style){
+Cos.overlay=function(style,build){
   style=OVER_BUILD[style]?style:'none';
-  return part('over:'+style,function(b){
+  build=build||'base';
+  return Body.skinPart('over:'+style+':'+build,function(b){
     b.mat('fabric');
-    OVER_BUILD[style](b);
-  },48);
+    OVER_BUILD[style](b,Body.girth(build));
+  });
+};
+
+/* ---------------- cape ----------------
+   Skinned to the shoulders at the clasp and to the pelvis at the hem,
+   so it hangs from the collarbone and swings with the hips rather than
+   rotating rigidly about the sternum. */
+Cos.cape=function(style,build){
+  style=style||'plain';
+  build=build||'base';
+  return Body.skinPart('cape:'+style+':'+build,function(b){
+    b.mat('fabric');
+    var n=16,steps=9,secs=[];
+    for(var i=0;i<=steps;i++){
+      var t=i/steps;
+      var y=M.lerp(1.470,0.640,t);
+      var w=M.lerp(0.150,0.290,Math.pow(t,0.85));
+      var d=M.lerp(0.100,0.190,t);
+      var pts=Body.sect(w,d,d,n,2.3);
+      for(var j=0;j<pts.length;j++){
+        /* keep the back: a cape does not wrap the chest */
+        if(pts[j][1]>0)pts[j][1]*=0.14;
+        else pts[j][1]-=0.030*t;
+        pts[j][0]*=1+Math.sin(j*2.4)*0.050*t;
+        pts[j][1]*=1+Math.cos(j*2.4)*0.060*t;
+      }
+      var sk=t<0.18?[Bn.chest,0.6,Bn.neck,0.4]
+            :(t<0.55?[Bn.chest,0.5,Bn.spine2,0.5]
+                    :[Bn.spine,0.4,Bn.hips,0.6]);
+      secs.push({y:y,pts:pts,skin:sk,
+        col:i<2?MID:(i>steps-2?LOW:LIT)});
+    }
+    b.loft(secs,LIT,{openTop:true,openBottom:true,uvScale:1.6});
+    /* clasp across the collarbone */
+    b.mat(style==='royal'?'gold':'panel');
+    b.skin(Bn.chest,0.6,Bn.neck,0.4);
+    b.push();b.translate(0,1.462,0.086);
+    b.chamfer(0,0,0,0.120,0.022,0.026,LIT,0.008,{noBand:true});
+    b.sphere(0,0,0.018,0.020,10,8,MID);
+    b.pop();
+  });
+};
+
+Cos.backpack=function(style,build){
+  style=style||'satchel';
+  build=build||'base';
+  return Body.skinPart('back:'+style+':'+build,function(b){
+    b.mat('fabric');
+    b.skin(Bn.spine2,0.6,Bn.chest,0.4);
+    b.push();b.translate(0,1.250,-0.212);
+    b.chamfer(0,0,0,0.220,0.280,0.120,LIT,0.026);
+    b.mat('panel');
+    b.push();b.translate(0,-0.062,0.010);
+    b.chamfer(0,0,0,0.230,0.096,0.130,MID,0.020);b.pop();
+    b.mat('fabric');
+    b.push();b.translate(0,0,0.066);
+    b.chamfer(0,0,0,0.196,0.078,0.018,DARK,0.007,{noBand:true});b.pop();
+    b.pop();
+    /* shoulder straps */
+    for(var s=-1;s<=1;s+=2){
+      b.skin(s>0?Bn.shoulderL:Bn.shoulderR,0.5,Bn.chest,0.5);
+      b.push();b.translate(s*0.082,1.370,-0.020);b.rotate(0.16,0,0);
+      b.chamfer(0,0,0,0.040,0.210,0.140,MID,0.012);b.pop();
+    }
+  });
 };
 
 /* ---------------- auras ----------------
@@ -6724,8 +7367,11 @@ Cos.tool=function(style){
   style=TOOL_BUILD[style]?style:'none';
   return part('tool:'+style,function(b){
     b.mat('blank');
-    /* grip at the origin, shaft running along the hand's -Y */
-    b.push();b.rotate(0,0,-Math.PI/2);
+    /* grip at the origin, shaft running along the hand's -Y.
+       Everything in TOOL_BUILD was measured against the old cartoon
+       hand, which was a third larger than the one it now sits in. */
+    b.push();b.scale(0.82,0.82,0.82);
+    b.rotate(0,0,-Math.PI/2);
     TOOL_BUILD[style](b);
     b.pop();
   },48);
@@ -6809,14 +7455,19 @@ var A={};
    because adding a cosmetic slot should not mean editing the drawer. */
 var SLOTS=[
   /* slot,      bone,        offset,             mirror */
-  ['head',      'head',      [0,0.030,0]],
-  ['eyes',      'head',      [0,0.030,0]],
-  ['iris',      'head',      [0,0.030,0]],
-  ['brows',     'head',      [0,0.030,0]],
-  ['hair',      'head',      [0,0.030,0]],
-  ['hat',       'head',      [0,0.030,0]],
-  ['facial',    'head',      [0,0.030,0]],
-  ['acc',       'head',      [0,0.030,0]],
+  /* The head bone sits at the atlas, 1.545 m, where a head actually
+     pivots. The skull's own centre is 12 cm above that, so everything
+     that rides the head is offset up by exactly that much — which also
+     means the hair and hats authored against the old skull still land
+     on this one. */
+  ['head',      'head',      [0,0.122,0]],
+  ['eyes',      'head',      [0,0.122,0]],
+  ['iris',      'head',      [0,0.122,0]],
+  ['brows',     'head',      [0,0.122,0]],
+  ['hair',      'head',      [0,0.122,0]],
+  ['hat',       'head',      [0,0.122,0]],
+  ['facial',    'head',      [0,0.122,0]],
+  ['acc',       'head',      [0,0.122,0]],
   ['neck',      'neck',      [0,0,0]],
   ['chest',     'chest',     [0,0,0]],
   ['shirt',     'chest',     [0,0,0]],
@@ -6909,6 +7560,10 @@ function Actor(opt){
   this.kit=opt.kit||A.defaultKit(opt.seed||1);
   this.anim=Rig.Anim();
   this.mats=[];
+  /* worldBone * inverseBind for every bone, refilled each frame and
+     handed straight to the skinned draw. One per actor because that is
+     exactly what a skinned draw cannot share. */
+  this.palette=new Float32Array(Rig.NB*16);
   this.root=M.m4();
   this.name=opt.name||'';
   this.visible=true;
@@ -7067,6 +7722,7 @@ Actor.prototype.update=function(dt){
     Rig.rootMatrix(this.root,this.pos,this.facing,pose,this.scale,this.squash);
     Rig.poseMatrices(this.mats,pose,this.root);
   }
+  Rig.skinPalette(this.palette,this.mats);
   /* the pet trails with a spring rather than sticking to a fixed offset */
   if(this.kit.pet&&this.kit.pet.style!=='none'){
     this.petPhase+=dt;
@@ -7079,8 +7735,30 @@ Actor.prototype.update=function(dt){
   return pose;
 };
 
-/* ---------------- batching ---------------- */
+/* ---------------- batching ----------------
+   Two queues, because there are two kinds of thing to draw.
+
+   Rigid parts — a hat, a held tool, a pet — are the same mesh on every
+   character wearing one, so they batch: one draw covers forty hats.
+
+   Skinned parts cannot. A skinned draw is placed by a bone palette,
+   and a palette belongs to one character standing in one pose, so
+   every skinned mesh on every visible actor is its own draw call. At
+   roughly five skinned meshes each and twenty actors on screen that is
+   a hundred draws, against the three hundred the world already costs —
+   the price of a body that bends. */
 var touched=[],touchedSet={};
+var skinJobs=[],skinCount=0;
+function pushSkin(mesh,actor,tint,emis){
+  if(!mesh||!actor.palette)return;
+  var j=skinJobs[skinCount];
+  if(!j)j=skinJobs[skinCount]={mesh:null,pal:null,tint:[0,0,0],emis:0};
+  j.mesh=mesh;j.pal=actor.palette;
+  j.tint[0]=tint[0];j.tint[1]=tint[1];j.tint[2]=tint[2];
+  j.emis=emis||0;
+  skinCount++;
+}
+A.pushSkin=pushSkin;
 function pushInstance(mesh,mat,tint,emis){
   if(!mesh)return;
   if(mesh.instances>=mesh.maxInstances)return;
@@ -7098,6 +7776,7 @@ A.groundAt=null;
 A.beginFrame=function(){
   for(var i=0;i<touched.length;i++)touched[i].instances=0;
   touched.length=0;touchedSet={};
+  skinCount=0;
 };
 
 var _m=M.m4(),_t=M.v3(),_s=M.v3(1,1,1),_off=M.m4(),_tmp=M.m4();
@@ -7143,7 +7822,7 @@ A.submit=function(actor){
      eye is open, so an unblinking crowd costs nothing. */
   if((actor.blink||0)>0.02)
     P(Body.lids(),'head',
-      [headOff[0],headOff[1]+(1-actor.blink)*0.085,headOff[2]],skin);
+      [headOff[0],headOff[1]+(1-actor.blink)*0.030,headOff[2]],skin);
   if(k.hair.style!=='bald')
     P(Body.hair(k.hair.style),'head',headOff,Geo.col3(k.hair.color),0,
       [-lag[0]*0.30,0,lag[1]*0.30]);
@@ -7153,57 +7832,34 @@ A.submit=function(actor){
     P(Body.facial(k.facial.style),'head',headOff,Geo.col3(k.hair.color));
   if(k.acc&&k.acc.style!=='none')
     P(Body.accessory(k.acc.style),'head',headOff,Geo.col3(k.acc.color));
-  P(Body.neck(),'neck',null,skin);
+
+  /* --- the body ---
+     One mesh, one draw, from the collarbone to the toes. What used to
+     be nine rigid parts and eleven joint spheres. */
+  pushSkin(Body.figure(k.build),actor,skin);
 
   /* --- torso --- */
-  P(Body.chest(k.build),'chest',null,skin);
   if(k.shirt.style!=='none')
-    P(Body.shirt(k.shirt.style),'chest',null,Geo.col3(k.shirt.color));
+    pushSkin(Body.shirt(k.shirt.style,k.shirt.sleeve,k.build),actor,
+      Geo.col3(k.shirt.color));
   /* The occupational layer goes on before the cape and after the
      shirt: a coat under a cape, a cape over a coat. */
   if(k.over&&k.over.style!=='none')
-    P(Cos.overlay(k.over.style),'chest',null,Geo.col3(k.over.color));
+    pushSkin(Cos.overlay(k.over.style,k.build),actor,Geo.col3(k.over.color));
   if(k.cape.style!=='none')
-    /* The cape answers to where the body has been. Sign checked by
-       eye: running forward has to throw it back, not wrap it round. */
-    P(Cos.cape(k.cape.style),'chest',null,Geo.col3(k.cape.color),0,
-      [-lag[0],0,lag[1]]);
+    pushSkin(Cos.cape(k.cape.style,k.build),actor,Geo.col3(k.cape.color));
   if(k.back.style!=='none')
-    P(Cos.backpack(k.back.style),'chest',null,Geo.col3(k.back.color));
+    pushSkin(Cos.backpack(k.back.style,k.build),actor,Geo.col3(k.back.color));
   if(k.wings.style!=='none')
     P(Cos.wings(k.wings.style),'chest',null,Geo.col3(k.wings.color),
       k.wings.emis||0);
 
-  /* --- hips and legs --- */
-  P(Body.hips(),'hips',null,skin);
+  /* --- legs and feet --- */
   if(k.pants.style!=='none')
-    P(Body.pants(k.pants.style),'hips',null,Geo.col3(k.pants.color));
-  P(Body.thigh(),'thighL',null,skin);
-  P(Body.thigh(),'thighR',null,skin);
-  if(k.pants.leg&&k.pants.leg!=='none'){
-    P(Body.legwear(k.pants.leg),'thighL',null,Geo.col3(k.pants.color));
-    P(Body.legwear(k.pants.leg),'thighR',null,Geo.col3(k.pants.color));
-    if(k.pants.leg==='long'){
-      P(Body.legwearLower('long'),'shinL',null,Geo.col3(k.pants.color));
-      P(Body.legwearLower('long'),'shinR',null,Geo.col3(k.pants.color));
-    }
-  }
-  P(Body.shin(),'shinL',null,skin);
-  P(Body.shin(),'shinR',null,skin);
-  P(Body.foot(k.shoes.style),'footL',null,Geo.col3(k.shoes.color));
-  P(Body.foot(k.shoes.style),'footR',null,Geo.col3(k.shoes.color));
-
-  /* --- arms --- */
-  P(Body.upperArm(),'armL',null,skin);
-  P(Body.upperArm(),'armR',null,skin);
-  if(k.shirt.sleeve&&k.shirt.sleeve!=='none'){
-    P(Body.sleeve(k.shirt.sleeve),'armL',null,Geo.col3(k.shirt.color));
-    P(Body.sleeve(k.shirt.sleeve),'armR',null,Geo.col3(k.shirt.color));
-  }
-  P(Body.forearm(),'forearmL',null,skin);
-  P(Body.forearm(),'forearmR',null,skin);
-  P(Body.hand(),'handL',null,skin);
-  P(Body.hand(),'handR',null,skin);
+    pushSkin(Body.trousers(k.pants.leg==='shorts'?'shorts':'long',k.build),
+      actor,Geo.col3(k.pants.color));
+  if(k.shoes.style!=='bare')
+    pushSkin(Body.shoes(k.shoes.style,k.build),actor,Geo.col3(k.shoes.color));
 
   /* --- held --- */
   if(k.tool.style!=='none')
@@ -7243,6 +7899,22 @@ A.flush=function(prog){
     GL.drawInstanced(m,m.instances);
   }
   GL.u1i(prog,'uInstanced',0);
+  A.flushSkinned(prog);
+};
+
+/* Both passes call this and neither clears the queue: the colour pass
+   runs after the shadow pass and needs the same jobs. */
+A.flushSkinned=function(prog){
+  if(!skinCount)return;
+  GL.u1i(prog,'uInstanced',0);
+  GL.u1i(prog,'uSkinned',1);
+  for(var i=0;i<skinCount;i++){
+    var j=skinJobs[i];
+    GL.uBones(prog,j.pal);
+    GL.u4f(prog,'uTint',j.tint[0],j.tint[1],j.tint[2],j.emis);
+    GL.draw(j.mesh);
+  }
+  GL.u1i(prog,'uSkinned',0);
 };
 /* The shadow pass needs the same batches without re-submitting, and it
    must not clear them — the colour pass runs afterwards. */
@@ -7255,6 +7927,7 @@ A.flushShadow=function(prog){
     GL.drawInstanced(m,m.instances);
   }
   GL.u1i(prog,'uInstanced',0);
+  A.flushSkinned(prog);
 };
 
 A.touched=function(){return touched;};
