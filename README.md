@@ -70,6 +70,9 @@ weather states riding on top as multipliers.
 | Combat | Six species, one AI state machine, humanoids reusing the player's rig, attacks that wind up before they land |
 | Missions | Eighteen across story, daily and weekly, plus nine achievements, all fed by one event tracker |
 | Trading | Two nine-slot grids, live totals, lock and confirm, and edits refused on a locked offer |
+| Map | The real heightmap rendered at 384×384 with depth-shaded water and a north-west hillshade; a pin per district, `?` until you find it, live NPC dots, and travel |
+| Wardrobe | Fifteen rows of live appearance, applied on the click, on a camera that turns the character three-quarters on to the lens |
+| Outfits | Six named sets priced and granted by the server, charging only for the pieces you are missing |
 | Progression | XP from every activity, six skills on their own curves, so a dedicated angler out-ranks a generalist at fishing without out-levelling them |
 | Interface | Dark premium HUD sized in container units, reusable panels, procedurally drawn item icons cut from the material each item will have in the world |
 | Onboarding | Title, character creation over the live world, and a seven-step checklist that completes when you act, not when you click |
@@ -425,10 +428,17 @@ and at reachable density it reads as dirt on the lawn — and the ink pass
 outlines every blade, so each tuft came back a black speck. Flowers are
 *meant* to be sparse, and an inked flower looks like a drawing of one.
 
-Emotes are on **V**: a wheel with wave, dance, laugh, cheer, clap, point
-and sit. The number row picks from the wheel while it is open and drives
-the hotbar while it is not, and a looping emote yields the moment you
-move.
+Emotes are on **V**: a wheel with wave, dance, laugh, cheer, clap,
+point, shrug and sit — eight, which is a wheel rather than a ring with
+a gap in it. The number row picks from the wheel while it is open and
+drives the hotbar while it is not, and a looping emote yields the
+moment you move. The shrug is built on the clavicles rather than the
+arms, which is the whole difference between a shrug and a character
+presenting two invisible trays: the shoulders lift, the arms come up
+only because the shoulders took them there, and the forearms roll
+outward as the elbows close so the palms end up turned over. Like the
+wave and the clap, it plays from the ribs up over a walk and full-body
+when you are standing.
 
 The two typefaces are the only downloaded asset in the project: Fredoka
 and Nunito, from Google Fonts, both with real fallbacks so the game
@@ -492,6 +502,118 @@ three draws hands every small seed the same person. The kit generator
 now scatters the seed and throws eight draws away before anybody looks
 at it. Twelve residents: eleven shirt colours, nine hairstyles, seven
 skin tones.
+
+### The island, as a map
+
+Growtopia and Club Penguin both do a thing this build was not doing:
+they tell you where you are, and they make somewhere else sound worth
+going. A world you can only learn by walking into it is a world most
+people put down before they find the second district.
+
+So `LH.World.mapImage()` renders the island — the real one, not a
+drawing of it. It reads `Terrain.heights` and `Terrain.mats` at 384×384
+and paints the actual heightmap: water shaded by depth rather than one
+flat blue, because a single blue loses every sandbar and every deep
+channel and that is most of what a harbour map is for; land coloured
+from the material palette so the paved district pads read as paved;
+and a hillshade off the height gradient, lit from the north-west the
+way every printed map since about 1800 has been. It costs about 50 ms
+and is cached until the terrain changes.
+
+On top of it: a pin per district, an unvisited one showing `?` instead
+of its icon, a dot per resident where they are actually standing right
+now, and an arrow for you that points where you are facing. Picking a
+pin opens a card — who is there, what the place is for, and a **Travel
+to** button that fades, drops you 45% of the pad radius in from the
+edge facing the middle, and turns you to look at it.
+
+`W.DISTRICTS` is the table under all of it, and it is honest: seven
+districts are `state:'open'` and two — the garage and the arena — are
+`state:'soon'`, drawn greyed with no travel button, because they are
+not built. A map that promised nine would be a nicer map and a worse
+one.
+
+Walking into a pad raises a banner with the district's name and, the
+first time, the word *Discovered* — 4.2 seconds on a discovery, 2.2 on
+a return.
+
+### The wardrobe, and the line through it
+
+Every appearance choice in the game already existed; you could only
+make it once, on the character screen, before you had seen the world
+the character was going to stand in. The Wardrobe (`O`, or the menu)
+is the same choices, live, from inside the game: skin, build, twelve
+hairstyles, hair colour, facial hair, eyes, what is worn on the face,
+top, sleeves, occupational layer, legs, feet, and two clothing
+colours — fifteen rows, forty-six style chips and forty-seven
+swatches, each one applying to the character standing behind the panel
+the instant it is clicked. A wardrobe you have to confirm is a form.
+
+The line it draws is the one `refreshKit` already implemented and the
+game had never said out loud: **this panel sets your default look, and
+an equipped item overrides the slot it belongs to for as long as you
+wear it.** Some slots have both — hair, the shirt, the occupational
+layer all have a free default here and items in the Store that can
+cover it. Others are items only: hats, capes, wings, backpacks, pets,
+auras. Which is exactly why *Surprise me* rerolls the eleven fields in
+the first group and deliberately does not touch the six in the second:
+handing out a hat would be handing out an item, and `refreshKit` would
+take it back on the next sync.
+
+Two details cost more thought than they look. The panel is pinned to
+the left rather than centred and the scrim drops from 62% to 22% with
+the blur off, because the entire point is watching the change land on
+the character. And opening it puts the camera in a dressing room:
+`LH.Player.dress()` notes the boom's pitch, distance, shoulder offset
+and height, pulls in to 2.9 m at chest level, and turns the character
+to `Cam.yaw + 0.42` radians — three quarters on to the lens, not
+square, because dead-on flattens a face and hides the silhouette of
+everything sitting on the shoulders. Closing the panel puts the four
+numbers back and lets the boom damp out to them, so the pull back is
+how you know you left. Turning the character rather than swinging the
+camera is the deliberate half of that: the yaw is the one thing a
+player owns outright, and taking it away to show them their own face
+would cost more than it bought.
+
+A colour row with nothing highlighted reads as broken, and the kit is
+full of colours the palettes never offered — a shade derived from
+somebody's loud one, a warden's slate grey. Whatever is being worn now
+goes on the front of its row if it is not already in it.
+
+### Outfits
+
+Thirty-one cosmetics sorted by price is a spreadsheet. What makes a
+shop worth opening is somebody having decided which three things go
+together, given the result a name and put one price on it — which is
+the whole of Club Penguin's catalogue and most of what a Growtopia
+player is scrolling for.
+
+`D.SETS` is six of those, drawn entirely from items that already
+existed: **Dockhand** (dock cap, harbour hoodie, satchel — what half
+the harbour is wearing by eight in the morning), **Field Survey**,
+**Nightwing**, **Lumen Warden** (everything on it glows, which is the
+entire point), and two premium ones, **Sovereign** and **Ascendant**.
+15% off a set, 10% on the premium pair. A set is premium only if every
+piece in it is, so a purchase is never half coins and half shards.
+
+The Style aisle leads with the six cards — the three pieces as icons,
+which of them you already own with a tick, the price of the rest —
+and puts the flat grid underneath under *Everything else*.
+
+Pricing is the server's, not the shop's. `buySet` takes a set key and
+nothing else: `D.setPrice` recomputes the total from the table, skips
+the pieces you already hold and charges you only for the rest at the
+set discount, then grants them in one transaction. A client that could
+name its own price would name zero. `wearSet` puts every owned piece
+through the same ownership check a single equip does — the set is a
+convenience, not a bypass.
+
+Which makes the numbers behave: Dockhand's three pieces are 22 coins
+bought separately and 19 as a set; own the cap already and the set
+costs 14 for the other two, not 19 and not 22. Buying it twice is
+refused rather than charged. And a set you cannot afford is refused
+by the server with your purse untouched and nothing in your
+inventory — the client asks, it does not decide.
 
 ### The sky
 
