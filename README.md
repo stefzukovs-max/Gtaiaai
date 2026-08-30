@@ -173,6 +173,54 @@ The scatter band is narrow on purpose. The first pass used one a third
 of a hemisphere wide and turned every face orange; scatter shows at the
 terminator, not across the whole lit side.
 
+### Hair, and the face
+
+Cards, not blobs. Every hairstyle was a cluster of spheres over a lofted
+cap, which is what a hairstyle looks like when it is modelled as a solid
+— and a solid is not what hair is. Real-time hair is strips: a ribbon
+with a width, a taper and a path, laid along the flow of the style,
+forty or eighty of them. `LH.Body` now has a strand engine, and each of
+the twelve styles is a description handed to it: a hairline elevation,
+a length function of azimuth, a droop, a sweep, a curl amplitude and
+frequency. Gathered styles — the bun, the topknot, the ponytail — add a
+bundle on top of the same machinery.
+
+The face is painted rather than tinted flat. A head that is one colour
+everywhere is the clearest single tell of amateur character work: real
+faces are darker in the sockets, redder at the lips, nose and ears,
+cooler along the jaw, lighter across the forehead and cheekbones, and
+none of that comes from geometry. `R.face` paints all of it into the
+head's own cylindrical unwrap — u = 0 at the left ear, 0.25 dead centre,
+v = 0 at the chin — and every value is a multiplier on the character's
+own skin tone, so one map serves every complexion in the palette.
+
+Eyes got the same treatment. A 24 mm eyeball with pupils 63 mm apart, a
+sclera that is warm off-white rather than paper, a dark limbal ring at
+the iris edge, eight faint radial spokes, a collarette around the pupil,
+a caruncle at the inner corner, and lids that cut across the top and
+bottom of the iris — a ring of white all the way round is the classic
+doll eye. Facial hair is strands too: two hundred to five hundred very
+short ones over the jaw, rather than the string of squashed spheres it
+replaces.
+
+The toon dials are off. Cel banding and an ink line around every
+silhouette were most of what made the characters read as a children's
+cartoon, and no amount of work on the geometry underneath survives them.
+
+Four things this cost. `Builder.vert` takes a colour as an `[r,g,b]`
+triple where every other builder call accepts a hex string — passing a
+string writes the characters `'#'`, `'D'`, `'2'` into a `Float32Array`
+as NaN, and a NaN albedo ships as black, so the first head of hair
+rendered as a black box. The ellipsoid standing in for the skull tapered
+to a point at the crown where a real cranium stays broad, so the scalp
+cap sank inside the head everywhere above the ears — fixed by raising
+the horizontal profile to a fractional power. Strand droop and sweep were
+scaled by step length rather than step count, so a three-centimetre crop
+barely bent while a long style folded double on the same number. And
+every hat in the file was authored with its band at y 0.02, which on the
+anatomical head is the eyeline, so they all sat across the eyebrows like
+a blindfold.
+
 ### Gait
 
 A real gait cycle is not symmetric. Stance is about 62 per cent of it,

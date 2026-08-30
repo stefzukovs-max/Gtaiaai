@@ -1877,6 +1877,13 @@ Builder.prototype.loft=function(sections,c,o){
      inward and vanish into the back-face cull. */
   var up=(sections[rings-1].y>=sections[0].y);
   var uvScale=o.uvScale||1;
+  /* `uvV` remaps the section height into 0..1 across the whole loft, so
+     a texture can be painted to fit the thing rather than tiled along
+     it. The head needs this: a face map is one image stretched from
+     chin to crown, not a repeating pattern. */
+  var vLo=o.uvV?o.uvV[0]:0, vHi=o.uvV?o.uvV[1]:0;
+  var vK=o.uvV?1/((vHi-vLo)||1):0;
+  var uOff=o.uvU||0;
   for(j=0;j<rings;j++){
     var S=sections[j],pts=S.pts,cc=S.col?col3(S.col):col;
     if(S.skin)this.skin.apply(this,S.skin);
@@ -1900,7 +1907,9 @@ Builder.prototype.loft=function(sections,c,o){
       var ny=-dr/dy;
       var nx=rx,nz=rz;
       var nl=Math.hypot(nx,ny,nz)||1;
-      this.vert(px,S.y,pz,nx/nl,ny/nl,nz/nl,i/n*uvScale,S.y*uvScale,cc);
+      var uu=i/n*uvScale+uOff;
+      var vvv=o.uvV?((S.y-vLo)*vK):S.y*uvScale;
+      this.vert(px,S.y,pz,nx/nl,ny/nl,nz/nl,uu,vvv,cc);
     }
   }
   /* Wind along the stack before going around the ring: sections from
@@ -2165,6 +2174,95 @@ R.solid=function(lo,hi,grain,seed,oct){
     var c=mixv(L,H,n);
     var g=(M.hash2(u*SZ|0,v*SZ|0,seed*7+3)-0.5)*grain;
     return litv(c,g);
+  };
+};
+
+/* The face map is authored in the head's own cylindrical unwrap:
+   u = 0 at the character's left ear, 0.25 dead centre front, 0.5 at the
+   right ear, 0.75 at the back of the skull; v = 0 at the chin and 1 at
+   the crown. Those are the coordinates LH.Body.head lofts with, so a
+   feature painted at (0.25, 0.212) lands on the mouth. */
+R.face=function(){
+  var BASE=rgb('#F1ECE8');
+  function blob(u,v,cu,cv,ru,rv){
+    var du=(u-cu)/ru, dv=(v-cv)/rv;
+    var d=du*du+dv*dv;
+    return d>=1?0:(1-d)*(1-d);
+  }
+  /* wrap-aware distance, so a feature near u=0 does not tear at the ear */
+  function wrapU(u,cu){var d=u-cu;if(d>0.5)d-=1;if(d<-0.5)d+=1;return d;}
+  function blobW(u,v,cu,cv,ru,rv){
+    var du=wrapU(u,cu)/ru, dv=(v-cv)/rv;
+    var d=du*du+dv*dv;
+    return d>=1?0:(1-d)*(1-d);
+  }
+  var EYE_U=[0.185,0.315], EYE_V=0.446;
+  return function(u,v){
+    /* The paint callback's v runs down the image; the head's v runs up
+       from the chin. One flip here rather than an inverted value in
+       every feature below. */
+    var h=1-v;
+    var c=BASE.slice();
+    /* low-frequency mottling: skin is never one value across a cheek */
+    var mot=tileFbm(u,v,4,613,4)-0.5;
+    c=litv(c,mot*9);
+
+    var i,e;
+    /* --- eye sockets: cooler and darker, deepest at the inner corner */
+    for(i=0;i<2;i++){
+      e=blobW(u,h,EYE_U[i],EYE_V-0.010,0.072,0.088);
+      c=mixv(c,rgb('#A98C84'),e*0.86);
+      /* the crease above the lid */
+      e=blobW(u,h,EYE_U[i],EYE_V+0.052,0.062,0.030);
+      c=mixv(c,rgb('#BE9A8D'),e*0.62);
+      /* a shadow under the lower lid, which is what makes an eye sit in
+         a face rather than on it */
+      e=blobW(u,h,EYE_U[i],EYE_V-0.062,0.058,0.026);
+      c=mixv(c,rgb('#C29A8B'),e*0.52);
+      /* brow shadow. The hair-coloured strands sit on top of this; the
+         shadow is what keeps them from looking stuck on. */
+      e=blobW(u,h,EYE_U[i]+(i?0.012:-0.012),EYE_V+0.145,0.070,0.036);
+      c=mixv(c,rgb('#8E786E'),e*0.62);
+    }
+    /* --- nose: warmer down the ridge, redder at the tip and alae */
+    e=blob(u,h,0.25,0.38,0.028,0.115);
+    c=mixv(c,rgb('#FFF2E9'),e*0.46);
+    e=blob(u,h,0.25,0.312,0.050,0.045);
+    c=mixv(c,rgb('#DE9880'),e*0.58);
+    for(i=0;i<2;i++){
+      e=blob(u,h,0.25+(i?0.030:-0.030),0.300,0.024,0.030);
+      c=mixv(c,rgb('#A87C6C'),e*0.58);
+    }
+    /* --- lips --- */
+    e=blob(u,h,0.25,0.216,0.082,0.046);
+    c=mixv(c,rgb('#BE6A5D'),e*0.88);
+    e=blob(u,h,0.25,0.202,0.070,0.014);
+    c=mixv(c,rgb('#7A3A33'),e*0.88);          /* the mouth line itself */
+    e=blob(u,h,0.25,0.246,0.030,0.014);
+    c=mixv(c,rgb('#FFF2EC'),e*0.30);          /* philtrum highlight    */
+    /* --- cheeks, and the hollow under the cheekbone --- */
+    for(i=0;i<2;i++){
+      e=blobW(u,h,EYE_U[i]+(i?0.055:-0.055),0.320,0.100,0.090);
+      c=mixv(c,rgb('#E19585'),e*0.44);
+      e=blobW(u,h,EYE_U[i]+(i?0.080:-0.080),0.268,0.070,0.070);
+      c=mixv(c,rgb('#B08878'),e*0.42);
+    }
+    /* --- ears: thin, so they carry more blood than anything else --- */
+    for(i=0;i<2;i++){
+      e=blobW(u,h,i?0.5:0.0,0.395,0.075,0.115);
+      c=mixv(c,rgb('#DE8E78'),e*0.58);
+    }
+    /* --- forehead and cheekbone lift --- */
+    e=blob(u,h,0.25,0.760,0.130,0.150);
+    c=mixv(c,rgb('#FFFCFA'),e*0.44);
+    /* --- jaw: cooler, and darker toward the underside --- */
+    e=blob(u,h,0.25,0.075,0.230,0.100);
+    c=mixv(c,rgb('#A99387'),e*0.56);
+    /* --- pores: fine, high-frequency, and only just visible --- */
+    var g=(M.hash2(u*SZ|0,v*SZ|0,911)-0.5)*10;
+    var pore=tileFbm(u,v,60,733,2);
+    c=litv(c,g+(pore-0.5)*7);
+    return c;
   };
 };
 
@@ -2525,6 +2623,14 @@ var LAYERS=[
      fragment shader can recognise it: skin is the one surface in this
      world that should not be cel-banded and should scatter light. */
   ['skin',    R.solid('#F0F0F0','#FFFFFF',7,401,3)],
+  /* The face. Painted rather than tinted flat, because a head that is
+     one colour everywhere is the single clearest tell of amateur
+     character work: real faces are darker in the sockets, redder at the
+     lips, nose and ears, cooler along the jaw and lighter across the
+     forehead and cheekbones, and none of that comes from geometry.
+     Everything here is a multiplier on the character's own skin tone,
+     so it works on every complexion in the palette. */
+  ['face',    R.face()],
   ['fabric',  R.fabric()],
   ['fabricw', R.fabric('#D8C0C6','#FBF2F4',317)],
   ['glass',   R.glass()],
@@ -2828,6 +2934,7 @@ uniform float uSpec;
 // buys a second lighting model without a second shader or a second
 // draw call.
 uniform float uSkinLayer;
+uniform float uFaceLayer;
 uniform float uTime;
 uniform float uAlpha;
 // Lit windows and neon should not blow out at noon. One global scale,
@@ -2892,7 +2999,8 @@ void main(){
   // away are all cheap: light wraps further round it than round cloth,
   // it glows warm at the terminator where light has gone in and come
   // back out, and its highlight is broad and faint rather than tight.
-  float isSkin = 1.0 - step(0.5, abs(vLayer-uSkinLayer));
+  float isSkin = 1.0 - step(0.5, min(abs(vLayer-uSkinLayer),
+                                     abs(vLayer-uFaceLayer)));
   float skinNdl = wrapDiffuse(n,l,0.66);
 
   // Shadow gets banded too. Leaving the PCF gradient smooth under a
@@ -2925,11 +3033,11 @@ void main(){
     // a hemisphere wide and turned every face orange: scatter shows at
     // the terminator, not across the whole lit side.
     float band2 = saturate(1.0-abs(t-0.04)*6.5);
-    col += albedo*uSunCol*vec3(0.17,0.042,0.026)*band2*sh;
+    col += albedo*uSunCol*vec3(0.105,0.026,0.016)*band2*sh;
     // and a little through the thin parts — an ear, a nostril, the
     // edge of a jaw — seen with the sun behind them
     float trans = saturate(dot(-l,v))*saturate(0.35-t)*0.5;
-    col += albedo*uSunCol*vec3(0.26,0.068,0.045)*trans*sh;
+    col += albedo*uSunCol*vec3(0.17,0.044,0.029)*trans*sh;
   }
 
   // Rim light picked out of the sky colour: separates a character from
@@ -3521,11 +3629,12 @@ R.scene={
      tonemap. All three at zero gives back the old stylized-realism
      look exactly, which is what makes this a setting and not a
      rewrite. */
-  /* Down from 1.0 with the realistic bodies: hard three-band cel on a
-     human face turns a cheek into a poster. The world keeps most of its
-     drawn quality at this setting, and skin opts out of banding
-     entirely in the shader regardless. */
-  toon:0.55,
+  /* Off. Cel banding and an ink line around every silhouette are what
+     made the characters read as a children's cartoon, and no amount of
+     work on the geometry underneath survives them. What is left is
+     stylised realism: saturated palette, strong key light, soft
+     shadows, no drawn edges. */
+  toon:0.0,
   /* Occlusion strength, the sample radius in metres, and a depth bias
      that stops a surface shadowing itself. */
   /* Weather the world can feel. `wind` is a direction times a
@@ -3536,21 +3645,26 @@ R.scene={
   cloudAmt:0.34,
   cloudDrift:[0,0],
   ao:1.0,
-  aoRadius:1.05,
-  aoBias:0.018,
-  aoStrength:2.2,
-  aoPower:1.45,
+  /* Radius in metres. A metre is the right scale for the crease where a
+     wall meets a floor and completely the wrong one for an eye socket:
+     at 1.05 every sample on a face landed on other parts of the same
+     face and the occlusion cancelled out. Faces need it at the scale of
+     a nostril. */
+  aoRadius:0.42,
+  aoBias:0.010,
+  aoStrength:2.6,
+  aoPower:1.30,
   debugView:0,
   fxaa:1,
   /* Kernel radius in shadow texels. Two is a hard edge with the
      aliasing filtered off; four is a soft one that starts to leak
      under thin geometry. */
-  shadowSoft:2.6,
-  outline:1.05,
+  shadowSoft:2.0,
+  outline:0.0,
   inkWidth:1.35,
   inkNear:24,
   inkFar:150,
-  saturation:0.12
+  saturation:0.06
 };
 
 R.vp=M.m4();R.view=M.m4();R.proj=M.m4();R.invVP=M.m4();R.invProj=M.m4();
@@ -3655,6 +3769,7 @@ function bindSceneUniforms(p){
   GL.u1f(p,'uExposure',s.exposure);
   GL.u1f(p,'uToon',s.toon);
   GL.u1f(p,'uSkinLayer',LH.Tex.layer('skin'));
+  GL.u1f(p,'uFaceLayer',LH.Tex.layer('face'));
   GL.u3v(p,'uWind',s.wind);
   GL.u1f(p,'uWindTime',s.windTime);
   GL.u2f(p,'uLeaf',LH.Tex.layer('foliage'),LH.Tex.layer('foliagep'));
@@ -5261,9 +5376,17 @@ function dent(pts,dx,dz,amt,width){
   return pts;
 }
 
+/* Warm and cool shifts on the skin tint, for the sculpted features the
+   face map cannot reach. Multiplied by the character's own skin colour,
+   so #F6C9B8 means "this part is redder than the rest of the face"
+   rather than any particular pink. */
+var WARM='#FFF3EC', BLUSH='#F6C9B8', LIPU='#E8A091', LIPL='#F0AB9B',
+    LIPLINE='#8E5348', NOSTRIL='#7A5348', EARC='#F5C0AB',
+    LIDU='#F2DED6', LIDL='#F7E6DD', FOLD='#DFC0B4', TEAR='#F0B3A4';
+
 Body.head=function(){
   return part('head',function(b){
-    b.mat('skin');
+    b.mat('face');
     b.push();b.scale(P.headScale,P.headScale,P.headScale);
     var n=22;
     function R(y,hw,hf,hb,ex,col){
@@ -5289,8 +5412,8 @@ Body.head=function(){
        them. The eye direction is 34 degrees off centre, which is where
        an eye actually sits on a head this wide. */
     var ex=Math.sin(0.60),ez=Math.cos(0.60);
-    dent(secs[5].pts, ex,ez,0.030,0.42);dent(secs[5].pts,-ex,ez,0.030,0.42);
-    dent(secs[6].pts, ex,ez,0.055,0.44);dent(secs[6].pts,-ex,ez,0.055,0.44);
+    dent(secs[5].pts, ex,ez,0.044,0.44);dent(secs[5].pts,-ex,ez,0.044,0.44);
+    dent(secs[6].pts, ex,ez,0.078,0.46);dent(secs[6].pts,-ex,ez,0.078,0.46);
     dent(secs[7].pts, ex,ez,0.038,0.44);dent(secs[7].pts,-ex,ez,0.038,0.44);
     /* temples, pulled in just above the eyeline */
     dent(secs[8].pts, 1,0.10,0.045,0.30);dent(secs[8].pts,-1,0.10,0.045,0.30);
@@ -5300,7 +5423,10 @@ Body.head=function(){
     dent(secs[2].pts, 0.90,0.20,-0.030,0.34);dent(secs[2].pts,-0.90,0.20,-0.030,0.34);
     /* brow ridge forward, and the glabella between the brows */
     dent(secs[8].pts, ex,ez,-0.050,0.40);dent(secs[8].pts,-ex,ez,-0.050,0.40);
-    b.loft(secs,LIT,{openBottom:false});
+    /* The face map is one image from chin to crown, so the loft has to
+       stretch it over that range rather than tile it. */
+    b.loft(secs,LIT,{openBottom:false,uvV:[-0.118,0.158]});
+    b.mat('skin');
 
     /* ---- nose ----
        Bridge, dorsum, tip, alae. Built as its own little loft rather
@@ -5314,18 +5440,18 @@ Body.head=function(){
       {y: 0.006,pts:headSect(0.016,0.109,0.020,12,2.2)},
       {y: 0.030,pts:headSect(0.014,0.103,0.020,12,2.2)},
       {y: 0.050,pts:headSect(0.014,0.100,0.020,12,2.2),col:MID}
-    ],LIT,{openTop:true,openBottom:true});
+    ],WARM,{openTop:true,openBottom:true});
     b.pop();
     /* alae, and the septum between them */
     for(var e=-1;e<=1;e+=2){
       b.push();b.translate(e*0.021,-0.033,0.096);b.rotate(0,e*0.30,0);
       b.scale(0.80,0.86,1.0);
-      b.sphere(0,0,0,0.017,9,7,LIT);b.pop();
+      b.sphere(0,0,0,0.017,9,7,BLUSH);b.pop();
       b.push();b.translate(e*0.017,-0.041,0.100);
-      b.sphere(0,0,0,0.007,6,5,DEEP);b.pop();   /* nostril */
+      b.sphere(0,0,0,0.007,6,5,NOSTRIL);b.pop();   /* nostril */
     }
     b.push();b.translate(0,-0.038,0.106);
-    b.sphere(0,0,0,0.010,8,6,LIT,{squash:0.8});b.pop();
+    b.sphere(0,0,0,0.010,8,6,BLUSH,{squash:0.8});b.pop();
 
     /* ---- mouth ----
        A vermilion border that stands a little proud, a groove between
@@ -5335,19 +5461,28 @@ Body.head=function(){
        shaded rather than coloured: a touch darker than the cheek, which
        is what a vermilion border does under a light from above. A face
        whose mouth is exactly the value of its chin has no mouth. */
-    b.push();b.translate(0,-0.052,0.080);b.rotate(-0.08,0,0);
-    b.scale(1.0,0.46,0.40);
-    b.sphere(0,0,0,0.026,12,9,MID);b.pop();
-    b.push();b.translate(0,-0.064,0.079);b.rotate(0.10,0,0);
-    b.scale(1.0,0.54,0.42);
-    b.sphere(0,0,0,0.024,12,9,MID);b.pop();
-    b.push();b.translate(0,-0.058,0.092);
-    b.chamfer(0,0,0,0.040,0.003,0.006,DARK,0.0015,{noBand:true});b.pop();
+    /* Lips have to stand about six millimetres proud of the face plane,
+       which sits at z 0.089 here. The previous pass pulled them back to
+       0.080 and they vanished into the skull — a face with no mouth. */
+    b.push();b.translate(0,-0.051,0.085);b.rotate(-0.10,0,0);
+    b.scale(1.0,0.44,0.52);
+    b.sphere(0,0,0,0.027,14,10,LIPU);b.pop();
+    b.push();b.translate(0,-0.065,0.084);b.rotate(0.12,0,0);
+    b.scale(1.0,0.52,0.54);
+    b.sphere(0,0,0,0.025,14,10,LIPL);b.pop();
+    /* the opening between them, and the corners, which are what stop a
+       mouth reading as two sausages */
+    b.push();b.translate(0,-0.058,0.098);
+    b.chamfer(0,0,0,0.044,0.0035,0.007,LIPLINE,0.0015,{noBand:true});b.pop();
+    for(var lc=-1;lc<=1;lc+=2){
+      b.push();b.translate(lc*0.024,-0.059,0.086);
+      b.sphere(0,0,0,0.005,6,5,LIPLINE,{squash:0.7});b.pop();
+    }
     /* philtrum: two ridges, not a groove — a groove needs geometry the
        other way round and reads as a scar */
     for(var q=-1;q<=1;q+=2){
-      b.push();b.translate(q*0.005,-0.045,0.093);
-      b.chamfer(0,0,0,0.0035,0.012,0.005,MID,0.001,{noBand:true});b.pop();
+      b.push();b.translate(q*0.005,-0.044,0.094);
+      b.chamfer(0,0,0,0.0035,0.012,0.005,WARM,0.001,{noBand:true});b.pop();
     }
 
     /* ---- eyelids ----
@@ -5356,16 +5491,26 @@ Body.head=function(){
        head rather than to Body.eyes because they are skin: they take
        the skin tint, and an eye part tinted white cannot. */
     for(var k=-1;k<=1;k+=2){
-      b.push();b.translate(k*0.0370,0.0165,0.0805);b.rotate(-0.18,k*-0.22,0);
-      b.scale(1.10,1.00,0.62);
-      b.sphere(0,0,0,0.0176,12,9,LIT);b.pop();
-      b.push();b.translate(k*0.0370,-0.0135,0.0800);b.rotate(0.22,k*-0.22,0);
-      b.scale(1.06,0.86,0.58);
-      b.sphere(0,0,0,0.0172,12,9,LIT);b.pop();
+      /* The opening between the lids is about eight millimetres on a
+         twenty-four millimetre eyeball, and the iris is thirteen — so
+         the lids cut across the top and bottom of the iris and sclera
+         shows only either side of it. Leaving a ring of white all the
+         way round is the classic doll eye. */
+      b.push();b.translate(k*0.0370,0.0258,0.0805);b.rotate(-0.18,k*-0.22,0);
+      b.scale(1.10,1.00,0.66);
+      b.sphere(0,0,0,0.0182,12,9,LIDU);b.pop();
+      b.push();b.translate(k*0.0370,-0.0160,0.0800);b.rotate(0.22,k*-0.22,0);
+      b.scale(1.06,0.86,0.62);
+      b.sphere(0,0,0,0.0176,12,9,LIDL);b.pop();
       /* the fold above the lid, which is what gives an eye an age */
-      b.push();b.translate(k*0.0370,0.0248,0.0770);b.rotate(-0.34,k*-0.22,0);
+      b.push();b.translate(k*0.0370,0.0348,0.0770);b.rotate(-0.34,k*-0.22,0);
       b.scale(1.10,0.50,0.70);
-      b.sphere(0,0,0,0.0168,10,8,MID);b.pop();
+      b.sphere(0,0,0,0.0168,10,8,FOLD);b.pop();
+      /* the caruncle at the inner corner. Three millimetres of pink
+         that nobody consciously notices and everybody notices the
+         absence of. */
+      b.push();b.translate(k*0.0182,0.0000,0.0836);
+      b.sphere(0,0,0,0.0042,6,5,TEAR,{squash:1.15});b.pop();
     }
 
     /* ---- ears ----
@@ -5376,17 +5521,17 @@ Body.head=function(){
       b.push();b.translate(s2*0.077,-0.008,-0.014);
       b.rotate(0,s2*0.34,s2*0.12);
       b.scale(0.40,1.0,1.0);
-      b.sphere(0,0,0,0.030,10,8,LIT,{squash:1.28});
+      b.sphere(0,0,0,0.030,10,8,EARC,{squash:1.28});
       /* helix */
       for(var h=0;h<8;h++){
         var a=(-0.9+h/7*4.2);
         b.push();
         b.translate(0.030,Math.cos(a)*0.030,Math.sin(a)*0.026);
-        b.sphere(0,0,0,0.0085,5,4,LIT);
+        b.sphere(0,0,0,0.0085,5,4,EARC);
         b.pop();
       }
       b.push();b.translate(0.010,-0.034,0.002);
-      b.sphere(0,0,0,0.013,8,6,LIT,{squash:1.1});b.pop();
+      b.sphere(0,0,0,0.013,8,6,EARC,{squash:1.1});b.pop();
       b.pop();
     }
     b.pop();
@@ -5400,40 +5545,74 @@ Body.head=function(){
    they replace, and the single biggest reason the old head read as a
    doll. The socket is already a dent in the skull, so the eye only
    has to fill it. */
-var EYE_X=0.0370, EYE_Y=0.0040, EYE_Z=0.0830, EYE_R=0.0145, EYE_TILT=-0.22;
+var EYE_X=0.0370, EYE_Y=0.0040, EYE_Z=0.0788, EYE_R=0.0145, EYE_TILT=-0.22;
 
 Body.eyes=function(){
   return part('eyes',function(b){
     b.mat('blank');
     b.push();b.scale(P.headScale,P.headScale,P.headScale);
     for(var s=-1;s<=1;s+=2){
-      /* the socket's shadow, then the white */
-      b.push();b.translate(s*EYE_X,EYE_Y,EYE_Z-0.006);b.rotate(0,s*EYE_TILT,0);
-      b.sphere(0,0,0,EYE_R*1.32,10,8,DEEP,{squash:0.80});
+      /* the socket behind, so nothing shows through the gap */
+      b.push();b.translate(s*EYE_X,EYE_Y,EYE_Z-0.008);b.rotate(0,s*EYE_TILT,0);
+      b.sphere(0,0,0,EYE_R*1.30,10,8,'#2A2428',{squash:0.80});
       b.pop();
+      /* The sclera is not white. Photographic white on an eyeball is
+         the fastest way to make a face look like a doll: it is a warm
+         off-white, darker at the top where the lid shades it and where
+         it curves away. */
       b.push();b.translate(s*EYE_X,EYE_Y,EYE_Z);b.rotate(0,s*EYE_TILT,0);
-      b.sphere(0,0,0,EYE_R,12,9,LIT);
+      b.sphere(0,0,0,EYE_R,14,11,'#E8E2DC');
       b.pop();
-      /* lash line: the upper lid's edge, always present. Without it an
-         eye reads as a bead sitting on the face. */
-      b.push();b.translate(s*EYE_X,EYE_Y+0.0105,EYE_Z+0.006);
-      b.rotate(-0.30,s*EYE_TILT,s*0.10);
-      b.chamfer(0,0,0,0.030,0.0035,0.010,DEEP,0.0012,{noBand:true});
+      b.push();b.translate(s*EYE_X,EYE_Y+0.0055,EYE_Z-0.0015);
+      b.rotate(-0.20,s*EYE_TILT,0);
+      b.scale(1.0,0.60,0.92);
+      b.sphere(0,0,0,EYE_R*1.02,12,9,'#B9ACA6');   /* lid shadow */
+      b.pop();
+      /* a hint of red at the inner corner */
+      b.push();b.translate(s*(EYE_X-0.0110),EYE_Y-0.0016,EYE_Z+0.0060);
+      b.sphere(0,0,0,0.0038,6,5,'#C99080',{squash:1.1});b.pop();
+      /* lash line: the upper lid's edge. Without it an eye reads as a
+         bead sitting on the face. */
+      b.push();b.translate(s*EYE_X,EYE_Y+0.0072,EYE_Z+0.0068);
+      b.rotate(-0.24,s*EYE_TILT,s*0.10);
+      b.chamfer(0,0,0,0.030,0.0030,0.009,'#241C1C',0.0011,{noBand:true});
+      b.pop();
+      /* Corneal highlights. They live here rather than with the iris
+         because this part is tinted white and the iris part is tinted
+         with the eye colour, and a specular is white whatever colour
+         the eye is. */
+      b.push();b.translate(s*EYE_X,EYE_Y,EYE_Z);b.rotate(0,s*EYE_TILT,0);
+      b.sphere(-0.0030,0.0038,EYE_R*0.93,0.0018,6,5,'#FFFFFF');
+      b.sphere(0.0028,-0.0032,EYE_R*0.93,0.0009,5,4,'#DCE4EC');
       b.pop();
     }
     b.pop();
   });
 };
+/* The iris carries the player's eye colour. Five concentric layers,
+   because an iris is not a disc: it has a dark limbal ring at its
+   edge, a lighter body, a darker collarette around the pupil, and the
+   pupil itself is a hole rather than a dot. */
 Body.iris=function(){
   return part('iris',function(b){
     b.mat('blank');
     b.push();b.scale(P.headScale,P.headScale,P.headScale);
     for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*EYE_X,EYE_Y,EYE_Z+EYE_R*0.86);
+      b.push();b.translate(s*EYE_X,EYE_Y,EYE_Z+EYE_R*0.80);
       b.rotate(0,s*EYE_TILT,0);
-      b.sphere(0,0,0,0.0062,10,8,LIT,{squash:0.72});
-      b.sphere(0,0,0.0022,0.0029,8,6,'#0A0A0C');
-      b.sphere(0.0022,0.0026,0.0038,0.0014,6,5,'#FFFFFF');
+      b.sphere(0,0,0,0.0068,14,10,'#2F3038',{squash:0.55});     /* limbal */
+      b.sphere(0,0,0.0009,0.0059,14,10,'#FFFFFF',{squash:0.50});/* body   */
+      /* radial striation: eight faint spokes, which is what stops a
+         flat disc of colour reading as a printed dot */
+      for(var k=0;k<8;k++){
+        var a=k/8*M.TAU;
+        b.push();b.translate(Math.cos(a)*0.0036,Math.sin(a)*0.0036,0.0013);
+        b.rotate(0,0,a);
+        b.chamfer(0,0,0,0.0034,0.0009,0.0006,'#B9BCC8',0.0002,{noBand:true});
+        b.pop();
+      }
+      b.sphere(0,0,0.0016,0.0034,10,8,'#5A5C68',{squash:0.5}); /* collarette */
+      b.sphere(0,0,0.0022,0.0026,10,8,'#08080A',{squash:0.5}); /* pupil  */
       b.pop();
     }
     b.pop();
@@ -5444,10 +5623,10 @@ Body.lids=function(){
     b.mat('skin');
     b.push();b.scale(P.headScale,P.headScale,P.headScale);
     for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*EYE_X,EYE_Y+0.010,EYE_Z-0.001);
+      b.push();b.translate(s*EYE_X,EYE_Y+0.008,EYE_Z-0.001);
       b.rotate(0.12,s*EYE_TILT,0);
-      b.scale(1.0,1.0,0.62);
-      b.sphere(0,0,0,EYE_R*1.22,12,9,LIT);
+      b.scale(1.0,1.0,0.66);
+      b.sphere(0,0,0,EYE_R*1.24,12,9,LIT);
       b.pop();
     }
     b.pop();
@@ -5459,16 +5638,23 @@ Body.brows=function(){
     b.mat('blank');
     b.push();b.scale(P.headScale,P.headScale,P.headScale);
     for(var s=-1;s<=1;s+=2){
-      /* Three tapered lobes along an arc: a brow is thickest at the
-         inner end and thins as it turns down at the temple, and a
-         single straight bar reads as a sticker. */
-      for(var i=0;i<3;i++){
-        var t=i/2;
+      /* Eleven fine strands along an arc rather than three lobes. A
+         brow is a field of hairs that starts thick and vertical at the
+         inner end and turns flat and thin as it runs out over the
+         temple, and three fat blobs cannot say any of that. */
+      for(var i=0;i<11;i++){
+        var t=i/10;
+        var arc=Math.sin(t*2.2)*0.010;
+        var x=EYE_X-0.020+t*0.046;
+        var y=0.0330+arc-t*t*0.010;
+        var z=EYE_Z+0.0175-t*0.0130-Math.abs(t-0.35)*0.004;
+        var len=0.0092-t*0.0030;
+        var thick=(0.0044-t*0.0018)*(1-0.35*Math.abs(t-0.25));
         b.push();
-        b.translate(s*(EYE_X-0.013+t*0.028),0.0345-t*t*0.007,EYE_Z+0.014-t*0.010);
-        b.rotate(0,s*(EYE_TILT-t*0.30),s*(0.10-t*0.34));
-        b.scale(1.0,0.52,0.62);
-        b.sphere(0,0,0,0.0125-t*0.0026,8,6,i?MID:LIT);
+        b.translate(s*x,y,z);
+        b.rotate(0.30-t*0.55,s*(EYE_TILT-t*0.34),s*(0.34-t*0.92));
+        b.scale(1.0,1.0,0.55);
+        b.cylinder(0,0,0,thick,thick*0.35,len,5,i%2?LIT:MID);
         b.pop();
       }
     }
@@ -5545,11 +5731,17 @@ Body.girth=girth;
    gets. Everything between them is interpolation. */
 function torsoRings(g,n,inf){
   inf=inf||0;
-  function r(y,hw,hf,hb,ex,skin){
-    return {y:y,pts:sect(hw*g+inf,hf*g+inf,hb*g+inf,n,ex),skin:skin};
+  /* The last argument is a value, not a colour: everything here is
+     painted in greys and multiplied by the character's skin tone. The
+     dark rings are the places light does not reach — under the jaw, in
+     the armpit, at the groin — which SSAO at any usable radius cannot
+     find on a body this size. */
+  function r(y,hw,hf,hb,ex,skin,col){
+    return {y:y,pts:sect(hw*g+inf,hf*g+inf,hb*g+inf,n,ex),skin:skin,
+            col:col||null};
   }
   return [
-    r(0.795,0.106,0.080,0.088,2.3,[B.hips,1]),
+    r(0.795,0.106,0.080,0.088,2.3,[B.hips,1],DARK),
     r(0.872,0.140,0.100,0.110,2.4,[B.hips,1]),
     r(0.955,0.160,0.112,0.120,2.4,[B.hips,1]),
     /* Glutes and the small of the back are added below, as dents with
@@ -5563,8 +5755,8 @@ function torsoRings(g,n,inf){
     r(1.260,0.160,0.115,0.108,2.5,[B.spine2,0.50,B.chest,0.50]),
     r(1.325,0.164,0.118,0.110,2.6,[B.chest,1]),
     r(1.395,0.156,0.110,0.106,2.6,[B.chest,1]),
-    r(1.440,0.140,0.096,0.100,2.5,[B.chest,0.80,B.neck,0.20]),
-    r(1.490,0.106,0.072,0.080,2.3,[B.chest,0.50,B.neck,0.50]),
+    r(1.440,0.140,0.096,0.100,2.5,[B.chest,0.80,B.neck,0.20],LOW),
+    r(1.490,0.106,0.072,0.080,2.3,[B.chest,0.50,B.neck,0.50],MID),
     r(1.524,0.072,0.054,0.058,2.1,[B.neck,1])
   ];
 }
@@ -5632,7 +5824,7 @@ function armRings(side){
     [0.930,0.036,0.031,0.033,2.1,[F,1]],
     [1.010,0.042,0.037,0.041,2.2,[F,1]],
     [1.082,0.046,0.041,0.046,2.2,[A,0.15,F,0.85]],   /* forearm belly*/
-    [1.122,0.040,0.038,0.041,2.1,[A,0.50,F,0.50]],   /* elbow        */
+    [1.122,0.040,0.038,0.041,2.1,[A,0.50,F,0.50],MID],/* elbow       */
     [1.162,0.042,0.040,0.041,2.1,[A,0.75,F,0.25]],
     [1.250,0.047,0.045,0.046,2.1,[A,1]],             /* biceps       */
     [1.340,0.052,0.050,0.050,2.1,[A,1]],
@@ -5658,13 +5850,13 @@ function legRings(side){
     [0.340,0.056,0.043,0.070,2.2,[S,1]],
     [0.420,0.059,0.044,0.074,2.2,[S,1]],             /* calf belly   */
     [0.480,0.058,0.048,0.066,2.2,[S,1]],
-    [0.515,0.058,0.052,0.056,2.2,[T,0.45,S,0.55]],   /* knee         */
+    [0.515,0.058,0.052,0.056,2.2,[T,0.45,S,0.55],MID],/* knee        */
     [0.552,0.061,0.056,0.058,2.2,[T,0.72,S,0.28]],
     [0.600,0.066,0.060,0.062,2.2,[T,1]],
     [0.700,0.076,0.070,0.074,2.3,[T,1]],
     [0.820,0.087,0.080,0.090,2.4,[T,1]],
     [0.912,0.095,0.086,0.100,2.4,[T,1]],             /* upper thigh  */
-    [0.968,0.092,0.082,0.096,2.4,[B.hips,0.45,T,0.55]],
+    [0.968,0.092,0.082,0.096,2.4,[B.hips,0.45,T,0.55],DARK],
     [1.030,0.040,0.036,0.040,2.2,[B.hips,1]]         /* cap, buried  */
   ];
 }
@@ -5761,8 +5953,8 @@ Body.figure=function(build){
     /* neck: its own short loft so the head can turn on it */
     b.push();
     b.loft([
-      {y:1.500,pts:sect(0.066*g,0.052*g,0.056*g,12,2.1),skin:[B.neck,1]},
-      {y:1.545,pts:sect(0.060*g,0.048*g,0.052*g,12,2.0),skin:[B.neck,0.70,B.head,0.30]},
+      {y:1.500,pts:sect(0.066*g,0.052*g,0.056*g,12,2.1),skin:[B.neck,1],col:LOW},
+      {y:1.545,pts:sect(0.060*g,0.048*g,0.052*g,12,2.0),skin:[B.neck,0.70,B.head,0.30],col:MID},
       {y:1.588,pts:sect(0.057*g,0.048*g,0.049*g,12,2.0),skin:[B.head,1]},
       {y:1.612,pts:sect(0.050*g,0.044*g,0.044*g,12,2.0),skin:[B.head,1]}
     ],LIT,{});
@@ -5932,223 +6124,323 @@ Body.shoes=function(style,build){
 Body.SHOES=['shoe','boot','bare'];
 
 /* ---------------- hair ---------------- */
+/* ---------------- hair ----------------
+   Cards, not blobs.
+
+   Every hairstyle here used to be a cluster of spheres over a lofted
+   cap, which is what a hairstyle looks like when it is modelled as a
+   solid — and a solid is not what hair is. Real-time hair is strips: a
+   ribbon with a width, a taper and a path, laid along the flow of the
+   style, forty or eighty of them. Forty ribbons read as hair. Eleven
+   spheres read as a helmet, and that helmet was the single most amateur
+   thing on screen.
+
+   Everything below is authored in the head's own space against an
+   ellipsoid that stands in for the skull. A card starts on that
+   surface, leaves along the tangent, and is bent downward by gravity
+   and sideways by whatever the style's flow says as it goes.
+
+   `az` runs 0 at the face and +/-PI at the back of the head; `el` runs
+   0 at the equator through the ears and PI/2 at the crown. */
+var SKULL={cx:0,cy:0.020,cz:-0.004,rx:0.092,ry:0.140,rz:0.108};
+
+/* A plain ellipsoid tapers to a point at the crown and the skull it is
+   standing in for does not — a real cranium is still eight centimetres
+   across four fifths of the way up. Raising the horizontal profile to a
+   fractional power keeps it broad up there, which is the difference
+   between a cap of hair that sits on the head and one that sinks into
+   it everywhere above the ears. */
+function skullCe(el){
+  var c=Math.cos(el);
+  return (c<0?-1:1)*Math.pow(Math.abs(c),0.42);
+}
+function scalpPt(az,el,r){
+  r=r===undefined?1:r;
+  var ce=skullCe(el);
+  return [SKULL.cx+Math.sin(az)*ce*SKULL.rx*r,
+          SKULL.cy+Math.sin(el)*SKULL.ry*r,
+          SKULL.cz+Math.cos(az)*ce*SKULL.rz*r];
+}
+function scalpNormal(az,el){
+  var ce=skullCe(el);
+  var n=[Math.sin(az)*ce/SKULL.rx,Math.sin(el)*0.85/SKULL.ry,
+         Math.cos(az)*ce/SKULL.rz];
+  var l=Math.hypot(n[0],n[1],n[2])||1;
+  return [n[0]/l,n[1]/l,n[2]/l];
+}
+function nrm3(v){var l=Math.hypot(v[0],v[1],v[2])||1;return [v[0]/l,v[1]/l,v[2]/l];}
+function crs(a,c){return [a[1]*c[2]-a[2]*c[1],a[2]*c[0]-a[0]*c[2],a[0]*c[1]-a[1]*c[0]];}
+
+/* A ribbon through a list of points. Four-sided cross-section, because
+   a card with no thickness disappears the moment it turns edge-on to
+   the camera and a head of hair does that constantly. */
+/* Builder.vert takes a colour as an [r,g,b] triple, not as the hex
+   string every other builder call accepts — the primitives convert it
+   for you and this one does not, because it is the layer underneath
+   them. Passing a string writes the characters '#', 'D', '2' into a
+   Float32Array as NaN, and a NaN albedo ships as black. */
+var HCOL={};
+function hcol(c){return HCOL[c]||(HCOL[c]=Geo.col3(c));}
+
+function ribbon(b,pts,ws,th,cols){
+  var n=pts.length,base=b.n,i,k;
+  for(i=0;i<n;i++){
+    var p=pts[i];
+    var prev=pts[Math.max(0,i-1)],next=pts[Math.min(n-1,i+1)];
+    var T=nrm3([next[0]-prev[0],next[1]-prev[1],next[2]-prev[2]]);
+    /* radial: away from the skull, so the card lies flat on the head */
+    var R=nrm3([(p[0]-SKULL.cx)/SKULL.rx,(p[1]-SKULL.cy)/SKULL.ry,
+                (p[2]-SKULL.cz)/SKULL.rz]);
+    /* A card leaving the head straight outward has its tangent parallel
+       to the radial, and the cross product of two parallel vectors is
+       zero — which propagates NaN through every vertex after it and
+       ships the whole strand as a black quad. Fall back to a world axis
+       when that happens. */
+    var S=crs(T,R);
+    if(Math.hypot(S[0],S[1],S[2])<1e-5){
+      S=crs(T,[0,1,0]);
+      if(Math.hypot(S[0],S[1],S[2])<1e-5)S=crs(T,[1,0,0]);
+    }
+    S=nrm3(S);
+    R=nrm3(crs(S,T));
+    var w=ws[i],t2=th*(0.45+0.55*ws[i]/(ws[0]||1));
+    var c=hcol(cols[Math.min(cols.length-1,i)]);
+    var quad=[[ w, t2],[-w, t2],[-w,-t2],[ w,-t2]];
+    for(k=0;k<4;k++){
+      var q=quad[k];
+      var vx=p[0]+S[0]*q[0]+R[0]*q[1];
+      var vy=p[1]+S[1]*q[0]+R[1]*q[1];
+      var vz=p[2]+S[2]*q[0]+R[2]*q[1];
+      var nn=nrm3([S[0]*(q[0]>0?1:-1)*0.55+R[0]*(q[1]>0?1:-1)*0.85,
+                   S[1]*(q[0]>0?1:-1)*0.55+R[1]*(q[1]>0?1:-1)*0.85,
+                   S[2]*(q[0]>0?1:-1)*0.55+R[2]*(q[1]>0?1:-1)*0.85]);
+      b.vert(vx,vy,vz,nn[0],nn[1],nn[2],k*0.25,i/(n-1),c);
+    }
+  }
+  for(i=0;i<n-1;i++)for(k=0;k<4;k++){
+    var a0=base+i*4+k, b0=base+i*4+(k+1)%4;
+    var c0=base+(i+1)*4+(k+1)%4, d0=base+(i+1)*4+k;
+    b.quad(a0,b0,c0,d0);
+  }
+  /* close the tip so a strand ends in a point rather than a pipe */
+  var last=pts[n-1];
+  var tip=b.vert(last[0],last[1],last[2],0,-1,0,0.5,1,hcol(cols[cols.length-1]));
+  for(k=0;k<4;k++)
+    b.tri(tip,base+(n-1)*4+(k+1)%4,base+(n-1)*4+k);
+}
+
+/* One card: integrate a path from the scalp outward, bending it down
+   under gravity and sideways under the style's flow. */
+function hairCard(b,o){
+  var seg=o.seg||7, pts=[], ws=[], cols=[];
+  var p=o.start.slice(), d=nrm3(o.dir.slice());
+  var step=o.len/seg;
+  var side=nrm3(o.side||[1,0,0]);
+  for(var i=0;i<=seg;i++){
+    var t=i/seg;
+    pts.push(p.slice());
+    ws.push(o.w*(1-(o.taper===undefined?0.72:o.taper)*t*t));
+    cols.push(t<0.22?MID:(t>0.80?LOW:LIT));
+    /* Gravity and flow are applied per step, not per metre. Scaling
+       them by the step length meant a three-centimetre crop barely bent
+       while a long style folded double on the same droop number, and
+       every style had to be retuned against its own length. */
+    var ds=1/seg;
+    d[1]-=(o.droop||0)*ds*(0.35+t);
+    if(o.sweep){d[0]+=o.sweep[0]*ds;d[1]+=o.sweep[1]*ds;d[2]+=o.sweep[2]*ds;}
+    if(o.curl){
+      var ph=t*(o.curlFreq||3)*M.TAU+(o.curlPh||0);
+      var k=o.curl*ds*0.55*Math.cos(ph);
+      d[0]+=side[0]*k;d[1]+=side[1]*k;d[2]+=side[2]*k;
+    }
+    d=nrm3(d);
+    p[0]+=d[0]*step;p[1]+=d[1]*step;p[2]+=d[2]*step;
+  }
+  ribbon(b,pts,ws,o.th||0.005,cols);
+}
+
+/* The scalp cap: a thin shell just outside the skull, so nothing shows
+   between the cards. Cut off below the hairline. */
+function scalpCap(b,cfg){
+  var n=22,secs=[],rows=10;
+  for(var i=0;i<=rows;i++){
+    var el=M.lerp(cfg.elLo-0.10,1.565,i/rows);
+    var pts=[];
+    for(var k=0;k<n;k++){
+      var az=(k/n)*M.TAU;
+      /* The hairline is higher at the face than at the nape. A ring has
+         one height, so the shell cannot simply stop at it — instead the
+         points in front of the hairline are pulled inside the skull,
+         where the head hides them, and the shell emerges along exactly
+         the line we want. */
+      var f=Math.cos(az)*0.5+0.5;                 /* 1 at the face     */
+      var lim=M.lerp(cfg.elLo,cfg.elFront,f*f);
+      var r=el<lim?0.90:1.062;
+      if(el>=lim&&el<lim+0.12)r=M.lerp(0.90,1.062,(el-lim)/0.12);
+      var q=scalpPt(az,el,r);
+      pts.push([q[0],q[2]]);
+    }
+    secs.push({y:scalpPt(0,el,1.0)[1],pts:pts});
+  }
+  /* Dark, not mid: what shows between strands is the shadow under
+     them, and a bright scalp reads as a bald patch. */
+  b.loft(secs,LOW,{openBottom:true});
+}
+
+/* A whole head of hair from one description. */
+function scalpHair(b,cfg){
+  scalpCap(b,cfg);
+  var rng=M.rng(cfg.seed||7);
+  for(var i=0;i<10;i++)rng();
+  var rows=cfg.rows||6, per=cfg.per||16;
+  for(var r=0;r<rows;r++){
+    var rt=(r+0.5)/rows;
+    for(var k=0;k<per;k++){
+      var az=((k+ (r%2)*0.5)/per)*M.TAU;
+      var f=Math.cos(az)*0.5+0.5;
+      var lim=M.lerp(cfg.elLo,cfg.elFront,f*f);
+      var el=M.lerp(lim,1.50,rt);
+      var start=scalpPt(az,el,1.064);
+      var nrmv=scalpNormal(az,el);
+      /* leave along the surface, running away from the crown */
+      var down=nrm3([scalpPt(az,el-0.22,1.064)[0]-start[0],
+                     scalpPt(az,el-0.22,1.064)[1]-start[1],
+                     scalpPt(az,el-0.22,1.064)[2]-start[2]]);
+      var dir=nrm3([down[0]+nrmv[0]*(cfg.lift||0.35),
+                    down[1]+nrmv[1]*(cfg.lift||0.35),
+                    down[2]+nrmv[2]*(cfg.lift||0.35)]);
+      var jit=(rng()-0.5);
+      var len=cfg.len(az,el,rng)* (1+jit*0.16);
+      hairCard(b,{
+        start:start,dir:dir,side:nrmv,len:len,
+        w:(cfg.w||0.014)*(0.85+rng()*0.30),
+        th:cfg.th||0.005,
+        taper:cfg.taper===undefined?0.72:cfg.taper,
+        droop:cfg.droop||0,
+        sweep:cfg.sweep?[cfg.sweep[0],cfg.sweep[1],cfg.sweep[2]]:null,
+        curl:cfg.curl||0,curlFreq:cfg.curlFreq||3,curlPh:rng()*6.28,
+        seg:cfg.seg||7
+      });
+    }
+  }
+}
+
+/* A gathered bundle — a bun, a topknot, the head of a ponytail. */
+function bundle(b,centre,radius,count,len,dir,droop,seed){
+  var rng=M.rng(seed||3);
+  for(var i=0;i<count;i++){
+    var a=i/count*M.TAU;
+    var st=[centre[0]+Math.cos(a)*radius*0.5,
+            centre[1]+Math.sin(a)*radius*0.5,centre[2]];
+    hairCard(b,{start:st,dir:nrm3([dir[0]+Math.cos(a)*0.6,
+      dir[1]+Math.sin(a)*0.6,dir[2]]),side:[0,0,1],
+      len:len*(0.7+rng()*0.6),w:0.011,th:0.005,taper:0.55,
+      droop:droop,curl:0.8,curlFreq:1.4,curlPh:rng()*6.28,seg:6});
+  }
+}
+
 var HAIR_BUILD={
   crop:function(b){
-    /* The cap starts above the eyebrows. It cannot simply be a taller
-       ring, because the same ring that covers the nape at the back
-       would cut across the face at the front. */
-    b.loft([
-      {y: 0.026,pts:Geo.roundRect(0.180,0.192,0.084,14)},
-      {y: 0.062,pts:Geo.roundRect(0.192,0.202,0.090,14)},
-      {y: 0.104,pts:Geo.roundRect(0.186,0.196,0.086,14)},
-      {y: 0.138,pts:Geo.roundRect(0.150,0.160,0.072,14)},
-      {y: 0.162,pts:Geo.roundRect(0.080,0.086,0.038,14)}
-    ],LIT,{openBottom:true});
-    /* Back and sides, dropped to the nape. The front half of each ring
-       is pulled back behind the ears so it never crosses the face. */
-    var back=[];
-    for(var i=0;i<4;i++){
-      var t=i/3, y=-0.062+t*0.096;
-      var pts=Geo.roundRect(0.176+t*0.014,0.190+t*0.012,0.082,14);
-      for(var j=0;j<pts.length;j++)
-        if(pts[j][1]>-0.010)pts[j][1]=-0.010-Math.max(0,pts[j][1])*0.16;
-      back.push({y:y,pts:pts});
-    }
-    b.loft(back,LIT,{openTop:true,openBottom:true});
-    /* A fringe swept off a parting. Spheres, not slabs — a flat plank
-       at the hairline reads as a headband bolted to the forehead. */
-    var sweep=[[0.052,0.076,0.058,0.062,0.26],[0.012,0.084,0.066,0.058,0.20],
-               [-0.030,0.082,0.062,0.054,-0.18],[-0.066,0.072,0.050,0.046,-0.30]];
-    for(var f=0;f<sweep.length;f++){
-      var S=sweep[f];
-      b.push();b.translate(S[0],S[1],S[2]);b.rotate(0.30,S[4],S[4]*0.7);
-      b.scale(1.15,0.52,1.0);
-      b.sphere(0,0,0,S[3],9,7,MID);b.pop();
-    }
+    scalpHair(b,{elLo:-0.42,elFront:0.56,rows:8,per:28,seed:11,
+      len:function(){return 0.036;},w:0.0095,th:0.0050,droop:0.9,lift:0.26,
+      sweep:[0,0.10,-0.30]});
   },
   swept:function(b){
-    HAIR_BUILD.crop(b);
-    /* volume pushed back and up on one side */
-    b.push();b.translate(0.014,0.126,-0.024);b.rotate(-0.20,0.10,0.12);
-    b.sphere(0,0,0,0.104,12,9,LIT,{squash:0.68});b.pop();
-    b.push();b.translate(-0.078,0.100,0.020);b.rotate(0,0,-0.42);
-    b.sphere(0,0,0,0.058,10,8,MID,{squash:1.2});b.pop();
+    scalpHair(b,{elLo:-0.40,elFront:0.50,rows:8,per:28,seed:23,
+      len:function(az,el){return 0.056+Math.max(0,Math.cos(az))*0.032;},
+      w:0.0100,th:0.0052,droop:1.1,lift:0.38,sweep:[0.9,0.25,-0.2]});
   },
   long:function(b){
-    HAIR_BUILD.crop(b);
-    /* two curtains down the back, tapering and flaring out */
-    b.push();b.translate(0,0.020,-0.060);
-    b.loft([
-      {y:-0.300,pts:Geo.roundRect(0.170,0.120,0.055,12)},
-      {y:-0.190,pts:Geo.roundRect(0.208,0.140,0.062,12)},
-      {y:-0.070,pts:Geo.roundRect(0.216,0.156,0.068,12)},
-      {y: 0.040,pts:Geo.roundRect(0.200,0.170,0.070,12)}
-    ],LIT,{openTop:true});
-    b.pop();
-    for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*0.096,-0.060,0.032);b.rotate(0,0,s*0.10);
-      b.chamfer(0,0,0,0.052,0.230,0.070,MID,0.024);b.pop();
-    }
+    scalpHair(b,{elLo:-0.62,elFront:0.54,rows:8,per:30,seed:31,
+      len:function(az,el){
+        var back=(1-Math.cos(az))*0.5;              /* 1 at the nape */
+        return 0.055+back*0.30+Math.max(0,-Math.sin(el))*0.05;},
+      sweep:[0,0.05,-0.30],
+      w:0.0110,th:0.0055,droop:2.1,lift:0.20,taper:0.60,seg:9});
   },
   bun:function(b){
-    HAIR_BUILD.crop(b);
-    b.push();b.translate(0,0.156,-0.078);
-    b.sphere(0,0,0,0.078,12,9,LIT,{squash:0.92});
-    b.sphere(0.034,0.020,0.020,0.040,10,8,MID);b.pop();
+    scalpHair(b,{elLo:-0.30,elFront:0.60,rows:7,per:28,seed:41,
+      len:function(az){return 0.046+(1-Math.cos(az))*0.5*0.034;},
+      w:0.0095,th:0.0046,droop:0.6,lift:0.10,sweep:[0,0.28,-0.95]});
+    var c=scalpPt(Math.PI,0.95,1.12);
+    bundle(b,[c[0],c[1]+0.010,c[2]],0.052,16,0.070,[0,0.25,-1],0.9,5);
   },
   spiked:function(b){
-    HAIR_BUILD.crop(b);
-    var rng=M.rng(41);
-    for(var i=0;i<11;i++){
-      var a=rng()*M.TAU,r=0.02+rng()*0.088;
-      var x=Math.cos(a)*r,z=Math.sin(a)*r*1.05;
-      b.push();
-      b.translate(x,0.128+rng()*0.02,z);
-      b.rotate(z*2.6,0,-x*2.6);
-      b.cylinder(0,0.040,0,0.028,0.002,0.090,6,i%2?LIT:MID);
-      b.pop();
-    }
+    scalpHair(b,{elLo:-0.38,elFront:0.52,rows:7,per:24,seed:53,
+      len:function(){return 0.048;},
+      w:0.0090,th:0.0055,droop:-0.9,lift:1.25,taper:0.88,seg:5});
   },
   braids:function(b){
-    HAIR_BUILD.crop(b);
+    scalpHair(b,{elLo:-0.34,elFront:0.56,rows:6,per:26,seed:61,
+      len:function(){return 0.034;},w:0.0095,th:0.0046,droop:0.6,lift:0.10,
+      sweep:[0,0.14,-0.75]});
     for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*0.094,0.020,-0.010);
-      for(var i=0;i<5;i++){
-        b.push();
-        b.translate(s*i*0.010,-0.060*i,0.004*i);
-        b.sphere(0,0,0,0.042-i*0.004,9,7,i%2?LIT:MID,{squash:0.9});
-        b.pop();
-      }
-      b.pop();
+      var st=scalpPt(s*1.35,0.28,1.06);
+      for(var i=0;i<3;i++)
+        hairCard(b,{start:[st[0],st[1],st[2]],dir:[s*0.35,-0.9,0.1],
+          side:[0,0,1],len:0.26,w:0.019,th:0.012,taper:0.45,droop:1.4,
+          curl:1.9,curlFreq:4.5,curlPh:i*2.1,seg:10});
     }
   },
-  /* Locs. Each one is a stack of beads with its own slight lean, so
-     the rope reads as hanging rather than as a drilled peg. The lean
-     is a function of where the loc leaves the skull — strands at the
-     back fall straight, strands at the temple fall outward. */
   locs:function(b){
-    HAIR_BUILD.crop(b);
-    var rng=M.rng(73);
-    for(var i=0;i<16;i++){
-      var a=(i/16)*M.TAU;
-      /* Geo.roundRect takes full width and depth while Geo.circle takes
-         a radius, so the cap above reaches 0.090 and not 0.180. Every
-         number here is a radius against that. */
-      var rx=0.094,rz=0.100;
-      /* skip the front third: locs do not grow across a face */
-      var fz=Math.cos(a);
-      if(fz>0.45)continue;
-      var x=Math.sin(a)*rx, z=fz*rz;
-      var lean=0.10+rng()*0.10;
-      b.push();b.translate(x,0.052,z);
-      var n=5+((rng()*3)|0);
-      for(var j=0;j<n;j++){
-        b.push();
-        b.translate(x*lean*j*0.30,-0.062*j,z*lean*j*0.30);
-        b.sphere(0,0,0,0.026-j*0.0020,7,6,j%2?LIT:MID,{squash:1.12});
-        b.pop();
-      }
-      b.pop();
-    }
+    scalpHair(b,{elLo:-0.44,elFront:0.62,rows:4,per:14,seed:73,
+      len:function(az){return 0.15+(1-Math.cos(az))*0.5*0.10;},
+      w:0.0135,th:0.0125,droop:2.4,lift:0.10,taper:0.30,seg:9,
+      curl:0.5,curlFreq:2.5,sweep:[0,0.10,-0.45]});
   },
-  /* Undercut. The whole read is the hard line between the shaved band
-     and the mass on top, so the band is a separate darker ring rather
-     than a shade of the same loft — a gradient there loses the edge. */
   undercut:function(b){
-    b.loft([
-      {y:-0.020,pts:Geo.roundRect(0.184,0.196,0.086,14)},
-      {y: 0.048,pts:Geo.roundRect(0.190,0.202,0.088,14)}
-    ],DEEP,{openTop:true,openBottom:true});
-    b.loft([
-      {y:0.048,pts:Geo.roundRect(0.190,0.202,0.088,14)},
-      {y:0.096,pts:Geo.roundRect(0.196,0.208,0.092,14)},
-      {y:0.146,pts:Geo.roundRect(0.176,0.188,0.082,14)},
-      {y:0.176,pts:Geo.roundRect(0.096,0.102,0.046,14)}
-    ],LIT,{openBottom:true});
-    /* the mass is pushed to one side and forward, which is what makes
-       an undercut look styled instead of merely short */
-    b.push();b.translate(0.018,0.136,0.018);b.rotate(-0.18,0,0.16);
-    b.scale(1.0,0.60,1.06);
-    b.sphere(0,0,0,0.104,12,9,LIT);b.pop();
+    /* the shaved band is its own short cap, and the mass on top starts
+       above it — the hard line between the two is the whole style */
+    scalpHair(b,{elLo:-0.44,elFront:0.30,rows:3,per:28,seed:83,
+      len:function(){return 0.010;},w:0.0085,th:0.0030,droop:0.4,lift:0.1});
+    scalpHair(b,{elLo:0.28,elFront:0.58,rows:7,per:26,seed:84,
+      len:function(az,el){return 0.066+Math.max(0,Math.cos(az))*0.028;},
+      w:0.0105,th:0.0055,droop:0.9,lift:0.50,sweep:[0.85,0.30,-0.25]});
   },
   ponytail:function(b){
-    HAIR_BUILD.crop(b);
-    /* the gather, then the tail, which swings out before it drops */
-    b.push();b.translate(0,0.090,-0.118);
-    b.sphere(0,0,0,0.052,10,8,MID,{squash:0.86});
-    b.push();b.translate(0,-0.006,-0.020);
-    b.loft([
-      {y: 0.010,pts:Geo.circle(0.042,10)},
-      {y:-0.100,pts:Geo.circle(0.058,10)},
-      {y:-0.230,pts:Geo.circle(0.050,10)},
-      {y:-0.330,pts:Geo.circle(0.022,10)}
-    ],LIT,{});
+    scalpHair(b,{elLo:-0.34,elFront:0.58,rows:7,per:28,seed:97,
+      len:function(az){return 0.048+(1-Math.cos(az))*0.5*0.038;},
+      w:0.0095,th:0.0046,droop:0.7,lift:0.10,sweep:[0,0.20,-1.00]});
+    var c=scalpPt(Math.PI,0.62,1.10);
+    /* the tie, then the tail */
+    b.push();b.translate(c[0],c[1],c[2]);
+    b.loft([{y:-0.012,pts:Geo.circle(0.024,10)},
+            {y: 0.012,pts:Geo.circle(0.024,10)}],DEEP,
+           {openTop:true,openBottom:true});
     b.pop();
-    /* the tie: a band a shade darker, because a tail with no tie reads
-       as a growth rather than a hairstyle */
-    b.push();b.translate(0,-0.020,-0.016);
-    b.loft([
-      {y:0,     pts:Geo.circle(0.048,10)},
-      {y:0.026, pts:Geo.circle(0.048,10)}
-    ],DEEP,{openTop:true,openBottom:true});
-    b.pop();
-    b.pop();
-  },
-  /* Afro. A shell of overlapping spheres on a hemisphere, seeded so it
-     is the same shape every time the part is rebuilt. */
-  afro:function(b){
-    var rng=M.rng(211);
-    b.push();b.translate(0,0.074,-0.006);
-    for(var i=0;i<46;i++){
-      var u=rng()*M.TAU, v=Math.acos(1-rng()*1.52);
-      var r=0.126+rng()*0.018;
-      var x=Math.sin(v)*Math.cos(u)*r;
-      var y=Math.cos(v)*r*0.92;
-      var z=Math.sin(v)*Math.sin(u)*r*1.05;
-      if(z>0.05&&y<0.010)continue;      /* no puffs across the face */
-      b.push();b.translate(x,y,z);
-      b.sphere(0,0,0,0.052+rng()*0.012,8,6,i%3?LIT:MID);
-      b.pop();
+    for(var i=0;i<14;i++){
+      var a=i/14*M.TAU;
+      hairCard(b,{start:[c[0]+Math.cos(a)*0.014,c[1]+Math.sin(a)*0.014,c[2]],
+        dir:[Math.cos(a)*0.25,-0.35,-0.9],side:[1,0,0],
+        len:0.24,w:0.013,th:0.006,taper:0.62,droop:1.9,
+        curl:0.7,curlFreq:1.8,curlPh:a,seg:9});
     }
-    b.pop();
-    b.loft([
-      {y:0.004,pts:Geo.roundRect(0.180,0.192,0.084,14)},
-      {y:0.090,pts:Geo.roundRect(0.192,0.202,0.088,14)}
-    ],MID,{openTop:true,openBottom:true});
+  },
+  afro:function(b){
+    scalpHair(b,{elLo:-0.30,elFront:0.40,rows:8,per:30,seed:107,
+      len:function(){return 0.052;},
+      w:0.0105,th:0.0085,droop:0.20,lift:0.85,taper:0.30,seg:7,
+      curl:4.2,curlFreq:5.5});
   },
   curls:function(b){
-    HAIR_BUILD.crop(b);
-    var rng=M.rng(157);
-    for(var i=0;i<22;i++){
-      var a=rng()*M.TAU, r=rng();
-      var x=Math.sin(a)*(0.024+r*0.070);
-      var z=Math.cos(a)*(0.026+r*0.076);
-      if(z>0.060&&x<0.036&&x>-0.036)continue;
-      b.push();
-      b.translate(x,0.104+rng()*0.052,z);
-      b.rotate(rng()*0.6,rng()*M.TAU,rng()*0.6);
-      b.sphere(0,0,0,0.034+rng()*0.014,8,6,i%2?LIT:MID,{squash:0.86});
-      b.pop();
-    }
+    scalpHair(b,{elLo:-0.40,elFront:0.44,rows:8,per:28,seed:113,
+      len:function(){return 0.060;},
+      w:0.0105,th:0.0075,droop:0.6,lift:0.60,taper:0.45,seg:8,
+      curl:3.0,curlFreq:4.2});
   },
   topknot:function(b){
-    /* shaved at the sides, gathered high — the silhouette is a column
-       above a narrow skull, which reads from a long way off */
-    b.loft([
-      {y:-0.010,pts:Geo.roundRect(0.182,0.194,0.086,14)},
-      {y: 0.070,pts:Geo.roundRect(0.188,0.200,0.088,14)}
-    ],DEEP,{openTop:true,openBottom:true});
-    b.push();b.translate(0,0.114,-0.008);
-    b.scale(0.80,1.0,0.92);
-    b.sphere(0,0,0,0.112,12,9,LIT,{squash:0.62});b.pop();
-    b.push();b.translate(0,0.176,-0.014);
-    b.loft([
-      {y:0,    pts:Geo.circle(0.036,10)},
-      {y:0.030,pts:Geo.circle(0.030,10)}
-    ],DEEP,{openTop:true,openBottom:true});
-    b.sphere(0,0.076,0,0.056,10,8,LIT,{squash:0.92});
-    b.sphere(0.024,0.104,0.018,0.030,8,6,MID);
+    scalpHair(b,{elLo:-0.40,elFront:0.20,rows:3,per:28,seed:127,
+      len:function(){return 0.011;},w:0.0085,th:0.0030,droop:0.3,lift:0.1});
+    scalpHair(b,{elLo:0.55,elFront:0.72,rows:4,per:20,seed:128,
+      len:function(){return 0.052;},w:0.0100,th:0.0046,droop:0.2,lift:0.35,
+      sweep:[0,0.9,-0.2]});
+    var c=scalpPt(0.35,1.36,1.16);
+    b.push();b.translate(c[0],c[1],c[2]);
+    b.loft([{y:-0.010,pts:Geo.circle(0.020,10)},
+            {y: 0.010,pts:Geo.circle(0.020,10)}],DEEP,
+           {openTop:true,openBottom:true});
     b.pop();
+    bundle(b,[c[0],c[1]+0.014,c[2]],0.038,12,0.052,[0,1,-0.15],0.5,9);
   },
   bald:function(b){}
 };
@@ -6164,10 +6456,14 @@ Body.hair=function(style){
   style=HAIR_BUILD[style]?style:'crop';
   return part('hair:'+style,function(b){
     b.mat('blank');
-    b.push();b.scale(HEAD_FIT[0],HEAD_FIT[1],HEAD_FIT[2]);
+    /* Hats keep the 1.085 stand-off because they were authored against
+       a reference skull. Hair does not: every card here is placed on
+       the skull ellipsoid itself, so scaling it out again would lift
+       the whole head of hair off the scalp by seven millimetres. */
+    b.push();b.scale(P.headScale,P.headScale,P.headScale);
     HAIR_BUILD[style](b);
     b.pop();
-  });
+  },160);
 };
 
 /* ---------------- headwear ---------------- */
@@ -6326,11 +6622,11 @@ var HAT_BUILD={
      only emissive part, so it still reads in the quarry shadow. */
   hardhat:function(b){
     b.loft([
-      {y:0.006,pts:Geo.roundRect(0.212,0.220,0.100,16)},
-      {y:0.070,pts:Geo.roundRect(0.208,0.216,0.098,16)},
-      {y:0.132,pts:Geo.roundRect(0.184,0.192,0.086,16)},
-      {y:0.178,pts:Geo.roundRect(0.118,0.124,0.056,16)},
-      {y:0.198,pts:Geo.roundRect(0.052,0.056,0.026,16)}
+      {y:-0.010,pts:Geo.roundRect(0.222,0.230,0.104,16)},
+      {y: 0.060,pts:Geo.roundRect(0.220,0.228,0.104,16)},
+      {y: 0.130,pts:Geo.roundRect(0.198,0.206,0.092,16)},
+      {y: 0.180,pts:Geo.roundRect(0.128,0.134,0.060,16)},
+      {y: 0.202,pts:Geo.roundRect(0.056,0.060,0.028,16)}
     ],LIT,{openBottom:true});
     /* the crown rib, and a shorter one either side */
     b.push();b.translate(0,0.176,-0.006);
@@ -6342,8 +6638,8 @@ var HAT_BUILD={
     /* brim, wider at the front than the back */
     b.push();b.translate(0,0.014,0.024);
     b.loft([
-      {y:0,     pts:Geo.circle(0.150,18,1.0,1.16)},
-      {y:0.020, pts:Geo.circle(0.146,18,1.0,1.16)}
+      {y:0,     pts:Geo.circle(0.132,18,1.0,1.16)},
+      {y:0.020, pts:Geo.circle(0.128,18,1.0,1.16)}
     ],MID,{});
     b.pop();
     b.mat('panel');
@@ -6409,7 +6705,14 @@ Body.hat=function(style){
   style=HAT_BUILD[style]?style:'none';
   return part('hat:'+style,function(b){
     b.mat('blank');
-    b.push();b.scale(HEAD_FIT[0],HEAD_FIT[1],HEAD_FIT[2]);
+    /* Every hat in this file was authored with its band at y 0.02,
+       which on the anatomical head is the eyeline — so they all sat
+       across the eyebrows like a blindfold. The band belongs at the
+       hairline, five and a half centimetres up. The 0.88 is the same
+       correction in width: a brim authored against the old skull came
+       out half a metre across on this one. */
+    b.push();b.translate(0,0.030,0);
+    b.scale(HEAD_FIT[0]*0.94,HEAD_FIT[1]*0.94,HEAD_FIT[2]*0.94);
     HAT_BUILD[style](b);
     b.pop();
   });
@@ -6424,68 +6727,89 @@ Body.hat=function(style){
    is given full widths: the jaw reaches x 0.063, the cheek 0.083, the
    eyeline 0.093, and the face plane sits at about z 0.104. Everything
    below is measured against those four numbers. */
+/* The lower face, as its own small ellipsoid. The skull one is too
+   generous below the ears — a jaw tapers and a cranium does not — and
+   facial hair sitting a centimetre off the chin reads as a beard drawn
+   on a balloon. */
+var JAW={cx:0,cy:-0.020,cz:0.006,rx:0.080,ry:0.106,rz:0.098};
+function jawPt(az,y,out){
+  var t=M.clamp((y-JAW.cy)/JAW.ry,-1,1);
+  var ce=Math.sqrt(Math.max(0,1-t*t));
+  return [JAW.cx+Math.sin(az)*ce*JAW.rx,
+          y,
+          JAW.cz+Math.cos(az)*ce*JAW.rz];
+}
+function jawNrm(az,y){
+  var t=M.clamp((y-JAW.cy)/JAW.ry,-1,1);
+  var ce=Math.sqrt(Math.max(0,1-t*t));
+  var n=[Math.sin(az)*ce/JAW.rx,t/JAW.ry*0.55,Math.cos(az)*ce/JAW.rz];
+  var l=Math.hypot(n[0],n[1],n[2])||1;
+  return [n[0]/l,n[1]/l,n[2]/l];
+}
+
+/* A field of short strands over part of the face. Facial hair used to
+   be a string of squashed spheres along the jaw, which read exactly as
+   what it was — a string of squashed spheres along a jaw. Hair is
+   strands at every scale, and stubble is just very short ones. */
+function whiskers(b,cfg){
+  var rng=M.rng(cfg.seed||5);
+  for(var i=0;i<12;i++)rng();
+  for(var i2=0;i2<cfg.count;i2++){
+    var az=cfg.az0+(cfg.az1-cfg.az0)*rng();
+    var y=cfg.y0+(cfg.y1-cfg.y0)*rng();
+    if(cfg.mask&&!cfg.mask(az,y))continue;
+    var p=jawPt(az,y);
+    var n=jawNrm(az,y);
+    var t=(y-cfg.y0)/((cfg.y1-cfg.y0)||1);
+    var len=cfg.len*(0.65+rng()*0.7)*(cfg.lenAt?cfg.lenAt(az,y):1);
+    var d=[n[0]*0.55+(rng()-0.5)*0.30,
+           n[1]*0.55-cfg.droop,
+           n[2]*0.55+(rng()-0.5)*0.20];
+    var l=Math.hypot(d[0],d[1],d[2])||1;
+    var seg=len>0.016?4:2;
+    var pts=[],ws=[],cols=[];
+    var q=[p[0]+n[0]*0.001,p[1]+n[1]*0.001,p[2]+n[2]*0.001];
+    for(var k=0;k<=seg;k++){
+      pts.push(q.slice());
+      ws.push(cfg.w*(1-0.65*k/seg));
+      cols.push(k===0?MID:(k===seg?LOW:LIT));
+      q=[q[0]+d[0]/l*len/seg,q[1]+d[1]/l*len/seg,q[2]+d[2]/l*len/seg];
+    }
+    ribbon(b,pts,ws,cfg.w*0.75,cols);
+  }
+}
+
 var FACE_BUILD={
   stubble:function(b){
-    /* A thin shell hugging the jaw. Squashed hard and kept close to the
-       surface: stubble that stands off the face reads as a mask. */
-    var pts=[[0,-0.100,0.062],[0.032,-0.094,0.058],[-0.032,-0.094,0.058],
-             [0.058,-0.078,0.044],[-0.058,-0.078,0.044],
-             [0.076,-0.058,0.018],[-0.076,-0.058,0.018],
-             [0.044,-0.062,0.070],[-0.044,-0.062,0.070]];
-    for(var i=0;i<pts.length;i++){
-      b.push();b.translate(pts[i][0],pts[i][1],pts[i][2]);
-      b.scale(1.25,0.72,0.55);
-      b.sphere(0,0,0,0.032,8,6,MID);
-      b.pop();
-    }
-    b.push();b.translate(0,-0.046,0.086);b.scale(1.5,0.5,0.5);
-    b.sphere(0,0,0,0.026,8,6,MID);b.pop();
+    whiskers(b,{seed:17,count:260,az0:-1.50,az1:1.50,y0:-0.118,y1:-0.030,
+      len:0.0050,w:0.0018,droop:0.35,
+      mask:function(az,y){
+        /* not on the lips, and thinning up the cheek */
+        if(Math.abs(az)<0.42&&y>-0.075&&y<-0.040)return false;
+        return true;}});
+    whiskers(b,{seed:19,count:70,az0:-0.42,az1:0.42,y0:-0.046,y1:-0.032,
+      len:0.0045,w:0.0016,droop:0.25});
   },
   moustache:function(b){
-    b.push();b.translate(0,-0.044,0.092);b.rotate(0.10,0,0);
-    b.scale(1.0,0.62,0.70);
-    b.sphere(0,0,0,0.028,10,8,LIT);
-    for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*0.024,-0.004,-0.004);b.rotate(0,0,s*0.5);
-      b.sphere(0,0,0,0.021,8,6,MID,{squash:0.8});
-      b.push();b.translate(s*0.019,0.008,0);
-      b.sphere(0,0,0,0.014,8,6,LIT,{squash:0.8});b.pop();
-      b.pop();
-    }
-    b.pop();
+    whiskers(b,{seed:23,count:130,az0:-0.46,az1:0.46,y0:-0.052,y1:-0.034,
+      len:0.011,w:0.0021,droop:0.60,
+      lenAt:function(az){return 1+Math.abs(az)*0.9;}});
   },
   goatee:function(b){
     FACE_BUILD.moustache(b);
-    b.push();b.translate(0,-0.086,0.062);b.rotate(-0.18,0,0);
-    b.loft([
-      {y: 0.030,pts:Geo.roundRect(0.062,0.050,0.020,10)},
-      {y:-0.012,pts:Geo.roundRect(0.072,0.058,0.024,10)},
-      {y:-0.062,pts:Geo.roundRect(0.048,0.042,0.016,10)}
-    ],LIT,{});
-    b.pop();
+    whiskers(b,{seed:29,count:190,az0:-0.44,az1:0.44,y0:-0.124,y1:-0.062,
+      len:0.017,w:0.0022,droop:0.85,
+      mask:function(az,y){return !(y>-0.074&&Math.abs(az)<0.30);}});
   },
   beard:function(b){
     FACE_BUILD.moustache(b);
-    /* An arc from ear to ear, each lobe leaning outward with its
-       distance from the chin, so the mass hangs instead of clamping. */
-    for(var i=0;i<9;i++){
-      var t=(i/8)*2-1;                 /* -1 left ear .. +1 right ear */
-      var a=t*1.16;
-      var x=Math.sin(a)*0.080;
-      var z=Math.cos(a)*0.078-0.010;
-      var drop=0.086-Math.abs(t)*0.052;
-      b.push();
-      b.translate(x,-0.078-drop*0.5,z);
-      b.rotate(0,-a,0);
-      b.scale(1.0,1.24,0.86);
-      b.sphere(0,0,0,0.038,9,7,i%2?LIT:MID);
-      b.pop();
-    }
-    b.push();b.translate(0,-0.150,0.046);
-    b.scale(1.0,1.30,0.90);
-    b.sphere(0,0,0,0.038,10,8,LIT);b.pop();
-    b.push();b.translate(0,-0.190,0.038);
-    b.sphere(0,0,0,0.026,8,6,MID,{squash:1.2});b.pop();
+    whiskers(b,{seed:31,count:520,az0:-1.42,az1:1.42,y0:-0.132,y1:-0.028,
+      len:0.019,w:0.0023,droop:0.95,
+      lenAt:function(az,y){return 0.5+1.1*(1-Math.abs(az)/1.5)+(y<-0.09?0.5:0);},
+      mask:function(az,y){
+        if(Math.abs(az)<0.44&&y>-0.074&&y<-0.038)return false;
+        if(y>-0.050&&Math.abs(az)<1.05)return false;
+        return true;}});
   },
   none:function(b){}
 };
@@ -6517,10 +6841,12 @@ var ACC_BUILD={
     b.mat('panel');
     for(var s=-1;s<=1;s+=2){
       b.push();b.translate(s*0.038,0.004,0.101);b.rotate(0,s*-0.20,0);
-      ringOf(b,0.027,14,0.0055,LIT);
-      b.mat('glass');
-      b.push();b.translate(0,0,-0.005);
-      b.sphere(0,0,0,0.025,10,8,MID,{squash:0.10});b.pop();
+      ringOf(b,0.027,14,0.0042,LIT);
+      /* Glass, not a lens cap. The first version put a dark disc in each
+         rim and the character came out wearing two black holes. */
+      b.mat('glass',0.10);
+      b.push();b.translate(0,0,-0.004);
+      b.sphere(0,0,0,0.024,10,8,'#FFFFFF',{squash:0.06});b.pop();
       b.mat('panel');
       /* temple arm, back past the ear */
       b.push();b.translate(s*0.048,0.006,-0.026);b.rotate(0,s*0.30,0);
@@ -6561,9 +6887,9 @@ var ACC_BUILD={
   },
   eyepatch:function(b){
     b.mat('fabric');
-    b.push();b.translate(-0.039,0.005,0.092);b.rotate(0,0.20,0.10);
-    b.scale(1.0,1.12,0.34);
-    b.sphere(0,0,0,0.034,10,8,DEEP);
+    b.push();b.translate(-0.037,0.004,0.086);b.rotate(0,0.22,0.10);
+    b.scale(1.0,1.08,0.36);
+    b.sphere(0,0,0,0.0235,10,8,DEEP);
     b.pop();
     /* the cord: two straps running back over the skull, not a ring —
        a full band reads as a blindfold from the side */
