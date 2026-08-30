@@ -72,6 +72,8 @@ weather states riding on top as multipliers.
 | Trading | Two nine-slot grids, live totals, lock and confirm, and edits refused on a locked offer |
 | Map | The real heightmap rendered at 384×384 with depth-shaded water and a north-west hillshade; a pin per district, `?` until you find it, live NPC dots, and travel |
 | Wardrobe | Fifteen rows of live appearance, applied on the click, on a camera that turns the character three-quarters on to the lens |
+| Hair | Around five hundred strands a head, each a rounded ribbon with a root-to-tip ramp and a helical curl, over a cap that fills the mass from inside |
+| Build | A per-region profile over the size scalar, so slim, base and bulk differ in taper rather than in scale — and every garment inherits it, because a garment is the body's own rings grown outward |
 | Outfits | Six named sets priced and granted by the server, charging only for the pieces you are missing |
 | Progression | XP from every activity, six skills on their own curves, so a dedicated angler out-ranks a generalist at fishing without out-levelling them |
 | Interface | Dark premium HUD sized in container units, reusable panels, procedurally drawn item icons cut from the material each item will have in the world |
@@ -614,6 +616,136 @@ costs 14 for the other two, not 19 and not 22. Buying it twice is
 refused rather than charged. And a set you cannot afford is refused
 by the server with your purse untouched and nothing in your
 inventory — the client asks, it does not decide.
+
+### Hair that is the colour you picked
+
+The most useful thing this pass found was not in the hair at all.
+
+The fragment shader adds an ambient sky reflection — the sky, in
+proportion to how smooth a surface is — and it deliberately does *not*
+multiply it by albedo, because a dielectric reflects the colour of what
+it is looking at rather than its own. On a wall that is correct and
+almost invisible. On a head of hair it is neither. A mass of thin round
+strands presents grazing normals in every direction at once, so the
+Fresnel term that gates the reflection is close to one nearly
+everywhere, and the sky lands on top of the hair as a flat additive
+wash.
+
+Hair was inheriting the `blank` material, at roughness 0.70, and at
+that roughness the wash was several times the albedo of anything dark.
+Which means hair in this game has always come out roughly the colour of
+the sky whatever the player chose, and the wardrobe's ten hair colours
+have been doing almost nothing. Setting pure red as a test rendered
+pale pink.
+
+Chasing a glossy sheen made it worse, not better — 0.36 turned every
+head into a lightbulb. The fix is the other direction: hair is a rough
+material, 0.93, which puts the reflection an order of magnitude below
+the albedo and hands the colour back. What is lost is the tight
+highlight. What is bought is that black hair is black, which is the
+better trade, and the broad grazing lobe that remains is the band you
+actually wanted anyway.
+
+### Strands
+
+Four things were wrong with the geometry underneath.
+
+**The section was a box.** Every strand was an extruded rectangle: two
+flat faces, two hard ninety-degree corners, a specular edge running the
+full length, and a normal that jumped a right angle four times around.
+It is now six points on an ellipse, and — this is the part that
+matters — the normal is the ellipse's *gradient*, `(cos/w, sin/t)`, not
+its position. On a tress four times wider than it is thick those are
+nowhere near the same vector, and using the position is how you get a
+strand lit like a cylinder instead of like a ribbon.
+
+**The shade came in three bands**, root, middle and tip, which put two
+visible seams across every strand at the same two places on all of
+them. It is a ramp now.
+
+**A curl was a zigzag.** Pushing along one axis on a cosine bends a
+strand inside a plane: from the side it is corrugated, from the front it
+is straight, and the two readings never agree. The perpendicular axis on
+a sine at the same frequency is the whole difference between that and a
+spiral.
+
+**And there were not enough of them.** Two hundred cards a centimetre
+wide on a fifteen-centimetre head is seven strands across the skull, and
+seven strands across a skull is a bundle of worms. There are now about
+two and a half times as many at just over half the width — the same
+volume of hair, made of far more and much finer pieces — with the
+sideways fan and the length variation cut right back, because a
+silhouette made of six hundred individually visible tips reads as a wig
+on a mannequin rather than as one mass with a soft edge.
+
+The cap under the cards changed job too. It used to sit on the skull, so
+every gap between strands showed bare head — a field of dark speckles
+across the crown. It now sits at forty per cent of the style's own
+length at each point, filling the volume from inside, and is shaded as
+hair the light has not reached rather than as scalp. A gap shows hair in
+shadow, which is what a gap in hair actually is.
+
+### Build, as a shape rather than a size
+
+`girth` multiplied every radius on the body by one number, so `bulk` was
+`base` photographed closer and `slim` was `base` photographed further
+away. At twenty metres — the distance a character is actually read at —
+all three silhouettes were identical, because a uniform scale cannot
+change a silhouette, only how much of the screen it takes.
+
+What differs between builds is a set of ratios: shoulder against waist,
+how deep the chest is, how much of a limb is muscle. So the scalar
+stays, and a profile rides on top of it — four control rows sampled at
+hip, waist, chest and shoulder height, interpolated up the body. It is
+restrained — nine per cent at the widest — and it averages to about
+one, so nothing changes size, only its distribution. What it changes is
+the taper: on top of the body's own shape it moves the shoulder-to-waist
+ratio about seven per cent between slim and bulk, and that ratio — not
+the size — is what a silhouette is made of.
+
+Garments inherit all of it for free, because a garment in this file has
+always been the body's own rings grown outward by a millimetre or
+twelve. The one thing that needed saying out loud is that the inflation
+is added *after* the profile and not scaled by it: eleven millimetres of
+clearance is a property of the cloth, not of the body inside it, and
+scaling it with the chest is how a shirt ends up fitting one build and
+clipping the other two. The pieces that are authored rather than derived
+— the occupational coats, the cape, the trouser waistband — are told the
+new width separately.
+
+The mesh got denser while the numbers were open: the torso from twenty
+segments around to twenty-six, arms from twelve to sixteen, legs from
+fourteen to eighteen. A limb at twelve is visibly a prism at portrait
+distance.
+
+### Cloth with edges
+
+Every garment in this file used to *stop*. A loft with an open bottom
+ends on a ring of vertices and nothing else, which is a hem with no
+thickness, and cloth with no thickness reads as paint on skin.
+
+`edgeBand` is four rings that step out from the shell, run straight for
+a centimetre or two, and tuck back under. It is now on the shirt hem,
+the neckline, both cuffs, the trouser waistband and the turn-ups —
+which is most of what tells you at a glance that a thing is made of
+fabric rather than sprayed on.
+
+Above that, the three tops finally differ by more than where they stop.
+The jacket has a collar that *stands* — lapels lying flat on the chest
+with nothing behind the neck is a jacket drawn from the front only — and
+three buttons down the closure. The hoodie's hood was one squashed
+sphere, with the silhouette of a rucksack and the highlight of a
+balloon; a hood that is down is a thick roll of cloth bunched behind the
+neck, wider than it is deep, heavy at the bottom and open at the top, so
+it is now its own loft with a dark mouth, and it has the drawstrings
+that are the reason a hoodie reads as a hoodie at fifty metres.
+
+One thing the back view caught. Garments take the body's rings, and the
+rings carry the body's own occlusion shading — a dark band at the groin,
+because that is where light does not reach on skin. Trousers were
+inheriting it, which put a dark patch across the hips of every pair in
+the game and read as a second garment underneath. The shape is the
+body's; the shading is not.
 
 ### The sky
 

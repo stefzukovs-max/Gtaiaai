@@ -2669,6 +2669,28 @@ R.fabric=function(lo,hi,seed){
   };
 };
 
+/* Hair. A card is not one hair, it is a tress of thirty or so, and the
+   only place those thirty exist is here: fine lanes of constant u,
+   which on a ribbon are lines running the length of the strand. The
+   relief derived from them tilts the normal across the card, and the
+   low roughness in SURF turns that tilt into the narrow travelling
+   highlight that reads, more than any amount of geometry, as hair. */
+R.hair=function(){
+  return function(u,v){
+    var lane=Math.sin(u*Math.PI*2*5)*0.5+0.5;
+    lane=lane*lane;                       /* thin bright, wide dark   */
+    var fine=M.hash2((u*SZ*1.5)|0,0,911);
+    var t=lane*0.62+fine*0.38;
+    /* Kept dark. Hair albedo is a multiplier on the character's own
+       colour, so a bright texture does not make hair shinier — it
+       washes the colour out of it, which is how a head of black hair
+       ends up looking like steel wool. */
+    var base=mixv(rgb('#8E8E8E'),rgb('#EAEAEA'),t);
+    /* a slow drift along the length, so one card is not one flat tube */
+    return litv(base,(tileFbm(u*0.4,v*0.30,3,919,3)-0.5)*20);
+  };
+};
+
 R.crystal=function(tint,seed){
   tint=tint||'#4FD8FF';
   return function(u,v){
@@ -2833,7 +2855,8 @@ var LAYERS=[
   ['gold',    R.gold()],
   ['water',   R.water()],
   ['neon',    R.emissive('#F4F8FF')],
-  ['neonw',   R.emissive('#FFFFFF')]
+  ['neonw',   R.emissive('#FFFFFF')],
+  ['hair',    R.hair()]
 ];
 
 Tex.NAME={};
@@ -2861,7 +2884,36 @@ var SURF={
   fabric:{bump:0.60,rough:0.93},fabricw:{bump:0.60,rough:0.93},
   glass:{bump:0.05,rough:0.08}, crystal:{bump:0.30,rough:0.14},
   gold:{bump:0.20,rough:0.22},  water:{bump:0,rough:0.10},
-  neon:{bump:0,rough:0.55},     neonw:{bump:0,rough:0.55}
+  neon:{bump:0,rough:0.55},     neonw:{bump:0,rough:0.55},
+  /* Hair is rough on purpose, and the reason is worth writing down.
+
+     The shader adds an ambient sky reflection that is deliberately
+     *not* multiplied by albedo — a dielectric reflects the colour of
+     what it is looking at, not its own — scaled by (1-rough) squared
+     and by a grazing Fresnel term. On a flat wall that is correct and
+     barely visible. On a head of hair it is neither: a mass of thin
+     round strands presents grazing normals in every direction at
+     once, so the Fresnel term is near one almost everywhere, and the
+     sky goes on top of the hair as a flat additive wash.
+
+     At the 0.70 this used to inherit from `blank`, that wash was
+     already strong enough to swamp the tint — which is why hair in
+     this game has always come out the colour of the sky whatever the
+     player picked, and why the wardrobe's ten hair colours were
+     doing almost nothing. Going glossier to chase a sheen made it
+     worse, not better. 0.82 cuts the wash to a third of what `blank`
+     gave and hands the colour back; what sheen there is comes from
+     the direct lobe and the relief, which is enough.
+
+     0.82 was not enough. The wash falls with (1-rough) squared but
+     the sky is bright and dark hair is not: at 0.82 the reflection was
+     still several times the albedo, and brown hair still came out
+     grey. 0.93 puts it below the albedo where it belongs. What is
+     lost is the tight highlight; what is bought is that a player who
+     picks black hair gets black hair, which is the trade worth
+     making. The sheen that remains is the broad grazing lobe, and on
+     a mass of round strands that is the band you actually want. */
+  hair:{bump:0.62,rough:0.93}
 };
 Tex.SURF=SURF;
 
@@ -6223,22 +6275,88 @@ function girth(build){
 }
 Body.girth=girth;
 
+/* ---------------- build ----------------
+   Build is a shape, not a size.
+
+   `girth` above multiplies every radius on the body by one number, so
+   on its own `bulk` is `base` photographed closer and `slim` is `base`
+   photographed further away. At twenty metres — which is the distance
+   a character is actually read at — the three silhouettes were
+   identical, because a uniform scale cannot change a silhouette, only
+   how much of the screen it takes.
+
+   What differs between builds is a set of ratios: how wide the
+   shoulders sit against the waist, how deep the chest is, how much of
+   a limb is muscle. So the scalar stays (it sets overall size, and
+   every garment and every occupational overlay is already cut against
+   it) and a profile rides on top of it. The profile is deliberately
+   restrained — nine per cent at the widest — and averages to about one
+   up the body, so a coat cut to the scalar still closes over the chest
+   underneath it. What it changes is the taper: on top of the body's own
+   shape it moves the shoulder-to-waist ratio about seven per cent
+   between slim and bulk, and that ratio — not the size — is what a
+   silhouette is made of.
+
+   Rows are [half-width, depth] sampled at hip, waist, chest and
+   shoulder height. */
+var SHAPE_Y=[0.900,1.070,1.325,1.450];
+var BUILD_SHAPE={
+  slim:{torso:[[0.970,0.955],[0.925,0.915],[0.940,0.930],[0.950,0.935]],
+        limb:0.905,neck:0.950},
+  base:{torso:[[1,1],[1,1],[1,1],[1,1]],limb:1,neck:1},
+  bulk:{torso:[[1.015,1.025],[0.990,1.020],[1.080,1.095],[1.092,1.060]],
+        limb:1.105,neck:1.070}
+};
+function buildShape(build){return BUILD_SHAPE[build]||BUILD_SHAPE.base;}
+/* The profile at a height, linear between the four control rows and
+   flat outside them. Two numbers out: width and depth. */
+function shapeAt(sh,y,out){
+  var T=sh.torso,i;
+  if(y<=SHAPE_Y[0]){out[0]=T[0][0];out[1]=T[0][1];return out;}
+  for(i=0;i<SHAPE_Y.length-1;i++){
+    if(y<=SHAPE_Y[i+1]){
+      var t=(y-SHAPE_Y[i])/(SHAPE_Y[i+1]-SHAPE_Y[i]);
+      out[0]=M.lerp(T[i][0],T[i+1][0],t);
+      out[1]=M.lerp(T[i][1],T[i+1][1],t);
+      return out;
+    }
+  }
+  out[0]=T[T.length-1][0];out[1]=T[T.length-1][1];return out;
+}
+Body.buildShape=buildShape;
+/* Anything cut against the plain scalar — the occupational coats, the
+   capes, the backpacks — needs to know the chest got wider, or a coat
+   sized for a base torso closes three millimetres inside a bulk one.
+   The widest of the upper-body factors, which is the one that decides
+   whether the garment closes at all. */
+Body.overFit=function(build){
+  var T=buildShape(build).torso;
+  return Math.max(T[2][0],T[2][1],T[3][0],T[3][1]);
+};
+
 /* ---------------- torso ----------------
    Thirteen rings from the crotch to the base of the neck. The numbers
    that matter are the three turning points: the iliac crest at 0.955
    is the widest the hips get, the waist at 1.070 is the narrowest the
    body gets, and the nipple line at 1.325 is the widest the rib cage
    gets. Everything between them is interpolation. */
-function torsoRings(g,n,inf){
+var _sh=[1,1];
+function torsoRings(g,n,inf,build){
   inf=inf||0;
+  var sh=buildShape(build);
   /* The last argument is a value, not a colour: everything here is
      painted in greys and multiplied by the character's skin tone. The
      dark rings are the places light does not reach — under the jaw, in
      the armpit, at the groin — which SSAO at any usable radius cannot
      find on a body this size. */
   function r(y,hw,hf,hb,ex,skin,col){
-    return {y:y,pts:sect(hw*g+inf,hf*g+inf,hb*g+inf,n,ex),skin:skin,
-            col:col||null};
+    shapeAt(sh,y,_sh);
+    /* The inflation is added after the profile, not scaled by it: a
+       garment's clearance is a property of the cloth, not of the body
+       inside it, and eleven millimetres has to stay eleven on every
+       build or a shirt fits one of them and clips the other two. */
+    return {y:y,pts:sect(hw*g*_sh[0]+inf,hf*g*_sh[1]+inf,hb*g*_sh[1]+inf,n,ex),
+            skin:skin,col:col||null};
   }
   return [
     r(0.795,0.106,0.080,0.088,2.3,[B.hips,1],DARK),
@@ -6260,8 +6378,8 @@ function torsoRings(g,n,inf){
     r(1.524,0.072,0.054,0.058,2.1,[B.neck,1])
   ];
 }
-function torsoRingsShaped(g,n,inf){
-  var R=torsoRings(g,n,inf);
+function torsoRingsShaped(g,n,inf,build){
+  var R=torsoRings(g,n,inf,build);
   dent(R[1].pts,0,-1,-0.16,0.66);   /* glutes                 */
   dent(R[2].pts,0,-1,-0.11,0.60);
   dent(R[4].pts,0,-1, 0.07,0.55);   /* lumbar curve, inward   */
@@ -6316,10 +6434,25 @@ function ringAt(rings,y){
    flat. The two rings either side of 1.122 are the elbow: they hand
    the surface from the upper arm to the forearm across four
    centimetres, which is about how much skin a real elbow recruits. */
-function armRings(side){
+/* The limb multiplier is applied here rather than at the loft so that
+   a garment cut from these same rings inherits it — which is the
+   whole reason garments are built from the body's rings in the first
+   place. A sleeve that did not know the arm inside it had grown is a
+   sleeve the arm comes through. */
+function limbShaped(rings,build){
+  var f=buildShape(build).limb;
+  if(f===1)return rings;
+  var out=[];
+  for(var i=0;i<rings.length;i++){
+    var R=rings[i];
+    out.push([R[0],R[1]*f,R[2]*f,R[3]*f,R[4],R[5],R[6]]);
+  }
+  return out;
+}
+function armRings(side,build){
   var L=B.shoulderL,A=B.armL,F=B.forearmL,H=B.handL;
   if(side<0){L=B.shoulderR;A=B.armR;F=B.forearmR;H=B.handR;}
-  return [
+  return limbShaped([
     [0.868,0.030,0.026,0.026,2.0,[F,0.55,H,0.45]],   /* wrist        */
     [0.930,0.036,0.031,0.033,2.1,[F,1]],
     [1.010,0.042,0.037,0.041,2.2,[F,1]],
@@ -6332,7 +6465,7 @@ function armRings(side){
     [1.462,0.062,0.058,0.058,2.2,[L,0.60,A,0.40]],
     [1.496,0.046,0.043,0.043,2.2,[L,0.85,A,0.15]],
     [1.516,0.020,0.019,0.019,2.2,[L,1]]              /* rounded top  */
-  ];
+  ],build);
 }
 
 /* ---------------- leg ----------------
@@ -6340,10 +6473,10 @@ function armRings(side){
    the top and the other way round above the knee; a calf sits almost
    entirely behind the bone, which is why the back depth at 0.420 is
    half again the front. */
-function legRings(side){
+function legRings(side,build){
   var T=side>0?B.thighL:B.thighR, S=side>0?B.shinL:B.shinR;
   var F=side>0?B.footL:B.footR;
-  return [
+  return limbShaped([
     [0.075,0.038,0.034,0.040,2.1,[S,0.55,F,0.45]],   /* ankle        */
     [0.140,0.041,0.036,0.046,2.1,[S,1]],
     [0.240,0.048,0.040,0.058,2.2,[S,1]],
@@ -6358,7 +6491,7 @@ function legRings(side){
     [0.912,0.095,0.086,0.100,2.4,[T,1]],             /* upper thigh  */
     [0.968,0.092,0.082,0.096,2.4,[B.hips,0.45,T,0.55],DARK],
     [1.030,0.040,0.036,0.040,2.2,[B.hips,1]]         /* cap, buried  */
-  ];
+  ],build);
 }
 
 /* ---------------- hand ----------------
@@ -6448,20 +6581,21 @@ Body.figure=function(build){
   build=build||'base';
   return skinPart('figure:'+build,function(b){
     b.mat('skin');
-    var g=girth(build),n=20;
-    b.loft(torsoRingsShaped(g,n),LIT,{});
+    var g=girth(build),n=26;
+    b.loft(torsoRingsShaped(g,n,0,build),LIT,{});
     /* neck: its own short loft so the head can turn on it */
+    var nk=buildShape(build).neck;
     b.push();
     b.loft([
-      {y:1.500,pts:sect(0.066*g,0.052*g,0.056*g,12,2.1),skin:[B.neck,1],col:LOW},
-      {y:1.545,pts:sect(0.060*g,0.048*g,0.052*g,12,2.0),skin:[B.neck,0.70,B.head,0.30],col:MID},
-      {y:1.588,pts:sect(0.057*g,0.048*g,0.049*g,12,2.0),skin:[B.head,1]},
-      {y:1.612,pts:sect(0.050*g,0.044*g,0.044*g,12,2.0),skin:[B.head,1]}
+      {y:1.500,pts:sect(0.066*g*nk,0.052*g*nk,0.056*g*nk,16,2.1),skin:[B.neck,1],col:LOW},
+      {y:1.545,pts:sect(0.060*g*nk,0.048*g*nk,0.052*g*nk,16,2.0),skin:[B.neck,0.70,B.head,0.30],col:MID},
+      {y:1.588,pts:sect(0.057*g*nk,0.048*g*nk,0.049*g*nk,16,2.0),skin:[B.head,1]},
+      {y:1.612,pts:sect(0.050*g*nk,0.044*g*nk,0.044*g*nk,16,2.0),skin:[B.head,1]}
     ],LIT,{});
     b.pop();
     for(var s=1;s>=-1;s-=2){
-      limbLoft(b,s*0.172,armRings(s),12,g);
-      limbLoft(b,s*0.092,legRings(s),14,g);
+      limbLoft(b,s*0.172,armRings(s,build),16,g);
+      limbLoft(b,s*0.092,legRings(s,build),18,g);
       handMesh(b,s);
       footMesh(b,s);
     }
@@ -6485,14 +6619,56 @@ Body.figure=function(build){
 
 /* The torso rings a garment needs, cut to a hem and a neckline and
    grown outward. */
-function shellRings(g,n,inf,lo,hi){
-  var all=torsoRingsShaped(g,n,inf);
+function shellRings(g,n,inf,lo,hi,build){
+  var all=torsoRingsShaped(g,n,inf,build);
   var out=[];
   for(var i=0;i<all.length;i++){
     if(all[i].y<lo-0.0001||all[i].y>hi+0.0001)continue;
     out.push(all[i]);
   }
   return out;
+}
+
+/* ---------------- finished edges ----------------
+   Every garment in this file used to stop. A loft with `openBottom`
+   ends on a ring of vertices and nothing else, which is a hem with no
+   thickness — and cloth with no thickness reads as paint on skin. Real
+   garments are hemmed, cuffed and banded, and those bands are most of
+   what tells you at a glance that a thing is made of fabric.
+
+   `edgeBand` is that: four rings that step out from the shell, run
+   straight for a centimetre, and tuck back under. `dir` is +1 for a
+   band that sits above its anchor (a cuff at the end of a sleeve) and
+   -1 for one that hangs below it (the hem of a shirt). */
+function scalePts(pts,f){
+  var o=[];
+  for(var i=0;i<pts.length;i++)o.push([pts[i][0]*f,pts[i][1]*f]);
+  return o;
+}
+function shiftPts(pts,dz){
+  var o=[];
+  for(var i=0;i<pts.length;i++)o.push([pts[i][0],pts[i][1]+dz]);
+  return o;
+}
+function edgeBand(b,pts,y,dir,h,swell,skin,col,lip){
+  var A=scalePts(pts,1+swell), C=scalePts(pts,1+swell*0.40);
+  var r=[
+    {y:y,            pts:C,skin:skin,col:lip||col},
+    {y:y+dir*h*0.24, pts:A,skin:skin,col:col},
+    {y:y+dir*h*0.76, pts:A,skin:skin,col:col},
+    {y:y+dir*h,      pts:C,skin:skin,col:lip||col}
+  ];
+  if(dir<0)r.reverse();
+  b.loft(r,LIT,{openTop:true,openBottom:true,uvScale:2});
+}
+/* The same thing on a limb, where the ring has to be built from the
+   arm's own dimensions and the whole band offset onto that arm. */
+function limbBand(b,x,rings,y,dir,h,g,inf,swell,n,col,lip){
+  var R=ringAt(rings,y);
+  var pts=sect(R[1]*g+inf,R[2]*g+inf,R[3]*g+inf,n,R[4]);
+  b.push();b.translate(x,0,0);
+  edgeBand(b,pts,y,dir,h,swell,R[5],col,lip);
+  b.pop();
 }
 
 var SHIRT_HEM={tee:0.868,jacket:0.840,hoodie:0.855,crop:1.150};
@@ -6504,24 +6680,37 @@ Body.shirt=function(style,sleeve,build){
   build=build||'base';
   return skinPart('shirt:'+style+':'+sleeve+':'+build,function(b){
     b.mat('fabric');
-    var g=girth(build),n=20,inf=0.011;
-    var secs=shellRings(g,n,inf,SHIRT_HEM[style],SHIRT_NECK[style]);
-    /* a collar band, drawn in a shade so the neckline reads as an edge
-       rather than as the place the mesh stopped */
-    secs.push({y:1.492,pts:sect(0.100*g+inf,0.068*g+inf,0.076*g+inf,n,2.3),
-               skin:[B.chest,0.5,B.neck,0.5],col:MID});
+    var g=girth(build),n=26,inf=0.011;
+    var secs=shellRings(g,n,inf,SHIRT_HEM[style],SHIRT_NECK[style],build);
+    var neckPts=sect(0.100*g+inf,0.068*g+inf,0.076*g+inf,n,2.3);
+    secs.push({y:1.492,pts:neckPts,skin:[B.chest,0.5,B.neck,0.5],col:MID});
     b.loft(secs,LIT,{openTop:true,openBottom:true,uvScale:2});
+
+    /* The ribbed neckband. A single darker ring at the neckline read
+       as a change of colour; this is the collar as an actual object,
+       standing a few millimetres proud of the shell and rolling back
+       over itself the way a knitted band does. */
+    b.skin(B.chest,0.5,B.neck,0.5);
+    edgeBand(b,neckPts,1.492,1,0.020,0.055,[B.chest,0.5,B.neck,0.5],MID,LOW);
+    /* The hem, hanging below the shell rather than stopping at it.
+       Anchored on the lowest ring the shell actually kept, not on the
+       hem the style asked for: the two are four centimetres apart on a
+       cropped top, and a band four centimetres below the cloth it is
+       supposed to finish is a floating hoop. */
+    edgeBand(b,secs[0].pts,secs[0].y,-1,0.018,0.030,secs[0].skin,MID,LOW);
 
     /* sleeves: the arm's own rings from the shoulder down to the cuff */
     var cuff=sleeve==='long'?0.878:1.240;
     for(var s=1;s>=-1;s-=2){
-      var rings=armRings(s);
+      var rings=armRings(s,build);
       var keep=[];
       for(var i=0;i<rings.length;i++)
         if(rings[i][0]>=cuff-0.0001)keep.push(rings[i]);
       if(sleeve!=='none'&&keep.length>1){
         keep.unshift(ringAt(rings,cuff));
-        limbLoft(b,s*0.172,keep,12,g,0.009,{openTop:false,openBottom:true,uvScale:2});
+        limbLoft(b,s*0.172,keep,16,g,0.009,{openTop:false,openBottom:true,uvScale:2});
+        /* and its cuff, turned back up the arm */
+        limbBand(b,s*0.172,rings,cuff,1,0.022,g,0.009,0.075,16,MID,LOW);
       }
     }
 
@@ -6534,16 +6723,64 @@ Body.shirt=function(style,sleeve,build){
       }
       b.push();b.translate(0,1.230,0.118*g+inf);
       b.chamfer(0,0,0,0.014,0.320,0.016,DEEP,0.005,{noBand:true});b.pop();
+      /* A collar that stands. Lapels lying flat on the chest with
+         nothing behind the neck is a jacket drawn from the front only;
+         the standing half is what you see from every other angle. */
+      b.skin(B.chest,0.55,B.neck,0.45);
+      b.loft([
+        {y:1.470,pts:shiftPts(scalePts(neckPts,1.035),-0.006),col:MID},
+        {y:1.512,pts:shiftPts(scalePts(neckPts,1.075),-0.012),col:LIT},
+        {y:1.545,pts:shiftPts(scalePts(neckPts,1.060),-0.018),col:LOW}
+      ],LIT,{openTop:true,openBottom:true,uvScale:2});
+      /* three buttons down the closure */
+      b.bone(B.chest);
+      for(var bt=0;bt<3;bt++){
+        b.push();b.translate(0.020,1.318-bt*0.078,0.126*g+inf);
+        b.sphere(0,0,0,0.0092,8,6,DEEP,{squash:0.45});b.pop();
+      }
     }
     if(style==='hoodie'){
-      /* the hood rides the neck, not the head: a hood pinned to a skull
-         swings with every glance and reads as a helmet */
-      b.skin(B.neck,0.65,B.chest,0.35);
-      b.push();b.translate(0,1.520,-0.070);b.rotate(-0.28,0,0);
-      b.sphere(0,0,0,0.108,12,9,MID,{squash:0.78});b.pop();
+      /* The hood rides the neck, not the head: a hood pinned to a skull
+         swings with every glance and reads as a helmet.
+
+         A hood that is down is also not a bag. It is a thick roll of
+         cloth bunched behind the neck — wider than it is deep, heavy
+         at the bottom, sagging onto the shoulders and open at the top
+         where the opening would be. One squashed sphere had none of
+         that: it had a silhouette like a rucksack and a highlight like
+         a balloon. This is its own loft so it can be all four. */
+      b.skin(B.neck,0.55,B.chest,0.45);
+      var hr=function(hw,hf,hb,z,ex){
+        return shiftPts(sect(hw*g,hf*g,hb*g,20,ex||2.4),z);
+      };
+      b.loft([
+        {y:1.372,pts:hr(0.118,0.044,0.108,-0.030),col:LOW},
+        {y:1.424,pts:hr(0.140,0.052,0.126,-0.038),col:MID},
+        {y:1.478,pts:hr(0.148,0.056,0.132,-0.040),col:LIT},
+        {y:1.528,pts:hr(0.138,0.052,0.124,-0.036),col:LIT},
+        {y:1.566,pts:hr(0.108,0.042,0.098,-0.030),col:MID},
+        {y:1.592,pts:hr(0.058,0.024,0.054,-0.024),col:LOW}
+      ],LIT,{uvScale:2});
+      /* the mouth of it, dark, so the roll reads as cloth folded over
+         a hole rather than as a solid lump */
+      b.loft([
+        {y:1.512,pts:hr(0.104,0.038,0.094,-0.030),col:DEEP},
+        {y:1.556,pts:hr(0.086,0.032,0.078,-0.026),col:DEEP}
+      ],DEEP,{openTop:true,openBottom:true});
+      /* drawstrings, which are the one part everybody draws and the
+         reason a hoodie reads as a hoodie at fifty metres */
       b.bone(B.chest);
+      for(var ds=-1;ds<=1;ds+=2){
+        b.push();b.translate(ds*0.030,1.404,0.108*g+inf);b.rotate(0.06,0,ds*0.05);
+        b.cylinder(0,0,0,0.0042,0.0038,0.104,6,MID);b.pop();
+        b.push();b.translate(ds*0.032,1.348,0.110*g+inf);
+        b.sphere(0,0,0,0.0075,7,5,LOW,{});b.pop();
+      }
+      /* the kangaroo pocket, with an opening rather than a slab */
       b.push();b.translate(0,1.230,0.120*g+inf);
       b.chamfer(0,0,0,0.170,0.056,0.020,MID,0.010,{noBand:true});b.pop();
+      b.push();b.translate(0,1.284,0.126*g+inf);
+      b.chamfer(0,0,0,0.166,0.007,0.014,DEEP,0.003,{noBand:true});b.pop();
     }
   });
 };
@@ -6556,19 +6793,40 @@ Body.trousers=function(leg,build){
   return skinPart('trousers:'+leg+':'+build,function(b){
     b.mat('fabric');
     var g=girth(build),inf=0.014;
-    var seat=shellRings(g,18,inf,0.795,1.075);
+    /* The waistband is authored, not derived, so it needs the profile
+       read out by hand — otherwise it is the one ring on a bulk body
+       still cut to a base waist. */
+    var _wsh=shapeAt(buildShape(build),1.100,[1,1]);
+    var wb=_wsh[0], wd=_wsh[1];
+    var seat=shellRings(g,24,inf,0.795,1.075,build);
+    /* The torso rings carry the body's own occlusion shading — a dark
+       ring at the groin, because that is where light does not reach on
+       skin. Cloth hanging over it is not shaded that way, and taking
+       the ring's colour with the ring put a dark band across the hips
+       of every pair of trousers in the game. The shape is the body's;
+       the shading is not. */
+    for(var q=0;q<seat.length;q++)seat[q].col=(q===0?MID:null);
     /* waistband, a shade darker, so the top of the trousers is an edge */
-    seat.push({y:1.100,pts:sect(0.140*g+inf,0.102*g+inf,0.100*g+inf,18,2.3),
+    seat.push({y:1.100,pts:sect(0.140*g*wb+inf,0.102*g*wd+inf,0.100*g*wd+inf,24,2.3),
                skin:[B.spine,1],col:MID});
     b.loft(seat,LIT,{openTop:true,openBottom:true,uvScale:2});
+    /* the waistband as an object, and a fly seam under it */
+    var wpts=seat[seat.length-1].pts;
+    edgeBand(b,wpts,1.100,-1,0.030,0.040,[B.spine,1],MID,LOW);
+    b.bone(B.hips);
+    b.push();b.translate(0,1.012,0.104*g*wd+inf);
+    b.chamfer(0,0,0,0.009,0.078,0.012,DEEP,0.004,{noBand:true});b.pop();
     var hem=leg==='shorts'?0.660:0.098;
     for(var s=1;s>=-1;s-=2){
-      var rings=legRings(s);
+      var rings=legRings(s,build);
       var keep=[];
       for(var i=0;i<rings.length;i++)
         if(rings[i][0]>=hem-0.0001&&rings[i][0]<=1.031)keep.push(rings[i]);
       keep.unshift(ringAt(rings,hem));
-      limbLoft(b,s*0.092,keep,14,g,inf,{openTop:true,openBottom:true,uvScale:2});
+      limbLoft(b,s*0.092,keep,18,g,inf,{openTop:true,openBottom:true,uvScale:2});
+      /* turn-ups. Trousers that stop mid-shin with a zero-thickness
+         edge are the same paint-on-skin problem as a shirt that does. */
+      limbBand(b,s*0.092,rings,hem,1,0.026,g,inf,0.060,18,MID,LOW);
     }
   });
 };
@@ -6631,9 +6889,15 @@ Body.SHOES=['shoe','boot','bare'];
    cap, which is what a hairstyle looks like when it is modelled as a
    solid — and a solid is not what hair is. Real-time hair is strips: a
    ribbon with a width, a taper and a path, laid along the flow of the
-   style, forty or eighty of them. Forty ribbons read as hair. Eleven
-   spheres read as a helmet, and that helmet was the single most amateur
-   thing on screen.
+   style. Eleven spheres read as a helmet, and that helmet was the
+   single most amateur thing on screen.
+
+   How many ribbons turned out to matter as much as the idea. Two
+   hundred at a centimetre wide is seven strands across a skull, which
+   reads as a bundle of worms; five hundred at half that width reads as
+   hair. The count and the width are two multipliers at the top of
+   `scalpHair`, applied to every style, so the density can be retuned
+   without re-measuring twelve hairstyles by hand.
 
    Everything below is authored in the head's own space against an
    ellipsoid that stands in for the skull. A card starts on that
@@ -6671,9 +6935,36 @@ function scalpNormal(az,el){
 function nrm3(v){var l=Math.hypot(v[0],v[1],v[2])||1;return [v[0]/l,v[1]/l,v[2]/l];}
 function crs(a,c){return [a[1]*c[2]-a[2]*c[1],a[2]*c[0]-a[0]*c[2],a[0]*c[1]-a[1]*c[0]];}
 
-/* A ribbon through a list of points. Four-sided cross-section, because
-   a card with no thickness disappears the moment it turns edge-on to
-   the camera and a head of hair does that constantly. */
+/* A ribbon through a list of points.
+
+   The section used to be a four-sided box, and a box is most of what
+   made this hair read as plastic. Two flat faces and two hard ninety
+   degree corners give every strand a specular edge running its whole
+   length, and the normal jumps a right angle at each corner, so a
+   head of hair shaded as a bundle of extruded rectangles — which is
+   what it was.
+
+   Six points on an ellipse cost half as much again and fix both: the
+   silhouette keeps a rounded edge from every angle, and the normal
+   turns continuously around the section. It still has thickness,
+   which is the original reason it is not a flat card: a card with no
+   thickness vanishes the moment it turns edge-on, and a head of hair
+   does that constantly. */
+var SECN=6,SECC=[],SECS=[];
+for(var _si=0;_si<SECN;_si++){
+  var _sa=(_si/SECN)*M.TAU;
+  SECC.push(Math.cos(_sa));SECS.push(Math.sin(_sa));
+}
+/* Root to tip as a ramp rather than three bands. Hair is darkest where
+   the scalp shades it and brightest across the middle where the light
+   actually lands; the old three-step version put two visible seams
+   across every strand, at the same two places on all of them. */
+var HRAMP=['#787878','#8A8A8A','#9C9C9C','#AEAEAE','#C0C0C0','#D0D0D0',
+           '#DCDCDC','#E6E6E6','#EEEEEE','#F4F4F4','#F6F6F6'];
+function hairShade(t){
+  var i=Math.round(t*(HRAMP.length-1));
+  return HRAMP[i<0?0:(i>=HRAMP.length?HRAMP.length-1:i)];
+}
 /* Builder.vert takes a colour as an [r,g,b] triple, not as the hex
    string every other builder call accepts — the primitives convert it
    for you and this one does not, because it is the layer underneath
@@ -6705,28 +6996,33 @@ function ribbon(b,pts,ws,th,cols){
     R=nrm3(crs(S,T));
     var w=ws[i],t2=th*(0.45+0.55*ws[i]/(ws[0]||1));
     var c=hcol(cols[Math.min(cols.length-1,i)]);
-    var quad=[[ w, t2],[-w, t2],[-w,-t2],[ w,-t2]];
-    for(k=0;k<4;k++){
-      var q=quad[k];
-      var vx=p[0]+S[0]*q[0]+R[0]*q[1];
-      var vy=p[1]+S[1]*q[0]+R[1]*q[1];
-      var vz=p[2]+S[2]*q[0]+R[2]*q[1];
-      var nn=nrm3([S[0]*(q[0]>0?1:-1)*0.55+R[0]*(q[1]>0?1:-1)*0.85,
-                   S[1]*(q[0]>0?1:-1)*0.55+R[1]*(q[1]>0?1:-1)*0.85,
-                   S[2]*(q[0]>0?1:-1)*0.55+R[2]*(q[1]>0?1:-1)*0.85]);
-      b.vert(vx,vy,vz,nn[0],nn[1],nn[2],k*0.25,i/(n-1),c);
+    for(k=0;k<SECN;k++){
+      var qx=SECC[k]*w, qy=SECS[k]*t2;
+      var vx=p[0]+S[0]*qx+R[0]*qy;
+      var vy=p[1]+S[1]*qx+R[1]*qy;
+      var vz=p[2]+S[2]*qx+R[2]*qy;
+      /* the ellipse's own normal, which is its gradient rather than
+         its position: (cos/w, sin/t), not (cos, sin). On a tress four
+         times wider than it is thick those are nowhere near the same
+         vector, and using the position is how you get a strand lit
+         like a cylinder instead of like a ribbon. */
+      var nu=SECC[k]/w, nv=SECS[k]/t2;
+      var nn=nrm3([S[0]*nu+R[0]*nv,S[1]*nu+R[1]*nv,S[2]*nu+R[2]*nv]);
+      b.vert(vx,vy,vz,nn[0],nn[1],nn[2],k/SECN,i/(n-1),c);
     }
   }
-  for(i=0;i<n-1;i++)for(k=0;k<4;k++){
-    var a0=base+i*4+k, b0=base+i*4+(k+1)%4;
-    var c0=base+(i+1)*4+(k+1)%4, d0=base+(i+1)*4+k;
+  for(i=0;i<n-1;i++)for(k=0;k<SECN;k++){
+    var a0=base+i*SECN+k, b0=base+i*SECN+(k+1)%SECN;
+    var c0=base+(i+1)*SECN+(k+1)%SECN, d0=base+(i+1)*SECN+k;
     b.quad(a0,b0,c0,d0);
   }
   /* close the tip so a strand ends in a point rather than a pipe */
   var last=pts[n-1];
-  var tip=b.vert(last[0],last[1],last[2],0,-1,0,0.5,1,hcol(cols[cols.length-1]));
-  for(k=0;k<4;k++)
-    b.tri(tip,base+(n-1)*4+(k+1)%4,base+(n-1)*4+k);
+  var lt=nrm3([last[0]-pts[n-2][0],last[1]-pts[n-2][1],last[2]-pts[n-2][2]]);
+  var tip=b.vert(last[0],last[1],last[2],lt[0],lt[1],lt[2],0.5,1,
+                 hcol(cols[cols.length-1]));
+  for(k=0;k<SECN;k++)
+    b.tri(tip,base+(n-1)*SECN+(k+1)%SECN,base+(n-1)*SECN+k);
 }
 
 /* One card: integrate a path from the scalp outward, bending it down
@@ -6740,7 +7036,7 @@ function hairCard(b,o){
     var t=i/seg;
     pts.push(p.slice());
     ws.push(o.w*(1-(o.taper===undefined?0.72:o.taper)*t*t));
-    cols.push(t<0.22?MID:(t>0.80?LOW:LIT));
+    cols.push(hairShade(t));
     /* Gravity and flow are applied per step, not per metre. Scaling
        them by the step length meant a three-centimetre crop barely bent
        while a long style folded double on the same droop number, and
@@ -6749,9 +7045,22 @@ function hairCard(b,o){
     d[1]-=(o.droop||0)*ds*(0.35+t);
     if(o.sweep){d[0]+=o.sweep[0]*ds;d[1]+=o.sweep[1]*ds;d[2]+=o.sweep[2]*ds;}
     if(o.curl){
+      /* A curl is a helix, not a zigzag. Pushing along one axis on a
+         cosine bends the strand inside a single plane, which from the
+         side is a corrugated ribbon and from the front is a straight
+         line — the two readings never agree and the eye notices. The
+         perpendicular axis on a sine, at the same frequency, is the
+         whole difference between that and a spiral. */
       var ph=t*(o.curlFreq||3)*M.TAU+(o.curlPh||0);
-      var k=o.curl*ds*0.55*Math.cos(ph);
-      d[0]+=side[0]*k;d[1]+=side[1]*k;d[2]+=side[2]*k;
+      var kk=o.curl*ds*0.55;
+      var up=crs(side,d);
+      var ul=Math.hypot(up[0],up[1],up[2]);
+      var c1=Math.cos(ph)*kk;
+      var c2=(ul>1e-5?Math.sin(ph)*kk*(o.helix===undefined?0.85:o.helix):0);
+      if(ul>1e-5){up[0]/=ul;up[1]/=ul;up[2]/=ul;}
+      d[0]+=side[0]*c1+up[0]*c2;
+      d[1]+=side[1]*c1+up[1]*c2;
+      d[2]+=side[2]*c1+up[2]*c2;
     }
     d=nrm3(d);
     p[0]+=d[0]*step;p[1]+=d[1]*step;p[2]+=d[2]*step;
@@ -6761,8 +7070,12 @@ function hairCard(b,o){
 
 /* The scalp cap: a thin shell just outside the skull, so nothing shows
    between the cards. Cut off below the hairline. */
+/* A constant standing in for the random draw, so the cap is built from
+   the same length function as the strands without consuming the
+   style's random sequence and changing every strand downstream. */
+function _half(){return 0.5;}
 function scalpCap(b,cfg){
-  var n=22,secs=[],rows=10;
+  var n=26,secs=[],rows=12;
   for(var i=0;i<=rows;i++){
     var el=M.lerp(cfg.elLo-0.10,1.565,i/rows);
     var pts=[];
@@ -6775,24 +7088,50 @@ function scalpCap(b,cfg){
          the line we want. */
       var f=Math.cos(az)*0.5+0.5;                 /* 1 at the face     */
       var lim=M.lerp(cfg.elLo,cfg.elFront,f*f);
-      var r=el<lim?0.90:1.062;
-      if(el>=lim&&el<lim+0.12)r=M.lerp(0.90,1.062,(el-lim)/0.12);
+      /* The cap is not the scalp: it is the inside of the hair.
+         Sitting it on the skull left every gap between cards showing
+         bare head, which at any density short of absurd is a mass of
+         dark speckles across the crown — and speckles are what made
+         this read as steel wool rather than hair. Pushing it out to
+         forty per cent of the style's own length at that point fills
+         the volume from within, so a gap shows hair in shadow. */
+      /* Sized against the strand *roots*, not the strand length. The
+         first version scaled it by the length and pushed the cap out
+         past the cards entirely: the hair became a smooth dark helmet
+         with a few tips poking through it as speckles. Almost all of a
+         strand's length runs along the head or hangs off it, so the
+         mass is only a few millimetres thick where it sits on the
+         skull, and the cap has to stay inside that. */
+      var L=cfg.len?cfg.len(az,el,_half):0.04;
+      var fill=Math.min(0.045,L*0.5);
+      var out=1.052+fill;
+      var r=el<lim?0.90:out;
+      if(el>=lim&&el<lim+0.12)r=M.lerp(0.90,out,(el-lim)/0.12);
       var q=scalpPt(az,el,r);
       pts.push([q[0],q[2]]);
     }
     secs.push({y:scalpPt(0,el,1.0)[1],pts:pts});
   }
-  /* Dark, not mid: what shows between strands is the shadow under
-     them, and a bright scalp reads as a bald patch. */
-  b.loft(secs,LOW,{openBottom:true});
+  /* Shaded as hair deep in the mass rather than as scalp: what shows
+     between strands is hair the light has not reached, and it should
+     read as the same material one stop down, not as a different one. */
+  b.loft(secs,hairShade(0.10),{openBottom:true});
 }
 
 /* A whole head of hair from one description. */
+var ROWMUL=1.45, PERMUL=2.20, FINE=0.56;
 function scalpHair(b,cfg){
   scalpCap(b,cfg);
   var rng=M.rng(cfg.seed||7);
   for(var i=0;i<10;i++)rng();
-  var rows=cfg.rows||6, per=cfg.per||16;
+  /* Density is the whole game. Two hundred cards a centimetre wide on
+     a fifteen-centimetre head is seven strands across the skull, and
+     seven strands across a skull is a bundle of worms — which is
+     exactly what it looked like. The multipliers here take every
+     style to roughly five hundred strands at a third of the width
+     without retuning eleven hairstyles by hand: DENSE scales the
+     count, FINE scales the width and the thickness together. */
+  var rows=Math.round((cfg.rows||6)*ROWMUL), per=Math.round((cfg.per||16)*PERMUL);
   for(var r=0;r<rows;r++){
     var rt=(r+0.5)/rows;
     for(var k=0;k<per;k++){
@@ -6800,22 +7139,39 @@ function scalpHair(b,cfg){
       var f=Math.cos(az)*0.5+0.5;
       var lim=M.lerp(cfg.elLo,cfg.elFront,f*f);
       var el=M.lerp(lim,1.50,rt);
-      var start=scalpPt(az,el,1.064);
+      /* Rows further from the hairline start further out. Every strand
+         leaving the same shell made hair one onion skin with cards
+         drawn on it; a third of a millimetre of stagger per row is
+         enough for the mass to have an inside and an outside. */
+      var rad=1.048+rt*0.030;
+      var start=scalpPt(az,el,rad);
       var nrmv=scalpNormal(az,el);
       /* leave along the surface, running away from the crown */
-      var down=nrm3([scalpPt(az,el-0.22,1.064)[0]-start[0],
-                     scalpPt(az,el-0.22,1.064)[1]-start[1],
-                     scalpPt(az,el-0.22,1.064)[2]-start[2]]);
-      var dir=nrm3([down[0]+nrmv[0]*(cfg.lift||0.35),
-                    down[1]+nrmv[1]*(cfg.lift||0.35),
-                    down[2]+nrmv[2]*(cfg.lift||0.35)]);
+      var down=nrm3([scalpPt(az,el-0.22,rad)[0]-start[0],
+                     scalpPt(az,el-0.22,rad)[1]-start[1],
+                     scalpPt(az,el-0.22,rad)[2]-start[2]]);
+      /* Fan sideways within the scalp's own surface rather than in
+         world axes: a comb is not perfectly regular, and a head where
+         every strand leaves on exactly the same bearing is the tell
+         that says wig. */
+      var tang=nrm3(crs(nrmv,down));
+      var mess=(cfg.mess===undefined?0.07:cfg.mess)*(rng()-0.5);
+      var lift=(cfg.lift||0.35)*(0.93+rng()*0.14);
+      var dir=nrm3([down[0]+nrmv[0]*lift+tang[0]*mess,
+                    down[1]+nrmv[1]*lift+tang[1]*mess,
+                    down[2]+nrmv[2]*lift+tang[2]*mess]);
+      /* Length varies, but not much. Every strand a different length
+         gives a silhouette made of individual tips, and a silhouette
+         made of individual tips is a wig on a mannequin — real hair
+         reads as one mass with a soft edge, not as six hundred
+         separate things that happen to be adjacent. */
       var jit=(rng()-0.5);
-      var len=cfg.len(az,el,rng)* (1+jit*0.16);
+      var len=cfg.len(az,el,rng)* (1+jit*0.075);
       hairCard(b,{
         start:start,dir:dir,side:nrmv,len:len,
-        w:(cfg.w||0.014)*(0.85+rng()*0.30),
-        th:cfg.th||0.005,
-        taper:cfg.taper===undefined?0.72:cfg.taper,
+        w:(cfg.w||0.014)*FINE*(0.82+rng()*0.36),
+        th:(cfg.th||0.005)*FINE,
+        taper:(cfg.taper===undefined?0.72:cfg.taper)*0.80,
         droop:cfg.droop||0,
         sweep:cfg.sweep?[cfg.sweep[0],cfg.sweep[1],cfg.sweep[2]]:null,
         curl:cfg.curl||0,curlFreq:cfg.curlFreq||3,curlPh:rng()*6.28,
@@ -6955,7 +7311,7 @@ var HEAD_FIT=[1.085*P.headScale,1.060*P.headScale,1.085*P.headScale];
 Body.hair=function(style){
   style=HAIR_BUILD[style]?style:'crop';
   return part('hair:'+style,function(b){
-    b.mat('blank');
+    b.mat('hair');
     /* Hats keep the 1.085 stand-off because they were authored against
        a reference skull. Hair does not: every card here is placed on
        the skull ellipsoid itself, so scaling it out again would lift
@@ -7272,7 +7628,7 @@ function whiskers(b,cfg){
     for(var k=0;k<=seg;k++){
       pts.push(q.slice());
       ws.push(cfg.w*(1-0.65*k/seg));
-      cols.push(k===0?MID:(k===seg?LOW:LIT));
+      cols.push(hairShade(k/seg));
       q=[q[0]+d[0]/l*len/seg,q[1]+d[1]/l*len/seg,q[2]+d[2]/l*len/seg];
     }
     ribbon(b,pts,ws,cfg.w*0.75,cols);
@@ -7317,7 +7673,7 @@ Body.FACIAL=Object.keys(FACE_BUILD);
 Body.facial=function(style){
   style=FACE_BUILD[style]?style:'none';
   return part('facial:'+style,function(b){
-    b.mat('blank');
+    b.mat('hair');
     b.push();b.scale(P.headScale,P.headScale,P.headScale);
     FACE_BUILD[style](b);
     b.pop();
@@ -7637,13 +7993,13 @@ function coatSkirt(b,y0,y1,w0,w1,d0,d1,front,n){
 /* Coat sleeves: the arm's own rings again, grown further than the
    shirt's so the shirt fits inside. A coat with bare arms is a
    waistcoat, and neither of these two is a waistcoat. */
-function coatSleeves(b,g,cuff,inf){
+function coatSleeves(b,g,cuff,inf,build){
   for(var s=1;s>=-1;s-=2){
-    var rings=Body.armRings(s),keep=[];
+    var rings=Body.armRings(s,build),keep=[];
     for(var i=0;i<rings.length;i++)
       if(rings[i][0]>=cuff-0.0001)keep.push(rings[i]);
     keep.unshift(Body.ringAt(rings,cuff));
-    Body.limbLoft(b,s*0.172,keep,12,g,inf,
+    Body.limbLoft(b,s*0.172,keep,16,g,inf,
       {openTop:false,openBottom:true,uvScale:2});
   }
 }
@@ -7660,10 +8016,10 @@ function standCollar(b,y,w,d,h,col){
 var OVER_BUILD={
   /* Harbourmaster's oilskin: heavy, long, storm collar, brass at the
      shoulder. It is the tallest silhouette in the game on purpose. */
-  oilskin:function(b,g){
+  oilskin:function(b,g,build){
     b.mat('fabric');
     coatBody(b,g,20,1.010,1.500);
-    coatSleeves(b,g,0.884,0.022);
+    coatSleeves(b,g,0.884,0.022,build);
     coatSkirt(b,1.030,0.560,0.196,0.268,0.130,0.170,0.62,20);
     standCollar(b,1.482,0.104,0.076,0.078,MID);
     /* storm flap down the right of the chest */
@@ -7690,10 +8046,10 @@ var OVER_BUILD={
   },
   /* Warden's longcoat: same family, different intent. Narrower, belted,
      one shoulder plated. */
-  longcoat:function(b,g){
+  longcoat:function(b,g,build){
     b.mat('fabric');
     coatBody(b,g,20,0.990,1.500);
-    coatSleeves(b,g,0.884,0.021);
+    coatSleeves(b,g,0.884,0.021,build);
     coatSkirt(b,1.010,0.640,0.190,0.250,0.126,0.158,0.56,20);
     standCollar(b,1.482,0.102,0.074,0.090,MID);
     /* asymmetric closure — the diagonal is the whole silhouette */
@@ -7867,7 +8223,7 @@ Cos.overlay=function(style,build){
   build=build||'base';
   return Body.skinPart('over:'+style+':'+build,function(b){
     b.mat('fabric');
-    OVER_BUILD[style](b,Body.girth(build));
+    OVER_BUILD[style](b,Body.girth(build)*Body.overFit(build),build);
   });
 };
 
@@ -7880,12 +8236,15 @@ Cos.cape=function(style,build){
   build=build||'base';
   return Body.skinPart('cape:'+style+':'+build,function(b){
     b.mat('fabric');
+    /* The cape's own numbers were fixed, so on a broad body its
+       shoulders sat inside the shoulders it was hanging from. */
+    var cg=Body.girth(build)*Body.overFit(build);
     var n=16,steps=9,secs=[];
     for(var i=0;i<=steps;i++){
       var t=i/steps;
       var y=M.lerp(1.470,0.640,t);
-      var w=M.lerp(0.150,0.290,Math.pow(t,0.85));
-      var d=M.lerp(0.100,0.190,t);
+      var w=M.lerp(0.150*cg,0.290*cg,Math.pow(t,0.85));
+      var d=M.lerp(0.100*cg,0.190*cg,t);
       var pts=Body.sect(w,d,d,n,2.3);
       for(var j=0;j<pts.length;j++){
         /* keep the back: a cape does not wrap the chest */
