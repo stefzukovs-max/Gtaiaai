@@ -431,6 +431,19 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .opt.on{border-color:var(--acc);color:var(--acc);background:rgba(59,224,200,.10)}
 .flabel{font-size:.76cqw;letter-spacing:.16em;text-transform:uppercase;
   color:var(--ink3);margin-bottom:.24cqw}
+/* The wardrobe is taller than the pane once every slot is exposed, so
+   the detail rows scroll inside their own box rather than pushing the
+   Continue button off the bottom of the screen. */
+.fscroll{max-height:40cqh;overflow-y:auto;overflow-x:hidden;
+  display:flex;flex-direction:column;gap:.9cqw;padding-right:.7cqw;
+  /* fade the cut edge, so a half-visible row reads as "more below"
+     rather than as a layout that ran out of room */
+  -webkit-mask-image:linear-gradient(180deg,#000 0,#000 90%,transparent 100%);
+  mask-image:linear-gradient(180deg,#000 0,#000 90%,transparent 100%)}
+.fscroll::-webkit-scrollbar{width:6px}
+.fscroll::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
+.fnote{font-size:.88cqw;line-height:1.5;color:var(--ink3);font-style:italic;
+  border-left:2px solid var(--acc);padding-left:.7cqw;max-width:30cqw}
 
 /* the guided first steps, as a small card in the corner */
 .guide{position:absolute;right:.7cqw;bottom:6.4cqw;width:min(13.2cqw,240px);
@@ -5139,8 +5152,33 @@ Body.foot=function(style){
     b.chamfer(0,0,0,0.090,0.052,0.076,MID,0.018);b.pop();
     b.push();b.translate(0,-0.018,0.128);
     b.chamfer(0,0,0,0.086,0.044,0.052,MID,0.016);b.pop();
+    if(style!=='boot')return;
+    /* A boot is a shaft and a turned cuff. It has to stop at the
+       ankle: the shaft rides the foot bone, and anything taller
+       swings through the shin the first time the leg bends. */
+    b.push();b.translate(0,0.062,-0.020);
+    b.loft([
+      {y:0,    pts:Geo.roundRect(0.092,0.116,0.038,12)},
+      {y:0.052,pts:Geo.roundRect(0.096,0.120,0.040,12)},
+      {y:0.078,pts:Geo.roundRect(0.106,0.132,0.044,12)}
+    ],LIT,{openTop:true,openBottom:true});
+    b.pop();
+    b.push();b.translate(0,0.138,-0.020);
+    b.loft([
+      {y:0,    pts:Geo.roundRect(0.112,0.138,0.046,12)},
+      {y:0.030,pts:Geo.roundRect(0.108,0.134,0.044,12)}
+    ],MID,{openTop:true,openBottom:true});
+    b.pop();
+    /* heel block, and a strap across the instep */
+    b.push();b.translate(0,-0.052,-0.048);
+    b.chamfer(0,0,0,0.086,0.036,0.078,DARK,0.010);b.pop();
+    b.push();b.translate(0,0.020,0.042);
+    b.chamfer(0,0,0,0.100,0.020,0.030,DARK,0.008,{noBand:true});b.pop();
   });
 };
+/* What the wardrobe offers for feet. `bare` is deliberately last —
+   it is the fallback, not a look anyone picks first. */
+Body.SHOES=['shoe','boot','bare'];
 
 /* ---------------- garments ----------------
    Garments are slightly inflated copies of the body parts they cover.
@@ -5372,6 +5410,134 @@ var HAIR_BUILD={
       b.pop();
     }
   },
+  /* Locs. Each one is a stack of beads with its own slight lean, so
+     the rope reads as hanging rather than as a drilled peg. The lean
+     is a function of where the loc leaves the skull — strands at the
+     back fall straight, strands at the temple fall outward. */
+  locs:function(b){
+    HAIR_BUILD.crop(b);
+    var rng=M.rng(73);
+    for(var i=0;i<16;i++){
+      var a=(i/16)*M.TAU;
+      /* Geo.roundRect takes full width and depth while Geo.circle takes
+         a radius, so the cap above reaches 0.090 and not 0.180. Every
+         number here is a radius against that. */
+      var rx=0.094,rz=0.100;
+      /* skip the front third: locs do not grow across a face */
+      var fz=Math.cos(a);
+      if(fz>0.45)continue;
+      var x=Math.sin(a)*rx, z=fz*rz;
+      var lean=0.10+rng()*0.10;
+      b.push();b.translate(x,0.052,z);
+      var n=5+((rng()*3)|0);
+      for(var j=0;j<n;j++){
+        b.push();
+        b.translate(x*lean*j*0.30,-0.062*j,z*lean*j*0.30);
+        b.sphere(0,0,0,0.026-j*0.0020,7,6,j%2?LIT:MID,{squash:1.12});
+        b.pop();
+      }
+      b.pop();
+    }
+  },
+  /* Undercut. The whole read is the hard line between the shaved band
+     and the mass on top, so the band is a separate darker ring rather
+     than a shade of the same loft — a gradient there loses the edge. */
+  undercut:function(b){
+    b.loft([
+      {y:-0.020,pts:Geo.roundRect(0.184,0.196,0.086,14)},
+      {y: 0.048,pts:Geo.roundRect(0.190,0.202,0.088,14)}
+    ],DEEP,{openTop:true,openBottom:true});
+    b.loft([
+      {y:0.048,pts:Geo.roundRect(0.190,0.202,0.088,14)},
+      {y:0.096,pts:Geo.roundRect(0.196,0.208,0.092,14)},
+      {y:0.146,pts:Geo.roundRect(0.176,0.188,0.082,14)},
+      {y:0.176,pts:Geo.roundRect(0.096,0.102,0.046,14)}
+    ],LIT,{openBottom:true});
+    /* the mass is pushed to one side and forward, which is what makes
+       an undercut look styled instead of merely short */
+    b.push();b.translate(0.018,0.136,0.018);b.rotate(-0.18,0,0.16);
+    b.scale(1.0,0.60,1.06);
+    b.sphere(0,0,0,0.104,12,9,LIT);b.pop();
+  },
+  ponytail:function(b){
+    HAIR_BUILD.crop(b);
+    /* the gather, then the tail, which swings out before it drops */
+    b.push();b.translate(0,0.090,-0.118);
+    b.sphere(0,0,0,0.052,10,8,MID,{squash:0.86});
+    b.push();b.translate(0,-0.006,-0.020);
+    b.loft([
+      {y: 0.010,pts:Geo.circle(0.042,10)},
+      {y:-0.100,pts:Geo.circle(0.058,10)},
+      {y:-0.230,pts:Geo.circle(0.050,10)},
+      {y:-0.330,pts:Geo.circle(0.022,10)}
+    ],LIT,{});
+    b.pop();
+    /* the tie: a band a shade darker, because a tail with no tie reads
+       as a growth rather than a hairstyle */
+    b.push();b.translate(0,-0.020,-0.016);
+    b.loft([
+      {y:0,     pts:Geo.circle(0.048,10)},
+      {y:0.026, pts:Geo.circle(0.048,10)}
+    ],DEEP,{openTop:true,openBottom:true});
+    b.pop();
+    b.pop();
+  },
+  /* Afro. A shell of overlapping spheres on a hemisphere, seeded so it
+     is the same shape every time the part is rebuilt. */
+  afro:function(b){
+    var rng=M.rng(211);
+    b.push();b.translate(0,0.074,-0.006);
+    for(var i=0;i<46;i++){
+      var u=rng()*M.TAU, v=Math.acos(1-rng()*1.52);
+      var r=0.126+rng()*0.018;
+      var x=Math.sin(v)*Math.cos(u)*r;
+      var y=Math.cos(v)*r*0.92;
+      var z=Math.sin(v)*Math.sin(u)*r*1.05;
+      if(z>0.05&&y<0.010)continue;      /* no puffs across the face */
+      b.push();b.translate(x,y,z);
+      b.sphere(0,0,0,0.052+rng()*0.012,8,6,i%3?LIT:MID);
+      b.pop();
+    }
+    b.pop();
+    b.loft([
+      {y:0.004,pts:Geo.roundRect(0.180,0.192,0.084,14)},
+      {y:0.090,pts:Geo.roundRect(0.192,0.202,0.088,14)}
+    ],MID,{openTop:true,openBottom:true});
+  },
+  curls:function(b){
+    HAIR_BUILD.crop(b);
+    var rng=M.rng(157);
+    for(var i=0;i<22;i++){
+      var a=rng()*M.TAU, r=rng();
+      var x=Math.sin(a)*(0.024+r*0.070);
+      var z=Math.cos(a)*(0.026+r*0.076);
+      if(z>0.060&&x<0.036&&x>-0.036)continue;
+      b.push();
+      b.translate(x,0.104+rng()*0.052,z);
+      b.rotate(rng()*0.6,rng()*M.TAU,rng()*0.6);
+      b.sphere(0,0,0,0.034+rng()*0.014,8,6,i%2?LIT:MID,{squash:0.86});
+      b.pop();
+    }
+  },
+  topknot:function(b){
+    /* shaved at the sides, gathered high — the silhouette is a column
+       above a narrow skull, which reads from a long way off */
+    b.loft([
+      {y:-0.010,pts:Geo.roundRect(0.182,0.194,0.086,14)},
+      {y: 0.070,pts:Geo.roundRect(0.188,0.200,0.088,14)}
+    ],DEEP,{openTop:true,openBottom:true});
+    b.push();b.translate(0,0.114,-0.008);
+    b.scale(0.80,1.0,0.92);
+    b.sphere(0,0,0,0.112,12,9,LIT,{squash:0.62});b.pop();
+    b.push();b.translate(0,0.176,-0.014);
+    b.loft([
+      {y:0,    pts:Geo.circle(0.036,10)},
+      {y:0.030,pts:Geo.circle(0.030,10)}
+    ],DEEP,{openTop:true,openBottom:true});
+    b.sphere(0,0.076,0,0.056,10,8,LIT,{squash:0.92});
+    b.sphere(0.024,0.104,0.018,0.030,8,6,MID);
+    b.pop();
+  },
   bald:function(b){}
 };
 Body.HAIR=Object.keys(HAIR_BUILD);
@@ -5494,6 +5660,136 @@ var HAT_BUILD={
     b.push();b.translate(0,0.026,0.108);b.rotate(-0.10,0,0);
     b.chamfer(0,0,0,0.216,0.040,0.036,LIT,0.014,{noBand:true});b.pop();
   },
+  /* Tricorn. The brim is a rounded triangle rather than a circle with
+     three flaps stuck on — the outline has to be the hat, because at
+     twenty metres the outline is all there is. */
+  tricorn:function(b){
+    function triBrim(r,n){
+      var pts=[];
+      for(var i=0;i<n;i++){
+        var a=i/n*M.TAU;
+        var rr=r*(1.0+0.140*Math.cos(3*a+Math.PI));
+        pts.push([Math.sin(a)*rr,Math.cos(a)*rr]);
+      }
+      return pts;
+    }
+    b.loft([
+      {y:0.014,pts:Geo.roundRect(0.198,0.204,0.092,14)},
+      {y:0.108,pts:Geo.roundRect(0.192,0.198,0.090,14)},
+      {y:0.150,pts:Geo.roundRect(0.168,0.174,0.078,14)}
+    ],LIT,{openBottom:true});
+    /* 0.245 is a radius, so the brim reads about two and a half times
+       the width of the crown — the existing round brim uses 0.300 and
+       anything past that stops looking like a hat and starts looking
+       like a parasol. */
+    b.push();b.translate(0,0.026,0);
+    b.loft([
+      {y:0,     pts:triBrim(0.245,24)},
+      {y:0.020, pts:triBrim(0.241,24)}
+    ],MID,{});
+    b.pop();
+    /* the three cocked corners, turned up against the crown */
+    for(var k=0;k<3;k++){
+      var a=k/3*M.TAU+Math.PI;
+      b.push();
+      b.translate(Math.sin(a)*0.206,0.050,Math.cos(a)*0.206);
+      b.rotate(0,a,0);
+      b.rotate(-0.62,0,0);
+      b.chamfer(0,0.046,0,0.190,0.098,0.020,LIT,0.014,{noBand:true});
+      b.pop();
+    }
+    /* hatband and a cockade at the left corner */
+    b.push();b.translate(0,0.062,0);
+    b.loft([
+      {y:0,     pts:Geo.roundRect(0.206,0.212,0.096,14)},
+      {y:0.032, pts:Geo.roundRect(0.206,0.212,0.096,14)}
+    ],DARK,{openTop:true,openBottom:true});
+    b.pop();
+    b.mat('gold');
+    b.push();b.translate(-0.126,0.092,0.108);b.rotate(0,-0.7,0.3);
+    b.sphere(0,0,0,0.038,10,8,LIT,{squash:0.5});b.pop();
+    b.mat('blank');
+  },
+  /* Hard hat. Ribs down the crown and a short peak; the lamp is the
+     only emissive part, so it still reads in the quarry shadow. */
+  hardhat:function(b){
+    b.loft([
+      {y:0.006,pts:Geo.roundRect(0.212,0.220,0.100,16)},
+      {y:0.070,pts:Geo.roundRect(0.208,0.216,0.098,16)},
+      {y:0.132,pts:Geo.roundRect(0.184,0.192,0.086,16)},
+      {y:0.178,pts:Geo.roundRect(0.118,0.124,0.056,16)},
+      {y:0.198,pts:Geo.roundRect(0.052,0.056,0.026,16)}
+    ],LIT,{openBottom:true});
+    /* the crown rib, and a shorter one either side */
+    b.push();b.translate(0,0.176,-0.006);
+    b.chamfer(0,0,0,0.030,0.030,0.230,MID,0.010,{noBand:true});b.pop();
+    for(var s2=-1;s2<=1;s2+=2){
+      b.push();b.translate(s2*0.062,0.148,-0.006);b.rotate(0,0,s2*0.30);
+      b.chamfer(0,0,0,0.022,0.022,0.196,MID,0.008,{noBand:true});b.pop();
+    }
+    /* brim, wider at the front than the back */
+    b.push();b.translate(0,0.014,0.024);
+    b.loft([
+      {y:0,     pts:Geo.circle(0.150,18,1.0,1.16)},
+      {y:0.020, pts:Geo.circle(0.146,18,1.0,1.16)}
+    ],MID,{});
+    b.pop();
+    b.mat('panel');
+    b.push();b.translate(0,0.090,0.112);
+    b.chamfer(0,0,0,0.086,0.062,0.044,MID,0.012);b.pop();
+    b.mat('neon',1.0);
+    b.push();b.translate(0,0.090,0.138);
+    b.sphere(0,0,0,0.026,8,6,'#FFE9B0',{squash:0.7});b.pop();
+    b.mat('blank');
+  },
+  /* Flat cap. Body overhangs the peak and sits off-centre; a symmetric
+     one reads as a bowl. */
+  flatcap:function(b){
+    b.loft([
+      {y:0.012,pts:Geo.roundRect(0.200,0.208,0.094,14)},
+      {y:0.062,pts:Geo.roundRect(0.204,0.214,0.096,14)},
+      {y:0.098,pts:Geo.roundRect(0.196,0.206,0.092,14)}
+    ],LIT,{openBottom:true});
+    b.push();b.translate(-0.012,0.098,-0.022);b.rotate(-0.10,0,0.07);
+    b.scale(1.14,0.34,1.24);
+    b.sphere(0,0,0,0.128,14,10,LIT);b.pop();
+    b.push();b.translate(0,0.038,0.122);b.rotate(-0.24,0,0);
+    b.loft([
+      {y:-0.008,pts:Geo.roundRect(0.176,0.118,0.058,12)},
+      {y: 0.010,pts:Geo.roundRect(0.180,0.122,0.060,12)}
+    ],DARK,{});
+    b.pop();
+  },
+  /* Headwrap. Three bands wound at slightly different angles, plus a
+     tail — the offset angles are the whole trick, one clean ring reads
+     as a sweatband. */
+  headwrap:function(b){
+    var band=[[0.016,0.00,0.000],[0.062,0.09,0.030],[0.106,-0.07,-0.020]];
+    for(var i=0;i<3;i++){
+      var B=band[i];
+      b.push();b.translate(0,B[0],B[2]);b.rotate(B[1]*0.5,0,B[1]);
+      b.loft([
+        {y:0,     pts:Geo.roundRect(0.206,0.214,0.098,14)},
+        {y:0.056, pts:Geo.roundRect(0.208,0.216,0.098,14)}
+      ],i%2?LIT:MID,{openTop:true,openBottom:true});
+      b.pop();
+    }
+    /* the crown is closed off, otherwise you can see into the skull */
+    b.push();b.translate(0,0.146,-0.004);
+    b.scale(1.0,0.52,1.0);
+    b.sphere(0,0,0,0.112,14,10,LIT);b.pop();
+    /* the knot and its tail, hanging at the left */
+    b.push();b.translate(-0.108,0.086,-0.042);b.rotate(0,0.4,0.3);
+    b.sphere(0,0,0,0.048,10,8,MID,{squash:0.9});
+    b.push();b.translate(-0.010,-0.040,-0.020);b.rotate(0.2,0,0.24);
+    b.loft([
+      {y: 0.010,pts:Geo.roundRect(0.052,0.030,0.014,8)},
+      {y:-0.110,pts:Geo.roundRect(0.062,0.034,0.016,8)},
+      {y:-0.210,pts:Geo.roundRect(0.038,0.024,0.011,8)}
+    ],LIT,{});
+    b.pop();
+    b.pop();
+  },
   none:function(b){}
 };
 Body.HATS=Object.keys(HAT_BUILD);
@@ -5505,6 +5801,203 @@ Body.hat=function(style){
     HAT_BUILD[style](b);
     b.pop();
   });
+};
+
+/* ---------------- facial hair ----------------
+   Authored in the head's own space, not the hair's, because every one
+   of these has to sit against a face landmark — the lip line, the jaw,
+   the underside of the nose — and those are measured in Body.head.
+   The tint is the hair colour, so the geometry is painted in greys. */
+/* Head landmarks, all half-extents, because Geo.roundRect in Body.head
+   is given full widths: the jaw reaches x 0.063, the cheek 0.083, the
+   eyeline 0.093, and the face plane sits at about z 0.104. Everything
+   below is measured against those four numbers. */
+var FACE_BUILD={
+  stubble:function(b){
+    /* A thin shell hugging the jaw. Squashed hard and kept close to the
+       surface: stubble that stands off the face reads as a mask. */
+    var pts=[[0,-0.100,0.062],[0.032,-0.094,0.058],[-0.032,-0.094,0.058],
+             [0.058,-0.078,0.044],[-0.058,-0.078,0.044],
+             [0.076,-0.058,0.018],[-0.076,-0.058,0.018],
+             [0.044,-0.062,0.070],[-0.044,-0.062,0.070]];
+    for(var i=0;i<pts.length;i++){
+      b.push();b.translate(pts[i][0],pts[i][1],pts[i][2]);
+      b.scale(1.25,0.72,0.55);
+      b.sphere(0,0,0,0.032,8,6,MID);
+      b.pop();
+    }
+    b.push();b.translate(0,-0.046,0.086);b.scale(1.5,0.5,0.5);
+    b.sphere(0,0,0,0.026,8,6,MID);b.pop();
+  },
+  moustache:function(b){
+    b.push();b.translate(0,-0.044,0.092);b.rotate(0.10,0,0);
+    b.scale(1.0,0.62,0.70);
+    b.sphere(0,0,0,0.028,10,8,LIT);
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.024,-0.004,-0.004);b.rotate(0,0,s*0.5);
+      b.sphere(0,0,0,0.021,8,6,MID,{squash:0.8});
+      b.push();b.translate(s*0.019,0.008,0);
+      b.sphere(0,0,0,0.014,8,6,LIT,{squash:0.8});b.pop();
+      b.pop();
+    }
+    b.pop();
+  },
+  goatee:function(b){
+    FACE_BUILD.moustache(b);
+    b.push();b.translate(0,-0.086,0.062);b.rotate(-0.18,0,0);
+    b.loft([
+      {y: 0.030,pts:Geo.roundRect(0.062,0.050,0.020,10)},
+      {y:-0.012,pts:Geo.roundRect(0.072,0.058,0.024,10)},
+      {y:-0.062,pts:Geo.roundRect(0.048,0.042,0.016,10)}
+    ],LIT,{});
+    b.pop();
+  },
+  beard:function(b){
+    FACE_BUILD.moustache(b);
+    /* An arc from ear to ear, each lobe leaning outward with its
+       distance from the chin, so the mass hangs instead of clamping. */
+    for(var i=0;i<9;i++){
+      var t=(i/8)*2-1;                 /* -1 left ear .. +1 right ear */
+      var a=t*1.16;
+      var x=Math.sin(a)*0.080;
+      var z=Math.cos(a)*0.078-0.010;
+      var drop=0.086-Math.abs(t)*0.052;
+      b.push();
+      b.translate(x,-0.078-drop*0.5,z);
+      b.rotate(0,-a,0);
+      b.scale(1.0,1.24,0.86);
+      b.sphere(0,0,0,0.038,9,7,i%2?LIT:MID);
+      b.pop();
+    }
+    b.push();b.translate(0,-0.150,0.046);
+    b.scale(1.0,1.30,0.90);
+    b.sphere(0,0,0,0.038,10,8,LIT);b.pop();
+    b.push();b.translate(0,-0.190,0.038);
+    b.sphere(0,0,0,0.026,8,6,MID,{squash:1.2});b.pop();
+  },
+  none:function(b){}
+};
+Body.FACIAL=Object.keys(FACE_BUILD);
+Body.facial=function(style){
+  style=FACE_BUILD[style]?style:'none';
+  return part('facial:'+style,function(b){
+    b.mat('blank');
+    b.push();b.scale(P.headScale,P.headScale,P.headScale);
+    FACE_BUILD[style](b);
+    b.pop();
+  },96);
+};
+
+/* ---------------- worn on the face ----------------
+   Glasses, goggles, a patch. Same space as the facial hair and for the
+   same reason: the eyeline sits at y 0.008 and the face plane at about
+   z 0.105, and everything here has to land on those two numbers. */
+function ringOf(b,r,n,thick,col){
+  for(var i=0;i<n;i++){
+    var a=i/n*M.TAU;
+    b.push();b.translate(Math.cos(a)*r,Math.sin(a)*r,0);
+    b.sphere(0,0,0,thick,5,4,col);
+    b.pop();
+  }
+}
+var ACC_BUILD={
+  specs:function(b){
+    b.mat('panel');
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.047,0.008,0.110);b.rotate(0,s*-0.14,0);
+      ringOf(b,0.036,14,0.0080,LIT);
+      b.mat('glass');
+      b.push();b.translate(0,0,-0.006);
+      b.sphere(0,0,0,0.033,10,8,MID,{squash:0.10});b.pop();
+      b.mat('panel');
+      /* temple arm, back past the ear */
+      b.push();b.translate(s*0.036,0.006,-0.034);b.rotate(0,s*0.42,0);
+      b.chamfer(0,0,0,0.008,0.008,0.112,MID,0.003,{noBand:true});b.pop();
+      b.pop();
+    }
+    b.push();b.translate(0,0.012,0.112);
+    b.chamfer(0,0,0,0.024,0.008,0.008,MID,0.003,{noBand:true});b.pop();
+    b.mat('blank');
+  },
+  /* Goggles ride on the forehead, not over the eyes. Someone who has
+     pushed their goggles up has been working; someone wearing them is
+     working right now, and hides the eyes doing it. */
+  goggles:function(b){
+    b.mat('fabric');
+    b.push();b.translate(0,0.066,0.006);b.rotate(-0.22,0,0);
+    b.loft([
+      {y:-0.020,pts:Geo.roundRect(0.196,0.206,0.092,14)},
+      {y: 0.020,pts:Geo.roundRect(0.196,0.206,0.092,14)}
+    ],MID,{openTop:true,openBottom:true});
+    b.mat('panel');
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.046,0.002,0.092);b.rotate(0,s*-0.16,0);
+      b.push();b.rotate(Math.PI/2,0,0);
+      b.cylinder(0,0,0,0.042,0.039,0.038,12,LIT,{open:true});
+      b.pop();
+      b.mat('crystal',0.14);
+      b.push();b.translate(0,0,0.014);
+      b.sphere(0,0,0,0.037,10,8,LIT,{squash:0.16});b.pop();
+      b.mat('panel');
+      b.pop();
+    }
+    /* the bridge strap between the cups */
+    b.push();b.translate(0,0.002,0.090);
+    b.chamfer(0,0,0,0.034,0.020,0.020,MID,0.006,{noBand:true});b.pop();
+    b.pop();
+    b.mat('blank');
+  },
+  eyepatch:function(b){
+    b.mat('fabric');
+    b.push();b.translate(-0.046,0.010,0.098);b.rotate(0,0.16,0.10);
+    b.scale(1.0,1.12,0.34);
+    b.sphere(0,0,0,0.044,10,8,DEEP);
+    b.pop();
+    /* the cord: two straps running back over the skull, not a ring —
+       a full band reads as a blindfold from the side */
+    b.push();b.translate(-0.034,0.050,0.010);b.rotate(0,-0.5,0.34);
+    b.chamfer(0,0,0,0.010,0.008,0.196,DARK,0.003,{noBand:true});b.pop();
+    b.push();b.translate(-0.038,-0.026,0.010);b.rotate(0,-0.5,-0.20);
+    b.chamfer(0,0,0,0.010,0.008,0.192,DARK,0.003,{noBand:true});b.pop();
+    b.mat('blank');
+  },
+  earrings:function(b){
+    b.mat('gold');
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.100,-0.042,-0.008);b.rotate(0,Math.PI/2,0);
+      ringOf(b,0.024,12,0.0060,LIT);
+      b.pop();
+    }
+    b.mat('blank');
+  },
+  /* Pulled up over the nose. The fold across the bridge is what stops
+     it reading as a painted stripe. */
+  bandana:function(b){
+    b.mat('fabric');
+    b.push();b.translate(0,-0.062,0.014);
+    b.loft([
+      {y: 0.056,pts:Geo.roundRect(0.196,0.206,0.090,14)},
+      {y: 0.010,pts:Geo.roundRect(0.194,0.204,0.090,14)},
+      {y:-0.048,pts:Geo.roundRect(0.156,0.164,0.072,14)}
+    ],LIT,{openTop:true,openBottom:true});
+    b.pop();
+    b.push();b.translate(0,-0.012,0.096);b.rotate(0.30,0,0);
+    b.chamfer(0,0,0,0.090,0.028,0.026,MID,0.010,{noBand:true});b.pop();
+    b.push();b.translate(0,-0.092,0.060);
+    b.chamfer(0,0,0,0.110,0.020,0.028,MID,0.008,{noBand:true});b.pop();
+    b.mat('blank');
+  },
+  none:function(b){}
+};
+Body.ACCESSORIES=Object.keys(ACC_BUILD);
+Body.accessory=function(style){
+  style=ACC_BUILD[style]?style:'none';
+  return part('acc:'+style,function(b){
+    b.mat('blank');
+    b.push();b.scale(P.headScale,P.headScale,P.headScale);
+    ACC_BUILD[style](b);
+    b.pop();
+  },96);
 };
 
 LH.Body=Body;
@@ -5710,6 +6203,269 @@ Cos.backpack=function(style){
   },48);
 };
 
+/* ---------------- occupational layers ----------------
+   A coat, a harness, an apron. These are what actually tell you what
+   somebody does: the colour of a shirt is a preference, but a chest
+   full of clipped-on quarry hardware is a job. They ride the chest
+   bone alongside the shirt, so they lean and turn with the torso.
+
+   Chest space, for anything added here: the shirt runs y -0.27 to
+   0.184, the shoulders sit near x +/-0.20, the hip line is about
+   y -0.27 and the knee is about y -0.72.
+   ============================================================ */
+
+/* Every measurement below is a half-extent against the shirt, which is
+   the thing an overlay has to clear. Geo.roundRect is given a FULL
+   width and depth, so a shirt ring written as roundRect(0.388,0.210)
+   reaches x 0.194 — the first draft of this file read those as radii
+   and built a coat that fitted neatly inside the shirt, visible only
+   as a collar and a stripe. The shirt's outer half-widths, by height:
+
+     y -0.27 : 0.150      y  0.04 : 0.174      y  0.163 : 0.165
+     y -0.12 : 0.154      y  0.09 : 0.195      y  0.184 : 0.110
+     y -0.02 : 0.160      y  0.13 : 0.208   (front face at z 0.119)
+
+   The thigh reaches x 0.239 with the knee near y -0.72, which is what
+   sets how wide a coat skirt has to be to swing clear of the legs. */
+
+/* A coat skirt: long at the back and sides, cut away at the front so
+   the legs have somewhere to go. Everything below the waist is a
+   rigid part of the chest bone, and a closed hem swings through the
+   thighs on the second stride. */
+function coatSkirt(b,y0,y1,w0,w1,d0,d1,front,col){
+  var n=16,steps=7,secs=[];
+  for(var i=0;i<=steps;i++){
+    var t=i/steps;
+    var y=M.lerp(y0,y1,t);
+    var pts=Geo.roundRect(M.lerp(w0,w1,t),M.lerp(d0,d1,t),0.070,n);
+    for(var j=0;j<pts.length;j++){
+      if(pts[j][1]>0){
+        /* the front is drawn in toward the body as the skirt falls,
+           which is what opens the coat */
+        var k=M.lerp(1.0,front,t);
+        pts[j][0]*=M.lerp(1.0,0.80,t);
+        pts[j][1]*=k;
+      }
+    }
+    secs.push({y:y,pts:pts,col:i===0?MID:(i>steps-2?LOW:col||LIT)});
+  }
+  b.loft(secs,LIT,{openTop:true,openBottom:true,uvScale:1.8});
+}
+
+/* A standing collar, turned up. It has to start above y 0.172, where
+   the shirt has already narrowed toward its own neck opening — lower
+   than that and the collar is inside the shoulder. */
+function standCollar(b,y,w,d,h,col){
+  b.push();b.translate(0,y,0);
+  var lo=Geo.roundRect(w,d,0.070,14), hi=Geo.roundRect(w+0.040,d+0.056,0.076,14);
+  for(var j=0;j<hi.length;j++)if(hi[j][1]>0)hi[j][1]*=1.28;
+  b.loft([{y:0,pts:lo},{y:h,pts:hi}],col||MID,{openTop:true,openBottom:true});
+  b.pop();
+}
+
+var OVER_BUILD={
+  /* Harbourmaster's oilskin: heavy, long, storm collar, brass at the
+     shoulder. It is the tallest silhouette in the game on purpose. */
+  oilskin:function(b){
+    b.mat('fabric');
+    coatSkirt(b,-0.24,-0.78,0.400,0.560,0.260,0.330,0.34,LIT);
+    b.loft([
+      {y:-0.24,pts:Geo.roundRect(0.380,0.250,0.086,16)},
+      {y:-0.02,pts:Geo.roundRect(0.400,0.260,0.090,16)},
+      {y: 0.09,pts:Geo.roundRect(0.470,0.276,0.100,16)},
+      {y: 0.15,pts:Geo.roundRect(0.430,0.262,0.096,16)}
+    ],LIT,{openTop:true,openBottom:true,uvScale:2});
+    standCollar(b,0.172,0.280,0.240,0.100,MID);
+    /* storm flap down the right of the chest */
+    b.push();b.translate(0.070,-0.030,0.136);b.rotate(0,0,0.05);
+    b.chamfer(0,0,0,0.150,0.380,0.024,MID,0.012,{noBand:true});b.pop();
+    b.mat('gold');
+    for(var i=0;i<3;i++){
+      b.push();b.translate(0.132,0.080-i*0.120,0.150);
+      b.sphere(0,0,0,0.020,8,6,LIT,{squash:0.6});b.pop();
+    }
+    /* the rank bar at the shoulder */
+    b.push();b.translate(0.190,0.134,0.010);b.rotate(0,0,-0.28);
+    b.chamfer(0,0,0,0.130,0.026,0.110,LIT,0.010,{noBand:true});b.pop();
+    b.mat('panel');
+    b.push();b.translate(0,-0.250,0.010);
+    b.loft([
+      {y:0,    pts:Geo.roundRect(0.412,0.276,0.088,14)},
+      {y:0.060,pts:Geo.roundRect(0.412,0.276,0.088,14)}
+    ],MID,{openTop:true,openBottom:true});
+    b.pop();
+  },
+  /* Warden's longcoat: same family, different intent. Narrower, belted,
+     one shoulder plated. */
+  longcoat:function(b){
+    b.mat('fabric');
+    coatSkirt(b,-0.26,-0.70,0.392,0.530,0.256,0.310,0.26,LIT);
+    b.loft([
+      {y:-0.26,pts:Geo.roundRect(0.370,0.246,0.084,16)},
+      {y:-0.04,pts:Geo.roundRect(0.392,0.256,0.088,16)},
+      {y: 0.09,pts:Geo.roundRect(0.462,0.272,0.098,16)},
+      {y: 0.15,pts:Geo.roundRect(0.424,0.258,0.094,16)}
+    ],LIT,{openTop:true,openBottom:true,uvScale:2});
+    standCollar(b,0.172,0.276,0.236,0.112,MID);
+    /* asymmetric closure — the diagonal is the whole silhouette */
+    b.push();b.translate(-0.040,-0.020,0.136);b.rotate(0,0,-0.22);
+    b.chamfer(0,0,0,0.180,0.400,0.022,MID,0.010,{noBand:true});b.pop();
+    b.mat('panel');
+    b.push();b.translate(0,-0.238,0.006);
+    b.loft([
+      {y:0,    pts:Geo.roundRect(0.402,0.268,0.086,14)},
+      {y:0.052,pts:Geo.roundRect(0.402,0.268,0.086,14)}
+    ],MID,{openTop:true,openBottom:true});
+    b.pop();
+    b.push();b.translate(0,-0.212,0.146);
+    b.chamfer(0,0,0,0.088,0.070,0.030,LIT,0.010);b.pop();
+    /* the pauldron, right shoulder only */
+    b.push();b.translate(0.212,0.120,0.000);b.rotate(0,0,-0.34);
+    b.scale(1.0,0.66,1.10);
+    b.sphere(0,0,0,0.132,12,9,LIT);
+    b.pop();
+    b.push();b.translate(0.220,0.064,0.000);b.rotate(0,0,-0.30);
+    b.scale(1.0,0.40,1.02);
+    b.sphere(0,0,0,0.126,12,9,MID);
+    b.pop();
+  },
+  /* Quarry harness. Straps, clips, and a coil of rope over one
+     shoulder — the rope is what sells it from behind. */
+  harness:function(b){
+    b.mat('fabric');
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.086,-0.020,0.006);b.rotate(0,0,s*0.20);
+      b.chamfer(0,0,0,0.062,0.400,0.264,LIT,0.014,{noBand:true});b.pop();
+    }
+    b.push();b.translate(0,-0.060,0.004);
+    b.loft([
+      {y:0,    pts:Geo.roundRect(0.430,0.268,0.090,14)},
+      {y:0.060,pts:Geo.roundRect(0.430,0.268,0.090,14)}
+    ],MID,{openTop:true,openBottom:true});
+    b.pop();
+    b.mat('panel');
+    b.push();b.translate(0,-0.030,0.140);
+    b.chamfer(0,0,0,0.110,0.086,0.030,LIT,0.012);b.pop();
+    for(var i=0;i<3;i++){
+      b.push();b.translate(-0.150+i*0.030,-0.076,0.136);
+      b.chamfer(0,0,0,0.026,0.052,0.026,MID,0.006);b.pop();
+    }
+    /* the coil, over the left shoulder and round the back */
+    b.mat('fabric');
+    b.push();b.translate(-0.170,0.020,-0.090);b.rotate(0.30,0,0.42);
+    for(var k=0;k<16;k++){
+      var a=k/16*M.TAU;
+      b.push();b.translate(Math.cos(a)*0.120,Math.sin(a)*0.120,(k%2)*0.024);
+      b.sphere(0,0,0,0.026,6,5,k%2?LIT:MID);b.pop();
+    }
+    b.pop();
+  },
+  /* Registry stole. Narrow, exact, fringed — it should look issued
+     rather than chosen. */
+  stole:function(b){
+    b.mat('fabric');
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.078,-0.030,0.132);b.rotate(0,0,s*0.10);
+      b.chamfer(0,0,0,0.074,0.420,0.020,LIT,0.008,{noBand:true});b.pop();
+      b.push();b.translate(s*0.078,-0.030,-0.132);b.rotate(0,0,s*0.10);
+      b.chamfer(0,0,0,0.074,0.420,0.020,MID,0.008,{noBand:true});b.pop();
+      b.push();b.translate(s*0.150,0.132,0.006);b.rotate(0,0,s*0.30);
+      b.scale(1.0,0.34,1.06);
+      b.sphere(0,0,0,0.104,10,8,LIT);b.pop();
+      /* fringe */
+      for(var f=0;f<4;f++){
+        b.push();b.translate(s*0.078-0.026+f*0.018,-0.244,0.132);
+        b.cylinder(0,0,0,0.006,0.003,0.048,5,MID);b.pop();
+      }
+    }
+    b.mat('gold');
+    b.push();b.translate(0,0.070,0.146);
+    b.chamfer(0,0,0,0.070,0.030,0.018,LIT,0.006,{noBand:true});
+    b.sphere(0,-0.032,0.006,0.024,10,8,LIT,{squash:0.7});b.pop();
+  },
+  /* Market apron: bib, waist tie, and a pocket band that stands off
+     the front. The skirt is a front panel rather than a full ring —
+     an apron that wraps all the way round is a smock. */
+  apron:function(b){
+    b.mat('fabric');
+    b.push();b.translate(0,-0.030,0.132);
+    b.chamfer(0,0,0,0.260,0.400,0.026,LIT,0.014,{noBand:true});b.pop();
+    b.push();b.translate(0,-0.240,0.126);
+    b.extrude([[-0.152,0.010],[0.152,0.010],[0.190,-0.330],[-0.190,-0.330]],
+      0.026,LIT);
+    b.pop();
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.100,0.096,0.126);b.rotate(0,0,s*0.30);
+      b.chamfer(0,0,0,0.040,0.190,0.020,MID,0.008,{noBand:true});b.pop();
+    }
+    b.push();b.translate(0,-0.222,0.006);
+    b.loft([
+      {y:0,    pts:Geo.roundRect(0.400,0.264,0.086,14)},
+      {y:0.048,pts:Geo.roundRect(0.400,0.264,0.086,14)}
+    ],MID,{openTop:true,openBottom:true});
+    b.pop();
+    /* the pocket, and something in it */
+    b.push();b.translate(0,-0.150,0.152);
+    b.chamfer(0,0,0,0.230,0.120,0.040,MID,0.014);b.pop();
+    b.mat('planks');
+    b.push();b.translate(-0.062,-0.106,0.164);b.rotate(0,0,0.18);
+    b.cylinder(0,0,0,0.012,0.010,0.090,6,LIT);b.pop();
+  },
+  /* Tool belt, sitting on the hip line with weight hanging off it. */
+  toolbelt:function(b){
+    b.mat('fabric');
+    b.push();b.translate(0,-0.250,0);
+    b.loft([
+      {y:0,    pts:Geo.roundRect(0.400,0.262,0.086,16)},
+      {y:0.070,pts:Geo.roundRect(0.400,0.262,0.086,16)}
+    ],LIT,{openTop:true,openBottom:true});
+    b.pop();
+    b.mat('panel');
+    b.push();b.translate(0,-0.216,0.140);
+    b.chamfer(0,0,0,0.078,0.062,0.028,MID,0.010);b.pop();
+    /* pouches at the hips, tools hanging behind them */
+    for(var s2=-1;s2<=1;s2+=2){
+      b.mat('fabric');
+      b.push();b.translate(s2*0.222,-0.286,0.036);b.rotate(0,s2*0.24,0);
+      b.chamfer(0,0,0,0.110,0.140,0.098,LIT,0.020);
+      b.push();b.translate(0,0.078,0.010);
+      b.chamfer(0,0,0,0.116,0.030,0.104,MID,0.010);b.pop();
+      b.pop();
+      b.mat('panel');
+      b.push();b.translate(s2*0.234,-0.330,-0.076);b.rotate(0.20,0,s2*0.10);
+      b.cylinder(0,0,0,0.017,0.013,0.180,7,MID);b.pop();
+    }
+    /* a rag through the belt */
+    b.mat('fabric');
+    b.push();b.translate(-0.126,-0.300,0.126);b.rotate(0.10,0,0.24);
+    b.chamfer(0,0,0,0.070,0.140,0.026,MID,0.012,{noBand:true});b.pop();
+  },
+  /* Plate on both shoulders, nothing else — for anyone who should read
+     as armoured without wearing a coat. */
+  pauldron:function(b){
+    b.mat('panel');
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.210,0.122,0.000);b.rotate(0,0,s*0.34);
+      b.scale(1.0,0.62,1.08);
+      b.sphere(0,0,0,0.128,12,9,LIT);b.pop();
+      b.push();b.translate(s*0.218,0.068,0.000);b.rotate(0,0,s*0.30);
+      b.scale(1.0,0.38,1.00);
+      b.sphere(0,0,0,0.122,12,9,MID);b.pop();
+    }
+    b.push();b.translate(0,0.104,0.128);
+    b.chamfer(0,0,0,0.220,0.070,0.040,MID,0.014);b.pop();
+  },
+  none:function(b){}
+};
+Cos.OVERLAYS=Object.keys(OVER_BUILD);
+Cos.overlay=function(style){
+  style=OVER_BUILD[style]?style:'none';
+  return part('over:'+style,function(b){
+    b.mat('fabric');
+    OVER_BUILD[style](b);
+  },48);
+};
+
 /* ---------------- auras ----------------
    The rarity tell. Drawn additively under the character, so it lights
    the ground the way the 2D build's ground bloom did.  */
@@ -5855,6 +6611,112 @@ var TOOL_BUILD={
     ],LOW,{openTop:true});
     b.pop();
   },
+  /* Hangs from the grip rather than standing on it: +X here is down
+     once the hand rotation is applied, so the body falls below the
+     fist and the bail closes over it. */
+  lantern:function(b){
+    /* The bail arcs back over the fist and the body hangs below it:
+       +X in this space is straight down once the hand rotation is
+       applied, which is why the loop is drawn into negative X. */
+    b.mat('panel');
+    b.push();b.rotate(0,0,Math.PI/2);
+    for(var k=0;k<9;k++){
+      var a=(k/8)*Math.PI;
+      b.push();b.translate(Math.cos(a)*0.062,-Math.sin(a)*0.062,0);
+      b.sphere(0,0,0,0.011,5,4,MID);b.pop();
+    }
+    b.pop();
+    b.push();b.translate(0.048,0,0);
+    b.chamfer(0,0,0,0.036,0.132,0.132,MID,0.014);b.pop();
+    b.push();b.translate(0.196,0,0);
+    b.chamfer(0,0,0,0.030,0.150,0.150,MID,0.016);b.pop();
+    /* four corner posts, then the glass and the flame between them */
+    for(var i2=0;i2<4;i2++){
+      var aa=i2/4*M.TAU+0.785;
+      b.push();b.translate(0.122,Math.cos(aa)*0.058,Math.sin(aa)*0.058);
+      b.chamfer(0,0,0,0.150,0.014,0.014,LIT,0.004,{noBand:true});b.pop();
+    }
+    b.mat('glass');
+    b.push();b.rotate(0,0,Math.PI/2);
+    b.cylinder(0,0.122,0,0.056,0.056,0.140,12,LIT,{open:true});
+    b.pop();
+    b.mat('neon',1.0);
+    b.push();b.translate(0.126,0,0);
+    b.sphere(0,0,0,0.034,10,8,'#FFCE7A',{squash:1.45});b.pop();
+    b.mat('panel');
+  },
+  /* A closed ledger, held against the forearm. Pages are their own
+     block a shade lighter than the boards — a single slab reads as a
+     brick, and a registrar carrying a brick is not the idea. */
+  ledger:function(b){
+    b.mat('panel');
+    b.push();b.translate(0.070,0.020,0);b.rotate(0,0,-0.30);
+    b.chamfer(0,0,0,0.180,0.030,0.250,MID,0.012);
+    b.mat('blank');
+    b.push();b.translate(0,0.024,-0.008);
+    b.chamfer(0,0,0,0.164,0.026,0.232,LIT,0.004,{noBand:true});b.pop();
+    b.mat('panel');
+    b.push();b.translate(0,0.042,0);
+    b.chamfer(0,0,0,0.180,0.026,0.250,MID,0.010);b.pop();
+    /* spine and a ribbon marker */
+    b.push();b.translate(0,0.022,-0.126);
+    b.chamfer(0,0,0,0.180,0.076,0.020,DARK,0.008,{noBand:true});b.pop();
+    b.mat('fabric');
+    b.push();b.translate(0.030,0.034,0.150);b.rotate(0.10,0,0);
+    b.chamfer(0,0,0,0.024,0.010,0.110,LIT,0.004,{noBand:true});b.pop();
+    b.mat('gold');
+    b.push();b.translate(0,0.058,0.040);
+    b.chamfer(0,0,0,0.070,0.010,0.070,LIT,0.004,{noBand:true});b.pop();
+    b.pop();
+  },
+  /* Balance scales. The beam is level, the pans hang: the only thing
+     that makes this read at distance is the gap under the pans. */
+  scales:function(b){
+    /* Beam level, pans hanging. The gap under the pans is the only
+       thing that reads at gameplay distance, so the chains are long. */
+    b.mat('gold');
+    b.push();b.rotate(0,0,Math.PI/2);
+    b.cylinder(0,0.110,0,0.020,0.016,0.22,8,MID);b.pop();
+    b.push();b.translate(0.220,0,0);
+    b.sphere(0,0,0,0.034,10,8,LIT,{squash:0.8});
+    b.push();b.rotate(Math.PI/2,0,0);
+    b.cylinder(0,0,0,0.013,0.013,0.400,8,LIT);b.pop();
+    for(var s2=-1;s2<=1;s2+=2){
+      b.push();b.translate(0,0,s2*0.190);
+      b.sphere(0,0,0,0.018,8,6,MID);
+      for(var k=0;k<2;k++){
+        b.push();b.rotate(0,0,Math.PI/2);
+        b.cylinder(0,0.048+k*0.092,0,0.006,0.006,0.090,5,MID);b.pop();
+      }
+      b.push();b.translate(0.186,0,0);b.rotate(0,0,Math.PI/2);
+      b.loft([
+        {y:0,     pts:Geo.circle(0.096,12)},
+        {y:0.038, pts:Geo.circle(0.064,12)}
+      ],LIT,{openBottom:true});
+      b.pop();
+      b.pop();
+    }
+    b.pop();
+  },
+  /* Three telescoping tubes and a brass ring at the eyepiece. */
+  spyglass:function(b){
+    b.mat('panel');
+    b.push();b.rotate(0,0,Math.PI/2);
+    b.cylinder(0,0.060,0,0.030,0.030,0.120,10,MID);
+    b.cylinder(0,0.180,0,0.026,0.026,0.120,10,LIT);
+    b.cylinder(0,0.300,0,0.022,0.022,0.120,10,MID);
+    b.pop();
+    b.mat('gold');
+    b.push();b.rotate(0,0,Math.PI/2);
+    b.cylinder(0,-0.006,0,0.034,0.034,0.026,10,LIT);
+    b.cylinder(0,0.120,0,0.030,0.030,0.018,10,LIT);
+    b.cylinder(0,0.240,0,0.026,0.026,0.018,10,LIT);
+    b.cylinder(0,0.362,0,0.025,0.025,0.020,10,LIT);
+    b.pop();
+    b.mat('glass');
+    b.push();b.translate(0.366,0,0);b.rotate(0,0,Math.PI/2);
+    b.cylinder(0,0,0,0.020,0.020,0.006,10,LIT);b.pop();
+  },
   none:function(b){}
 };
 Cos.TOOLS=Object.keys(TOOL_BUILD);
@@ -5953,9 +6815,12 @@ var SLOTS=[
   ['brows',     'head',      [0,0.030,0]],
   ['hair',      'head',      [0,0.030,0]],
   ['hat',       'head',      [0,0.030,0]],
+  ['facial',    'head',      [0,0.030,0]],
+  ['acc',       'head',      [0,0.030,0]],
   ['neck',      'neck',      [0,0,0]],
   ['chest',     'chest',     [0,0,0]],
   ['shirt',     'chest',     [0,0,0]],
+  ['over',      'chest',     [0,0,0]],
   ['cape',      'chest',     [0,0,0]],
   ['wings',     'chest',     [0,0,0]],
   ['back',      'chest',     [0,0,0]],
@@ -5986,8 +6851,19 @@ for(var si=0;si<SLOTS.length;si++)SLOT_BONE[SLOTS[si][0]]=SLOTS[si];
    The 2D build let players start dressed. This one does not: you
    arrive in the simplest possible clothes and everything after that
    is something you found, earned or bought. */
+/* Xorshift32 needs its seed scattered before the first draw is worth
+   anything. Seeded with 5, 36 or 67 the state stays under 2^25 for a
+   round or two, so the first value is always below 0.01 — and a kit
+   that picks its skin, hair and shirt from the first three draws hands
+   every small seed the same person. Scatter, then throw a few away. */
+function kitRng(seed){
+  var r=M.rng((((seed||1)*2654435761)>>>0)||1);
+  for(var i=0;i<8;i++)r();
+  return r;
+}
+A.kitRng=kitRng;
 A.defaultKit=function(seed){
-  var rng=M.rng(seed||1);
+  var rng=kitRng(seed);
   var SKIN=['#F2C9A4','#E3AE83','#C98B62','#9C6242','#75462C','#54321F','#FBDCC0'];
   var HAIRC=['#2B2118','#4A3222','#7A5230','#A87740','#D8B978','#8E3B2E','#2A2E3A'];
   var EYEC=['#4A7FB5','#4E6B3A','#6B4A2C','#3A3F4A','#5C4B8A'];
@@ -6005,6 +6881,12 @@ A.defaultKit=function(seed){
     build:'base',
     hair:{style:'crop',color:HAIRC[(rng()*HAIRC.length)|0]},
     hat:{style:'none',color:'#FFFFFF'},
+    /* Facial hair takes the hair's colour, so it carries no colour of
+       its own — two greys that disagree on the same head is the fastest
+       way to make a character look assembled rather than designed. */
+    facial:{style:'none'},
+    acc:{style:'none',color:'#2E3540'},
+    over:{style:'none',color:'#FFFFFF'},
     shirt:{style:'tee',color:TEE[(rng()*TEE.length)|0],sleeve:'short'},
     pants:{style:'long',color:TROUSER[(rng()*TROUSER.length)|0],leg:'long'},
     shoes:{style:'shoe',color:SHOE[(rng()*SHOE.length)|0]},
@@ -6267,12 +7149,20 @@ A.submit=function(actor){
       [-lag[0]*0.30,0,lag[1]*0.30]);
   if(k.hat.style!=='none')
     P(Body.hat(k.hat.style),'head',headOff,Geo.col3(k.hat.color));
+  if(k.facial&&k.facial.style!=='none')
+    P(Body.facial(k.facial.style),'head',headOff,Geo.col3(k.hair.color));
+  if(k.acc&&k.acc.style!=='none')
+    P(Body.accessory(k.acc.style),'head',headOff,Geo.col3(k.acc.color));
   P(Body.neck(),'neck',null,skin);
 
   /* --- torso --- */
   P(Body.chest(k.build),'chest',null,skin);
   if(k.shirt.style!=='none')
     P(Body.shirt(k.shirt.style),'chest',null,Geo.col3(k.shirt.color));
+  /* The occupational layer goes on before the cape and after the
+     shirt: a coat under a cape, a cape over a coat. */
+  if(k.over&&k.over.style!=='none')
+    P(Cos.overlay(k.over.style),'chest',null,Geo.col3(k.over.color));
   if(k.cape.style!=='none')
     /* The cape answers to where the body has been. Sign checked by
        eye: running forward has to throw it back, not wrap it round. */
@@ -6370,6 +7260,318 @@ A.flushShadow=function(prog){
 A.touched=function(){return touched;};
 
 LH.Actors=A;
+})();
+
+/* ============================================================
+   LH.Cast — the people, designed one at a time.
+
+   Everything before this file gives a character a vocabulary: eleven
+   hairstyles, ten hats, seven occupational layers, twelve things to
+   hold. None of that is a character. A character is one specific set
+   of those choices, made on purpose, and readable as a silhouette
+   before you are close enough to see a face.
+
+   So each entry here is written to a single sentence of intent, kept
+   in `note`, and every field under it exists to serve that sentence.
+   Where a choice fights the sentence it loses, even when it would
+   look nicer on its own.
+
+   The three rules the whole table obeys:
+
+     1. Silhouette first. Two residents must be distinguishable in
+        black at twenty metres. That is why nobody shares a headwear
+        shape, and why height varies by up to fourteen centimetres.
+     2. One loud colour each, and it belongs to that person. Mira has
+        the teal, Dell the safety orange, Bao the gold. Nobody else
+        may use it as their loud colour.
+     3. The job is worn, not stated. A harness full of clips says
+        quarry foreman without a nameplate; the nameplate is a
+        fallback for players who are already close.
+   ============================================================ */
+(function(){
+'use strict';
+var Act=LH.Actors,Cast={};
+
+/* Shallow-merge one level deep, because every kit field is either a
+   scalar or a flat {style,color} pair and a full deep clone would
+   quietly share the palette arrays between actors. */
+function apply(kit,spec){
+  for(var k in spec){
+    var v=spec[k];
+    if(v&&typeof v==='object'&&!(v instanceof Array)){
+      if(!kit[k])kit[k]={};
+      for(var j in v)kit[k][j]=v[j];
+    }else kit[k]=v;
+  }
+  return kit;
+}
+
+/* ---------------- the named residents ----------------
+   Keyed by the id LH.Quests already uses, so the quest table stays the
+   single source of who exists and this file only says what they look
+   like. */
+var NAMED={
+  harbourmaster:{
+    note:'Thirty years of weather in one coat. The tallest and the '+
+         'stillest person on the island; everything about her is '+
+         'vertical, and the lantern is the only warm thing she owns.',
+    scale:1.07, build:'base',
+    skin:'#C08055', eye:'#93A7B2',
+    hair:{style:'locs',color:'#6B675F'},
+    hat:{style:'tricorn',color:'#1B3038'},
+    over:{style:'oilskin',color:'#1D6570'},
+    shirt:{style:'tee',color:'#D9CDB6',sleeve:'long'},
+    pants:{style:'long',color:'#26313A',leg:'long'},
+    shoes:{style:'boot',color:'#3A2C21'},
+    tool:{style:'lantern',color:'#C79A4B'}
+  },
+  foreman:{
+    note:'Built like the rock he takes down. Widest silhouette in the '+
+         'game, goggles pushed up because he has just stopped work, '+
+         'and every strap on him is carrying something.',
+    scale:1.11, build:'bulk',
+    skin:'#6E4128', eye:'#4A2E1C',
+    hair:{style:'crop',color:'#191512'},
+    facial:{style:'beard'},
+    hat:{style:'hardhat',color:'#F09A32'},
+    acc:{style:'goggles',color:'#59626F'},
+    over:{style:'harness',color:'#4B3B2C'},
+    shirt:{style:'tee',color:'#DFE4E9',sleeve:'short'},
+    pants:{style:'long',color:'#3C4653',leg:'long'},
+    shoes:{style:'boot',color:'#2B2723'},
+    tool:{style:'pickaxe',color:'#9AA2AE'}
+  },
+  clerk:{
+    note:'Precise to the millimetre. Narrow, upright, plum stole over '+
+         'a charcoal jacket, and she never puts the ledger down — not '+
+         'to talk to you, not to point at anything.',
+    scale:0.97, build:'slim',
+    skin:'#F0C6A0', eye:'#4E6B3A',
+    hair:{style:'bun',color:'#33241A'},
+    acc:{style:'specs',color:'#4C5460'},
+    over:{style:'stole',color:'#6D3D79'},
+    shirt:{style:'jacket',color:'#2B3142',sleeve:'long'},
+    pants:{style:'long',color:'#262B36',leg:'long'},
+    shoes:{style:'shoe',color:'#1D2029'},
+    tool:{style:'ledger',color:'#77502E'}
+  },
+  warden:{
+    note:'The one person here who has already lost something to the '+
+         'old works. Asymmetric on purpose — one shoulder plated, one '+
+         'eye covered, the coat closed across the body.',
+    scale:1.05, build:'base',
+    skin:'#DFA97E', eye:'#39414C',
+    hair:{style:'undercut',color:'#8B8478'},
+    facial:{style:'stubble'},
+    acc:{style:'eyepatch',color:'#20242B'},
+    over:{style:'longcoat',color:'#35604A'},
+    shirt:{style:'tee',color:'#39404A',sleeve:'long'},
+    pants:{style:'long',color:'#262A33',leg:'long'},
+    shoes:{style:'boot',color:'#1B1D24'},
+    tool:{style:'sword',color:'#B4BAC5'}
+  },
+  merchant:{
+    note:'Round, quick, permanently mid-transaction. The gold apron is '+
+         'the loudest thing on the island and it is deliberate — you '+
+         'are supposed to spot the market from the harbour road.',
+    scale:0.96, build:'bulk',
+    skin:'#E0A87D', eye:'#6B4A2C',
+    /* A bun, not the topknot it started as: a knot on the crown comes
+       straight up through the flat cap and reads as a lollipop. */
+    hair:{style:'bun',color:'#211A14'},
+    hat:{style:'flatcap',color:'#8C382A'},
+    acc:{style:'earrings',color:'#E8C46A'},
+    over:{style:'apron',color:'#E2B547'},
+    shirt:{style:'tee',color:'#AE372F',sleeve:'short'},
+    pants:{style:'long',color:'#463629',leg:'long'},
+    shoes:{style:'shoe',color:'#372B21'},
+    tool:{style:'scales',color:'#D9B14A'},
+    pet:{style:'cat',color:'#E8DCC6'}
+  },
+  mechanic:{
+    note:'Covered in a job that is not finished. Boiler-suit blue from '+
+         'collar to boot so the orange goggles and the drone are the '+
+         'only things your eye lands on.',
+    scale:1.00, build:'base',
+    skin:'#C98B62', eye:'#4A7FB5',
+    hair:{style:'ponytail',color:'#7B3220'},
+    acc:{style:'goggles',color:'#E8863C'},
+    over:{style:'toolbelt',color:'#4A3B2E'},
+    shirt:{style:'tee',color:'#2E6E86',sleeve:'long'},
+    pants:{style:'long',color:'#2E6E86',leg:'long'},
+    shoes:{style:'boot',color:'#2A2E36'},
+    tool:{style:'wrench',color:'#98A2B0'},
+    pet:{style:'drone',color:'#5FD8FF'}
+  }
+};
+Cast.NAMED=NAMED;
+Cast.names=function(){return Object.keys(NAMED);};
+
+/* ---------------- starter looks ----------------
+   The character screen used to open on a set of sliders, which is a
+   fine way to make one person and a terrible way to make a first
+   impression. It opens on these instead: six finished characters, each
+   still fully editable afterwards.
+
+   They are deliberately not the residents. Standing next to the person
+   you were modelled on is the one thing that makes a preset feel
+   cheap. */
+var PRESETS=[
+  {id:'dockrunner',name:'Dock Runner',
+   note:'Fast and unbothered. Bare arms, rolled hems, salt-bleached.',
+   scale:0.99,build:'slim',skin:'#E3AE83',eye:'#4A7FB5',
+   hair:{style:'curls',color:'#3A2A1C'},
+   acc:{style:'bandana',color:'#F2705C'},
+   shirt:{style:'tee',color:'#F2705C',sleeve:'short'},
+   pants:{style:'long',color:'#2F5FA8',leg:'shorts'},
+   shoes:{style:'shoe',color:'#F0E4D2'}},
+  {id:'quarryhand',name:'Quarry Hand',
+   note:'New on the face, borrowed hat, everything a size too big.',
+   scale:1.04,build:'bulk',skin:'#9C6242',eye:'#5A3A22',
+   hair:{style:'crop',color:'#20180F'},
+   facial:{style:'goatee'},
+   hat:{style:'hardhat',color:'#E9D14A'},
+   over:{style:'harness',color:'#54422F'},
+   shirt:{style:'tee',color:'#7E8894',sleeve:'long'},
+   pants:{style:'long',color:'#3E4652',leg:'long'},
+   shoes:{style:'boot',color:'#2B2723'}},
+  {id:'skycourier',name:'Sky Courier',
+   note:'Everything cut close so nothing catches the wind.',
+   scale:0.98,build:'slim',skin:'#F2C9A4',eye:'#5C4B8A',
+   hair:{style:'undercut',color:'#B8D8E8'},
+   acc:{style:'goggles',color:'#7BE0C8'},
+   shirt:{style:'jacket',color:'#2A3350',sleeve:'long'},
+   pants:{style:'long',color:'#1F2740',leg:'long'},
+   shoes:{style:'boot',color:'#2A3350'},
+   wings:{style:'crystal',color:'#7BE0C8'},
+   back:{style:'satchel',color:'#C4703C'}},
+  {id:'nightwarden',name:'Night Warden',
+   note:'Off duty, still armoured. Reads as a shape before a person.',
+   scale:1.06,build:'base',skin:'#75462C',eye:'#3A3F4A',
+   hair:{style:'locs',color:'#141210'},
+   facial:{style:'stubble'},
+   over:{style:'pauldron',color:'#5A6472'},
+   shirt:{style:'hoodie',color:'#33384A',sleeve:'long'},
+   pants:{style:'long',color:'#23273A',leg:'long'},
+   shoes:{style:'boot',color:'#1A1D26'},
+   cape:{style:'plain',color:'#7C2B3E'},
+   tool:{style:'torch',color:'#C08A50'}},
+  {id:'marketkid',name:'Market Kid',
+   note:'Loudest palette in the roster, and the smallest silhouette.',
+   scale:0.92,build:'base',skin:'#FBDCC0',eye:'#4E6B3A',
+   hair:{style:'afro',color:'#2A1E16'},
+   acc:{style:'earrings',color:'#F0CC6A'},
+   over:{style:'apron',color:'#4FD08A'},
+   shirt:{style:'tee',color:'#FFC93C',sleeve:'short'},
+   pants:{style:'long',color:'#C4573C',leg:'shorts'},
+   shoes:{style:'shoe',color:'#3E7A5E'},
+   pet:{style:'cat',color:'#3A3026'}},
+  {id:'fieldbotanist',name:'Field Botanist',
+   note:'Sun hat, spectacles, a coat with too many pockets.',
+   scale:1.01,build:'base',skin:'#C98B62',eye:'#4E6B3A',
+   hair:{style:'ponytail',color:'#6E5230'},
+   acc:{style:'specs',color:'#8A7A5E'},
+   hat:{style:'headwrap',color:'#E4D9B4'},
+   over:{style:'apron',color:'#8FA86A'},
+   shirt:{style:'tee',color:'#F0EAD8',sleeve:'long'},
+   pants:{style:'long',color:'#6E6248',leg:'long'},
+   shoes:{style:'boot',color:'#4A3C2A'},
+   pet:{style:'sprite',color:'#B8E86A'}}
+];
+Cast.PRESETS=PRESETS;
+
+/* Build a full kit. The base is always LH.Actors.defaultKit so a new
+   slot added there appears on every character without touching this
+   table — the seed only matters for the fields a spec leaves alone. */
+Cast.kit=function(spec,seed){
+  var kit=Act.defaultKit(seed||1);
+  if(typeof spec==='string')
+    spec=NAMED[spec]||Cast.preset(spec);
+  if(!spec)return kit;
+  apply(kit,spec);
+  /* `note` is documentation, not a kit field, and `id`/`name` belong to
+     the roster rather than the body. Strip them so nothing downstream
+     has to know they were ever here. */
+  delete kit.note;delete kit.id;delete kit.name;
+  return kit;
+};
+Cast.preset=function(id){
+  for(var i=0;i<PRESETS.length;i++)if(PRESETS[i].id===id)return PRESETS[i];
+  return null;
+};
+
+/* ---------------- the crowd ----------------
+   Residents nobody wrote. They draw from the same wardrobe but are
+   assembled by a rule rather than by hand, so they read as a
+   population instead of six clones: one loud garment each, everything
+   else pulled down to agree with it.
+
+   Deterministic in `seed` — the person you saw by the fountain has to
+   still be that person the next time the harbour loads. */
+var CROWD_HAIR=['crop','swept','long','bun','spiked','braids','locs',
+                'undercut','ponytail','afro','curls','topknot'];
+var CROWD_HAT =['none','none','none','cap','beanie','brim','flatcap',
+                'headwrap','visor'];
+var CROWD_ACC =['none','none','none','none','specs','goggles','earrings',
+                'bandana'];
+var CROWD_OVER=['none','none','none','none','none','apron','toolbelt',
+                'harness','stole','pauldron'];
+var CROWD_FACE=['none','none','none','none','stubble','beard','goatee',
+                'moustache'];
+var SKIN=['#FBDCC0','#F2C9A4','#E3AE83','#C98B62','#9C6242','#75462C',
+          '#54321F'];
+var HAIRC=['#241C16','#3A2A1C','#5A3A22','#7A5230','#A87740','#D8B978',
+           '#8E3B2E','#2A2E3A','#8B8478','#B8D8E8','#7B3220','#3E5A4A'];
+var EYEC=['#4A7FB5','#4E6B3A','#6B4A2C','#3A3F4A','#5C4B8A','#93A7B2'];
+/* One saturated garment colour per person. Neighbouring entries are
+   kept far apart in hue so two people picked in a row rarely match. */
+var LOUD=['#FF6B5B','#4FA8FF','#4FD08A','#FFB84D','#C08BFF','#4FE3B0',
+          '#FF8FC7','#FFE066','#FF8A4C','#7FA8FF','#E2585E','#3EC7B4'];
+
+Cast.crowd=function(seed){
+  /* Scattered and warmed — see LH.Actors.kitRng. A raw M.rng here gave
+     twelve residents the same red shirt, because every small seed's
+     first draw lands in the first entry of every palette. */
+  var rng=Act.kitRng(seed);
+  var kit=Act.defaultKit(seed);
+  var loud=LOUD[(rng()*LOUD.length)|0];
+  kit.scale=0.90+rng()*0.20;
+  kit.build=rng()<0.22?'bulk':(rng()<0.26?'slim':'base');
+  kit.skin=SKIN[(rng()*SKIN.length)|0];
+  kit.eye=EYEC[(rng()*EYEC.length)|0];
+  kit.hair.style=CROWD_HAIR[(rng()*CROWD_HAIR.length)|0];
+  kit.hair.color=HAIRC[(rng()*HAIRC.length)|0];
+  kit.facial.style=rng()<0.30?CROWD_FACE[(rng()*CROWD_FACE.length)|0]:'none';
+  kit.hat.style=CROWD_HAT[(rng()*CROWD_HAT.length)|0];
+  kit.acc.style=CROWD_ACC[(rng()*CROWD_ACC.length)|0];
+  kit.over.style=CROWD_OVER[(rng()*CROWD_OVER.length)|0];
+  kit.shirt.style=['tee','jacket','hoodie'][(rng()*3)|0];
+  kit.shirt.sleeve=rng()<0.55?'long':'short';
+  kit.pants.leg=rng()<0.24?'shorts':'long';
+  /* The loud colour lands on exactly one garment. Whichever one it is,
+     the rest of the outfit is derived from it rather than rolled, which
+     is the difference between an outfit and a bag of colours. */
+  if(kit.over.style!=='none'){
+    kit.over.color=loud;
+    kit.shirt.color=LH.Geo.shade(loud,-58);
+    kit.pants.color=LH.Geo.shade(loud,-72);
+  }else{
+    kit.shirt.color=loud;
+    kit.pants.color=LH.Geo.shade(loud,-52);
+  }
+  kit.hat.color=rng()<0.5?loud:LH.Geo.shade(loud,-46);
+  kit.shoes.color=LH.Geo.shade(loud,-70);
+  kit.acc.color=rng()<0.4?loud:'#4C5460';
+  if(rng()<0.10){
+    kit.wings.style=LH.Cos.WINGS[(rng()*LH.Cos.WINGS.length)|0];
+    kit.wings.color=loud;
+  }
+  if(rng()<0.12)kit.pet.style=LH.Cos.PETS[(rng()*LH.Cos.PETS.length)|0];
+  if(rng()<0.10){kit.cape.style='plain';kit.cape.color=loud;}
+  return kit;
+};
+
+LH.Cast=Cast;
 })();
 
 
@@ -9793,7 +10995,13 @@ var state={
 function grantStarter(){
   state.inv={pick_stone:1,rod_cane:1,bait_worm:12,plank:24,stone:24,
              lantern:4,food_bread:3};
-  state.equipped={hair:'h_crop',shirt:'t_tee',hat:null,wings:null,
+  /* Nothing is equipped in the appearance slots, deliberately. A
+     starter hair item and a starter tee here meant the equipped map
+     always had an opinion about those two slots, and the character you
+     built at creation lost its hairstyle and its jacket the moment the
+     kit was refreshed. Equipment still wins when there is any — this
+     just stops it winning by default. */
+  state.equipped={hair:null,shirt:null,hat:null,wings:null,
                   cape:null,back:null,pet:null,aura:null,tool:'pick_stone'};
 }
 grantStarter();
@@ -12178,7 +13386,7 @@ function Enemy(kind,x,z,opt){
   this.leash=opt.leash||22;
   /* Humanoids borrow the player's rig outright. */
   if(S.body==='humanoid'){
-    var k=Act.defaultKit(this.id.length*7+3);
+    var k=Act.defaultKit(E._next*7919+3);
     var kt=S.kit||{};
     k.shirt.style=kt.shirt||'jacket';k.shirt.color=kt.shirtCol||'#3A3F4E';
     k.shirt.sleeve='long';
@@ -13755,12 +14963,16 @@ LH.Audio=A;
 (function(){
 'use strict';
 var M=LH.M,D=LH.Data,Net=LH.Net,Act=LH.Actors,Body=LH.Body,Cos=LH.Cos,Geo=LH.Geo;
+var Cast=LH.Cast;
 var F={};
 
 var root=null,pane=null,step='title';
 var draft=null;
 F.active=function(){return step!=='done';};
 F.step=function(){return step;};
+/* Exposed so anything outside this module can move between screens
+   without synthesising clicks on chips it has to find first. */
+F.go=function(s){go(s);};
 
 var SKIN=['#F7DCC2','#F2C9A4','#E3AE83','#C98B62','#9C6242','#75462C','#54321F'];
 var HAIRC=['#1E1B18','#2B2118','#4A3222','#7A5230','#A87740','#D8B978',
@@ -13862,6 +15074,7 @@ function optRow(label,opts,current,onPick){
   return wrap;
 }
 
+var presetName=Cast.PRESETS[0].name;
 function renderCreate(){
   var p=LH.Game&&LH.Game.player;
   if(!p)return;
@@ -13870,8 +15083,8 @@ function renderCreate(){
   pane.appendChild(el('div','fstep','Step one of two'));
   pane.appendChild(el('div','fbrand','Who Are You'));
   pane.appendChild(el('div','fbody',
-    'You arrive with the clothes you are standing in. Everything after '+
-    'this is something you find, earn or buy.'));
+    'Start from somebody, then change whatever you like. Everything '+
+    'you are not wearing is something you find, earn or buy.'));
 
   var nameWrap=el('div');
   nameWrap.appendChild(el('div','flabel','Name'));
@@ -13889,38 +15102,79 @@ function renderCreate(){
        the world rather than on a separate doll. */
     render();
   }
-  pane.appendChild(swatchRow('Skin',SKIN,draft.skin,function(c){
+  /* Overwrite the draft in place. The draft *is* the player's kit
+     object, so replacing the reference would leave the preview wearing
+     the old one and nothing on screen would move. */
+  function wear(kit){
+    var keep=draft.name;
+    for(var key in kit)draft[key]=kit[key];
+    draft.name=keep;
+    if(LH.Game&&LH.Game.player)LH.Game.player.scale=draft.scale||1;
+  }
+
+  /* Six finished characters to start from. A first screen of sliders
+     asks a player to design somebody before they know what the game
+     looks like; a row of people asks them to pick one. */
+  var pnames=Cast.PRESETS.map(function(q){return q.name;});
+  pane.appendChild(optRow('Start from',pnames,presetName,function(o){
+    for(var i=0;i<Cast.PRESETS.length;i++){
+      if(Cast.PRESETS[i].name!==o)continue;
+      presetName=o;
+      wear(Cast.kit(Cast.PRESETS[i].id,7));
+      LH.Audio&&LH.Audio.play('ui');
+      render();          /* the whole pane, so every row shows the new pick */
+      return;
+    }
+  }));
+  var pspec=null;
+  for(var pi=0;pi<Cast.PRESETS.length;pi++)
+    if(Cast.PRESETS[pi].name===presetName)pspec=Cast.PRESETS[pi];
+  if(pspec)pane.appendChild(el('div','fnote',pspec.note));
+
+  var det=el('div','fscroll');
+  det.appendChild(swatchRow('Skin',SKIN,draft.skin,function(c){
     draft.skin=c;repaint();}));
-  pane.appendChild(optRow('Hair',Body.HAIR,draft.hair.style,function(o){
+  det.appendChild(optRow('Hair',Body.HAIR,draft.hair.style,function(o){
     draft.hair.style=o;repaint();}));
-  pane.appendChild(swatchRow('Hair colour',HAIRC,draft.hair.color,function(c){
+  det.appendChild(swatchRow('Hair colour',HAIRC,draft.hair.color,function(c){
     draft.hair.color=c;repaint();}));
-  pane.appendChild(swatchRow('Eyes',EYEC,draft.eye,function(c){
+  det.appendChild(optRow('Facial hair',Body.FACIAL,draft.facial.style,
+    function(o){draft.facial.style=o;repaint();}));
+  det.appendChild(swatchRow('Eyes',EYEC,draft.eye,function(c){
     draft.eye=c;repaint();}));
-  pane.appendChild(optRow('Build',['slim','base','bulk'],draft.build,function(o){
+  det.appendChild(optRow('Build',['slim','base','bulk'],draft.build,function(o){
     draft.build=o;repaint();}));
-  pane.appendChild(optRow('Top',['tee','jacket','hoodie'],draft.shirt.style,
+  det.appendChild(optRow('Headwear',Body.HATS,draft.hat.style,function(o){
+    draft.hat.style=o;repaint();}));
+  det.appendChild(optRow('Worn on the face',Body.ACCESSORIES,draft.acc.style,
+    function(o){draft.acc.style=o;repaint();}));
+  det.appendChild(optRow('Top',['tee','jacket','hoodie'],draft.shirt.style,
     function(o){draft.shirt.style=o;repaint();}));
-  pane.appendChild(swatchRow('Clothes',WEAR,draft.shirt.color,function(c){
+  det.appendChild(optRow('Sleeves',['short','long','none'],draft.shirt.sleeve,
+    function(o){draft.shirt.sleeve=o;repaint();}));
+  det.appendChild(optRow('Layer',Cos.OVERLAYS,draft.over.style,function(o){
+    draft.over.style=o;repaint();}));
+  det.appendChild(optRow('Legs',['long','shorts'],draft.pants.leg,function(o){
+    draft.pants.leg=o;repaint();}));
+  det.appendChild(optRow('Feet',Body.SHOES,draft.shoes.style,function(o){
+    draft.shoes.style=o;repaint();}));
+  det.appendChild(swatchRow('Clothes',WEAR,draft.shirt.color,function(c){
     draft.shirt.color=c;
     draft.pants.color=Geo.shade(c,-52);
     repaint();}));
+  det.appendChild(swatchRow('Layer colour',WEAR,draft.over.color,function(c){
+    draft.over.color=c;repaint();}));
+  pane.appendChild(det);
 
   var row=el('div','frow');
   var rand=el('button','fbtn','Surprise me');
   rand.addEventListener('click',function(){
-    function pick(a){return a[(Math.random()*a.length)|0];}
-    draft.skin=pick(SKIN);
-    draft.hair.style=pick(Body.HAIR);
-    draft.hair.color=pick(HAIRC);
-    draft.eye=pick(EYEC);
-    draft.build=pick(['slim','base','bulk']);
-    draft.shirt.style=pick(['tee','jacket','hoodie']);
-    draft.shirt.color=pick(WEAR);
-    draft.pants.color=Geo.shade(draft.shirt.color,-52);
-    draft.shirt.sleeve=Math.random()<0.5?'long':'short';
+    /* The same rule that dresses the crowd, so a random character is
+       still an outfit rather than a bag of colours. */
+    wear(Cast.crowd((Math.random()*1e9)|0));
+    presetName='';
     LH.Audio&&LH.Audio.play('ui');
-    repaint();
+    render();
   });
   row.appendChild(rand);
   var next=el('button','fbtn pri','Continue');
@@ -13929,6 +15183,8 @@ function renderCreate(){
     if(!nm){LH.UI.toast('Pick a name first.','bad');inp.focus();return;}
     Net.request('setName',{name:nm},function(r){
       if(!r.ok){LH.UI.toast(r.why,'bad');return;}
+      /* Lock in what they built, so the first equip does not undo it. */
+      LH.Game&&LH.Game.rememberLook&&LH.Game.rememberLook();
       LH.UI.sync(r.state);
       LH.Audio&&LH.Audio.play('ui');
       go('ready');
@@ -14196,6 +15452,7 @@ LH.Sky=S;
 'use strict';
 var M=LH.M,GL=LH.GL,R=LH.Render,App=LH.App,Cam=LH.Cam,Geo=LH.Geo;
 var T=LH.Terrain,W=LH.World,P=LH.Props,Act=LH.Actors,I=LH.Input,Pl=LH.Player,Sky=LH.Sky;
+var Cast=LH.Cast;
 var V=LH.Voxels,D=LH.Data,Net=LH.Net,UI=LH.UI,Icon=LH.Icon;
 var En=LH.Enemies,Fish=LH.Fishing,Quests=LH.Quests,Realm=LH.Realm;
 var Aud=LH.Audio,Front=LH.Front;
@@ -14233,12 +15490,13 @@ Act.groundAt=function(x,z){return W.groundAt(x,z);};
 
 App.stage('Waking the harbour',function(){
   var spawn=W.spawn;
-  var kit=Act.defaultKit(7);
-  kit.hair.style='swept';
-  kit.shirt.style='hoodie';kit.shirt.color='#4FC3F7';kit.shirt.sleeve='long';
-  kit.pants.color='#3E63C8';
-  kit.shoes.color='#F5A03C';
+  /* You arrive as the Dock Runner. It is a designed look rather than
+     a default one, so the first thing on screen is a character — and
+     it is the first entry in the same preset list the wardrobe
+     offers, so changing it is one click, not a rebuild. */
+  var kit=Cast.kit('dockrunner',7);
   G.player=Act.Actor({x:spawn[0],y:spawn[1],z:spawn[2],kit:kit,name:'You'});
+  G.rememberLook();
   Pl.init(G.player);
 
   /* Simulated residents. There is no server behind them — they walk a
@@ -14250,18 +15508,10 @@ App.stage('Waking the harbour',function(){
     var pt=[T.pad('plaza'),T.pad('market'),T.pad('harbour')][i%3];
     var a=rng()*M.TAU,rr=6+rng()*14;
     var x=pt.x+Math.cos(a)*rr, z=pt.z+Math.sin(a)*rr;
-    var k=Act.defaultKit(i*31+5);
-    k.hair.style=LH.Body.HAIR[(rng()*LH.Body.HAIR.length)|0];
-    k.shirt.style=['tee','jacket','hoodie'][(rng()*3)|0];
-    k.shirt.color=['#FF6B6B','#4FA8FF','#4FD08A','#FFB84D','#C08BFF','#4FE3B0',
-                   '#FF8FC7','#FFE066'][(rng()*8)|0];
-    k.shirt.sleeve=rng()<0.5?'long':'short';
-    k.pants.color=Geo.shade(k.shirt.color,-42);
-    k.shoes.color='#3A404C';
-    if(rng()<0.25)k.hat.style=LH.Body.HATS[(rng()*LH.Body.HATS.length)|0];
-    if(rng()<0.14){k.wings.style=LH.Cos.WINGS[(rng()*LH.Cos.WINGS.length)|0];
-      k.wings.color=k.shirt.color;}
-    if(rng()<0.14)k.pet.style=LH.Cos.PETS[(rng()*LH.Cos.PETS.length)|0];
+    /* Dressed by LH.Cast, not here: the rule that keeps a crowd from
+       looking like a colour test lives with the rest of the wardrobe
+       decisions rather than in the spawner. */
+    var k=Cast.crowd(i*31+5);
     var npc=Act.Actor({x:x,y:T.heightAt(x,z),z:z,kit:k,
       name:NAMES[i%NAMES.length],facing:rng()*M.TAU});
     npc.home=[pt.x,pt.z];
@@ -14283,15 +15533,9 @@ App.stage('Waking the harbour',function(){
     var def=Quests.NPCS[id], spot=NPCSPOT[id];
     var pad=T.pad(spot[0]);
     var nx=pad.x+spot[1], nz=pad.z+spot[2];
-    var kit=Act.defaultKit(600+i*41);
-    kit.hair.style=['swept','bun','long','crop','braids','spiked'][i%6];
-    kit.shirt.style=['jacket','hoodie','jacket','jacket','tee','hoodie'][i%6];
-    kit.shirt.color=['#3EA7DC','#F08A3C','#7C5BD8','#4FBF77','#E8557E','#E0C24A'][i%6];
-    kit.shirt.sleeve='long';
-    kit.pants.color=Geo.shade(kit.shirt.color,-46);
-    kit.shoes.color='#3A404C';
-    if(i%2)kit.hat.style=['cap','beanie','brim'][i%3];
-    kit.hat.color=kit.shirt.color;
+    /* Each one is a designed character — see LH.Cast for the sentence
+       every kit was built to serve. */
+    var kit=Cast.kit(id,600+i*41);
     var a=Act.Actor({x:nx,y:T.heightAt(nx,nz),z:nz,kit:kit,name:def.name,
       facing:Math.atan2(pad.x-nx,pad.z-nz)});
     a.npcId=id;
@@ -14350,6 +15594,22 @@ G.loadSave=function(){
   return true;
 };
 
+/* The look the player actually chose. Equipment is still authoritative
+   — an equipped hat always wins — but a slot with nothing equipped in
+   it now falls back to this rather than to the engine's default. It
+   used to fall back to 'crop' and 'none', which meant the first thing
+   you ever equipped quietly shaved your head and took your coat off. */
+var LOOK={};
+var LOOK_SLOTS=['hair','shirt','hat','wings','cape','back','pet','aura'];
+G.rememberLook=function(){
+  if(!G.player)return;
+  var k=G.player.kit;
+  for(var i=0;i<LOOK_SLOTS.length;i++){
+    var n=LOOK_SLOTS[i];
+    if(k[n])LOOK[n]=k[n].style;
+  }
+};
+
 G.refreshKit=function(){
   if(!G.player)return;
   var eq=Net.snapshot().equipped;
@@ -14360,7 +15620,10 @@ G.refreshKit=function(){
     if(it&&it.props&&it.props.style){
       k[name].style=it.props.style;
       if(it.props.emis!==undefined)k[name].emis=it.props.emis;
-    }else if(dflt!==undefined)k[name].style=dflt;
+    }else{
+      var fb=LOOK[name]!==undefined?LOOK[name]:dflt;
+      if(fb!==undefined)k[name].style=fb;
+    }
   }
   slot('hair','crop');slot('shirt','tee');slot('hat','none');
   slot('wings','none');slot('cape','none');slot('back','none');

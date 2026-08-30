@@ -148,6 +148,61 @@ world where every vertex is generated at load is the fastest way to make
 a game look like an asset flip, and the loader and the file size would
 both be real costs for a worse result.
 
+### The cast
+
+The wardrobe is not the characters. Twelve hairstyles and a shaved
+head, ten hats, four kinds of facial hair, five things worn on the
+face, seven occupational layers and eleven things to hold are a
+vocabulary;
+a character is one specific set of those choices, made on purpose.
+`LH.Cast` is where those choices live — a table of designed people,
+each written to a single sentence of intent kept beside it in `note`,
+with every field under it serving that sentence.
+
+| Who | Read at twenty metres |
+| --- | --- |
+| **Mira Vance**, Harbourmaster | Tallest and stillest. Tricorn, storm collar, an oilskin to the knee, iron locs — everything vertical, and the lantern is the only warm thing she owns |
+| **Dell Okonjo**, Quarry Foreman | Widest. Hard hat with goggles pushed up because he has just stopped, a harness with something clipped to every strap, full beard |
+| **Rosalind Ash**, Land Registry | Narrowest. Bun, spectacles, a plum registry stole with a fringed hem, and the ledger never goes down |
+| **Ivo Karr**, Warden | Asymmetric on purpose: one shoulder plated, one eye covered, the coat closed diagonally across the body |
+| **Bao Ling**, Market Trader | Loudest. A gold apron you are meant to spot from the harbour road, flat cap, balance scales, and a market cat |
+| **Tess Aurelio**, Garage | Boiler-suit blue collar to boot so the orange goggles and the drone are the only things your eye lands on |
+
+Three rules hold the table together. **Silhouette first** — two residents
+must be distinguishable in black at twenty metres, which is why nobody
+shares a headwear shape and heights vary by fourteen centimetres.
+**One loud colour each, and it is theirs** — Mira has the teal, Dell the
+safety orange, Bao the gold, and nobody else may use it as their loud
+colour. **The job is worn, not stated** — a chest full of clipped-on
+quarry hardware says foreman without a nameplate.
+
+The character screen opens on six finished people rather than a set of
+sliders, and every slider is still there underneath. The crowd is
+assembled by rule instead of by hand: one saturated garment each, with
+the rest of the outfit derived from it rather than rolled separately,
+which is the difference between an outfit and a bag of colours.
+
+Three things this cost. `Geo.roundRect` takes a **full** width and depth
+while `Geo.circle` takes a **radius**, so the first draft of the
+occupational layers read the shirt's numbers as radii and built coats
+that fitted neatly *inside* the shirt — visible only as a collar and a
+stripe down the chest. Every measurement in `OVER_BUILD` is now a
+half-extent written against a table of the shirt's actual outer edge.
+`refreshKit` used to fall back to `'crop'` and `'none'` for any slot
+with nothing equipped in it, so the first thing you ever equipped
+quietly shaved your head and took your coat off; it now falls back to
+the look you chose, and the starter grant no longer equips a hair item
+and a tee just to have an opinion about those two slots.
+
+And the crowd came back as twelve people in the same red shirt.
+`M.rng` is a xorshift32, and seeded with a small number its state stays
+under 2²⁵ for a round or two — so the *first* draw is always below
+0.01, and every kit that picks its skin, hair and shirt from the first
+three draws hands every small seed the same person. The kit generator
+now scatters the seed and throws eight draws away before anybody looks
+at it. Twelve residents: eleven shirt colours, nine hairstyles, seven
+skin tones.
+
 ### The sky
 
 Twelve floating islands ring the harbour, three of them pouring water into
