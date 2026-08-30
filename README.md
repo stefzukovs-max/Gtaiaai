@@ -72,7 +72,8 @@ weather states riding on top as multipliers.
 | Trading | Two nine-slot grids, live totals, lock and confirm, and edits refused on a locked offer |
 | Map | The real heightmap rendered at 384×384 with depth-shaded water and a north-west hillshade; a pin per district, `?` until you find it, live NPC dots, and travel |
 | Wardrobe | Fifteen rows of live appearance, applied on the click, on a camera that turns the character three-quarters on to the lens |
-| Hair | Around five hundred strands a head, each a rounded ribbon with a root-to-tip ramp and a helical curl, over a cap that fills the mass from inside |
+| Hair | Cards over a solid cap pushed out to the style's own length, so the cap carries the silhouette and the strands ride on it; the hairline sits low enough to give every style a fringe |
+| Proportion | One per-bone map turns the anatomical body into a three-and-a-fifth-head toy at draw time — legs to 56 per cent, arms shortened and thickened, head at 1.90 — without changing a single number in any garment |
 | Build | A per-region profile over the size scalar, so slim, base and bulk differ in taper rather than in scale — and every garment inherits it, because a garment is the body's own rings grown outward |
 | Outfits | Six named sets priced and granted by the server, charging only for the pieces you are missing |
 | Progression | XP from every activity, six skills on their own curves, so a dedicated angler out-ranks a generalist at fishing without out-levelling them |
@@ -888,6 +889,83 @@ Street lamps, shop signs and the fountain crystal register themselves as
 point lights when they are placed, and the renderer picks the sixteen
 nearest the camera each frame. They fade up with the sun's elevation
 instead of switching on at a clock edge, and overcast brings them on early.
+
+### A toy, not a person
+
+The reference for this pass was a phone game: flat unlit colour, no
+surface detail, no specular anywhere, and characters a shade over three
+heads tall standing in a world made of primary shapes. Everything the
+previous six passes had built toward — anatomical proportion, strand
+hair, relief from an albedo-derived normal map, a GGX lobe on skin and
+cloth — is the opposite of that. So most of this pass is subtraction.
+
+The shading went first. Sun down, ambient up threefold, a warm bounce off
+the ground, `uSpec` from 0.25 to 0.03 and the sky-reflection term from
+0.85 to 0.22; every roughness in `SURF` pushed toward matte, and the
+bump multiplier from 1.0 to 0.10. Then `toyify` pulls each of the
+forty-odd painted textures 84 per cent of the way to one flat colour,
+mean-preserving, so a plank still reads as a plank and a brick as a brick
+but neither has visible grain at two metres.
+
+The bodies are the interesting half. The skeleton and the sixty ring
+tables hanging off it are all in metres, all authored against a real
+figure, and re-measuring them was a week of work nobody wanted. So both
+bodies are kept and one map moves between them. Each bone gets two
+scales: a **structural** one that decides where its children land, and a
+**vertex** one that decides how the skin around it stretches. A vertex is
+then moved exactly the way it will later be skinned — by the weighted
+blend of its own bones' maps — which is what makes this safe. A shirt cut
+from the body's rings arrives where the body arrives, a seam that closed
+before still closes, and not one literal in any garment, coat, cape or
+boot had to change. `LH.Rig.warp` is thirty lines and every skinned part
+in the game goes through it.
+
+What it buys: legs at 56 per cent of their length, a torso a tenth longer,
+arms shortened to 86 per cent and thickened by two thirds, thighs at 130
+per cent and pushed apart so they still clear, hands half again as wide.
+The head is not warped — it is instanced and scaled by `P.headScale`,
+which went from 0.86 to 1.90, and every hairstyle, hat, beard and pair of
+glasses is authored in that same space and grew with it for free.
+
+The crown is then solved rather than scaled to. It sits at 1.62 m, six
+centimetres below where the real body's did, and that drop is deliberate:
+it buries the jaw in the collar. A toy has no neck, and the way you get
+no neck is not to shorten the neck bone but to lower the skull until the
+shoulders meet it. The neck bone moves up under the jaw, what is left of
+the neck's own skin is squashed to 62 per cent, and the two rings bound
+to the head are pressed to 30 so they stay hidden inside it. The figure
+is three heads and a fifth, which is the reference to within a tenth.
+
+The face lost most of what the last pass gave it. The painted map goes
+from a full portrait — sockets, alae, a philtrum, cheek hollows, blood in
+the ears, pores — to three marks: a soft socket, the hint of a nose, and
+a mouth. The lips are still geometry, because a mouth that is only paint
+disappears when the light moves, but their colours stepped from a third
+away from the skin to a twentieth. The nose came back two thirds of the
+way to the face plane; at 1.90 head scale the old one stood out five and
+a half centimetres and threw a shadow across half the face.
+
+Hair keeps its cards and changes what they are for. The cap underneath
+them — which used to be a backing, pushed out four centimetres so no
+scalp showed between strands — is now pushed out to most of the style's
+own length, so it carries the silhouette and the cards ride on top of it.
+The hairline comes down two fifths, because a forehead that was right on
+a real head is a cinema screen on this one, and the fringe arrives with
+it. The strand density is only slightly coarser than before: the head
+nearly doubled, so the same strand already covers twice the pixels, and
+going wider than 0.9 turns cards into roof shingles — which is exactly
+what the first two attempts at this looked like.
+
+Three things are honestly still short of the reference. The swept fringe
+still resolves into individual ribbons at conversation distance. The eyes
+are the realistic build from two passes ago, scaled up; enlarging the
+iris to match the reference's read made them worse, not better, because
+the limbal ring grows with it, so `IRISK` is left at 1. And the face is
+still a sculpted head with a painted map on it rather than two dots on a
+flat field. Each is its own pass.
+
+Every switch has an off position — `TOYHAIR`, `TOYFACE`, `TOY_MIX`, and
+`LH.Rig.TOY` — and turning them off restores the previous look exactly.
 
 ---
 

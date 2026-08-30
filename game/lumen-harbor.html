@@ -2392,6 +2392,25 @@ R.face=function(){
     return d>=1?0:(1-d)*(1-d);
   }
   var EYE_U=[0.185,0.315], EYE_V=0.446;
+  /* Everything below this line paints a real face: sockets, a nose
+     with alae, lips with a philtrum, cheek hollows, blood in the ears
+     and pores over all of it. None of that belongs on a toy. The
+     reference's face is three marks on a flat field, and the eyes are
+     geometry here rather than paint, so what the map has to supply is
+     a mouth, the hint of a nose, and enough of a socket that the eye
+     balls do not look glued on. */
+  if(TOYFACE)return function(u,v){
+    var h=1-v, c=BASE.slice(), i, e;
+    for(i=0;i<2;i++){
+      e=blobW(u,h,EYE_U[i],EYE_V-0.008,0.070,0.082);
+      c=mixv(c,rgb('#EBD4C9'),e*0.42);
+    }
+    e=blob(u,h,0.25,0.306,0.040,0.036);
+    c=mixv(c,rgb('#F0CDBE'),e*0.42);
+    e=blob(u,h,0.25,0.214,0.064,0.017);
+    c=mixv(c,rgb('#C87668'),e*0.85);
+    return c;
+  };
   return function(u,v){
     /* The paint callback's v runs down the image; the head's v runs up
        from the chin. One flip here rather than an inverted value in
@@ -2916,24 +2935,35 @@ Tex.SIZE=SZ;
    is 0 for a mirror and 1 for chalk. These are the only two numbers
    that separate wet slate from dry bark in this renderer, so they are
    worth setting by hand rather than defaulting. */
+/* Relief and gloss, in a world that has neither.
+
+   The reference has no surface detail whatever: no normal map, no
+   specular, no sheen. Roughness stays in the table because the
+   ambient sky term reads it, and everything except glass, water and
+   the gems is now near the top of its range — a matte moulded look,
+   where what you read is the silhouette and a very soft light rather
+   than the surface. The bump numbers are kept as ratios rather than
+   zeroed so the material still has *some* relative relief if `bump`
+   is ever dialled back up; the scene's global `bump` is what actually
+   turns it off. */
 var SURF={
-  blank:{bump:0,rough:0.70},
-  grass:{bump:0.55,rough:0.96}, dirt:{bump:0.85,rough:0.97},
-  sand:{bump:0.60,rough:0.95},  stone:{bump:1.00,rough:0.90},
-  cliff:{bump:1.20,rough:0.92}, gravel:{bump:1.10,rough:0.94},
-  snow:{bump:0.35,rough:0.66},  planks:{bump:0.75,rough:0.78},
-  deck:{bump:0.80,rough:0.82},  bark:{bump:1.30,rough:0.96},
+  blank:{bump:0,rough:0.94},
+  grass:{bump:0.55,rough:0.97}, dirt:{bump:0.85,rough:0.97},
+  sand:{bump:0.60,rough:0.96},  stone:{bump:1.00,rough:0.95},
+  cliff:{bump:1.20,rough:0.95}, gravel:{bump:1.10,rough:0.95},
+  snow:{bump:0.35,rough:0.92},  planks:{bump:0.75,rough:0.94},
+  deck:{bump:0.80,rough:0.94},  bark:{bump:1.30,rough:0.96},
   brick:{bump:-0.95,rough:0.90},brickpale:{bump:-0.95,rough:0.90},
-  panel:{bump:0.45,rough:0.42}, panelw:{bump:0.40,rough:0.46},
+  panel:{bump:0.45,rough:0.90}, panelw:{bump:0.40,rough:0.90},
   concrete:{bump:0.55,rough:0.92},
-  tile:{bump:-0.35,rough:0.66}, tilepale:{bump:-0.35,rough:0.64},
-  tiledark:{bump:-0.35,rough:0.62},
-  roof:{bump:0.85,rough:0.80},  road:{bump:0.65,rough:0.93},
+  tile:{bump:-0.35,rough:0.93}, tilepale:{bump:-0.35,rough:0.93},
+  tiledark:{bump:-0.35,rough:0.93},
+  roof:{bump:0.85,rough:0.94},  road:{bump:0.65,rough:0.95},
   foliage:{bump:0.45,rough:0.86},foliagep:{bump:0.45,rough:0.86},
-  skin:{bump:0.30,rough:0.62},  face:{bump:0.26,rough:0.56},
+  skin:{bump:0.30,rough:0.92},  face:{bump:0.26,rough:0.90},
   fabric:{bump:0.60,rough:0.93},fabricw:{bump:0.60,rough:0.93},
-  glass:{bump:0.05,rough:0.08}, crystal:{bump:0.30,rough:0.14},
-  gold:{bump:0.20,rough:0.22},  water:{bump:0,rough:0.10},
+  glass:{bump:0.05,rough:0.08}, crystal:{bump:0.30,rough:0.26},
+  gold:{bump:0.20,rough:0.42},  water:{bump:0,rough:0.16},
   neon:{bump:0,rough:0.55},     neonw:{bump:0,rough:0.55},
   /* Hair is rough on purpose, and the reason is worth writing down.
 
@@ -2967,12 +2997,73 @@ var SURF={
 };
 Tex.SURF=SURF;
 
+/* ---------------- the toy pass ----------------
+   The whole world is repainted through one table.
+
+   The reference for this look is a mobile game whose surfaces have no
+   texture at all: grass is one green, stone is one grey, a shirt is
+   one yellow, and what shape you read comes entirely from the
+   silhouette and a very soft light. Everything this project spent
+   passes building — woven cloth, brick courses, bark ridges, tile
+   grain — is the exact opposite of that, and at a distance it is what
+   makes a surface look photographed rather than moulded.
+
+   Rather than rewrite twenty recipes, each one is pulled most of the
+   way toward a flat target colour after it is painted. `MIX` is how
+   much of the recipe survives: at 0.16 a brick wall still has the
+   faintest suggestion of courses in it and a plank deck of boards,
+   which stops large flat areas from going dead, but the colour and
+   the value are the table's.
+
+   Nothing here is a shader change. The textures really are flat now,
+   so the icons the UI cuts from the same canvases match the world. */
+var TOY={
+  grass:'#7CC93A', dirt:'#A9793F', sand:'#F0DFA4', stone:'#C3C7CC',
+  cliff:'#A8ADB4', gravel:'#B4B8BE', snow:'#F4F8FF',
+  planks:'#C08A52', deck:'#B47F49', bark:'#8A6242',
+  brick:'#D2705A', brickpale:'#E0A070',
+  panel:'#BFC7D0', panelw:'#E6ECF2', concrete:'#C6CBD0',
+  tile:'#C9BFA8', tilepale:'#DCD2BC', tiledark:'#8E8A84',
+  roof:'#C0564E', road:'#B9B2A4',
+  foliage:'#4FA83C', foliagep:'#F07CC0',
+  fabric:'#E8ECF2', fabricw:'#F4F6FA',
+  skin:'#FFFFFF', face:null, hair:'#F2F2F2',
+  glass:'#BEE0F0', crystal:'#7FE4FF', gold:'#F2C455',
+  water:null, neon:null, neonw:null, blank:null
+};
+var TOY_MIX=0.16;
+/* The face map, likewise, in its three-mark version. */
+var TOYFACE=true;
+function toyify(cv,name){
+  var target=TOY[name];
+  if(!target)return cv;
+  var t=[parseInt(target.slice(1,3),16),
+         parseInt(target.slice(3,5),16),
+         parseInt(target.slice(5,7),16)];
+  var ctx=cv.getContext('2d');
+  var img=ctx.getImageData(0,0,SZ,SZ),d=img.data;
+  /* The recipe's own mean, so what survives is its *variation* rather
+     than its variation plus its offset — otherwise a dark recipe pulls
+     the whole material down and the table stops meaning anything. */
+  var mr=0,mg=0,mb=0,n=SZ*SZ,i;
+  for(i=0;i<d.length;i+=4){mr+=d[i];mg+=d[i+1];mb+=d[i+2];}
+  mr/=n;mg/=n;mb/=n;
+  for(i=0;i<d.length;i+=4){
+    d[i]  =M.clamp(t[0]+(d[i]  -mr)*TOY_MIX,0,255)|0;
+    d[i+1]=M.clamp(t[1]+(d[i+1]-mg)*TOY_MIX,0,255)|0;
+    d[i+2]=M.clamp(t[2]+(d[i+2]-mb)*TOY_MIX,0,255)|0;
+  }
+  ctx.putImageData(img,0,0);
+  return cv;
+}
+Tex.TOY=TOY;
+
 Tex.buildAll=function(){
   var canvases=[],normals=[];
   for(var i=0;i<LAYERS.length;i++){
     var name=LAYERS[i][0];
     Tex.NAME[name]=i;
-    var cv=paint(make(),LAYERS[i][1],name);
+    var cv=toyify(paint(make(),LAYERS[i][1],name),name);
     canvases.push(cv);
     normals.push(bumpMap(cv,SURF[name],name));
   }
@@ -3475,10 +3566,15 @@ void main(){
   // a thing is metal is what it reflects when the sun is off it. The
   // reflection is not multiplied by albedo, because a dielectric's
   // reflection is the colour of what it is looking at, not its own.
+  // Cut hard for the moulded look. This term is what tells you a
+  // thing is metal or wet when the sun is off it, and in a world made
+  // of matte plastic there is nothing for it to say — while at
+  // grazing angles it puts a bright untinted rim on every silhouette,
+  // which is the single most "rendered" thing left in the frame.
   vec3 refl = reflect(-v,n);
   float amb_f = 0.04+0.96*pow(1.0-saturate(dot(n,v)),5.0);
   vec3 skyRefl = mix(uGndCol,uSkyCol,refl.y*0.5+0.5)*2.4;
-  col += skyRefl*amb_f*(1.0-rough)*(1.0-rough)*0.85;
+  col += skyRefl*amb_f*(1.0-rough)*(1.0-rough)*0.22;
 
   // Subsurface: a narrow warm band either side of the terminator, where
   // light entered the skin and came back out somewhere else. It is a
@@ -4062,17 +4158,26 @@ R.scene={
      ambient has to land near 1.0 combined; the first pass at this had
      them summing to ~1.7 and every surface blew out a stop and a half
      hot, which reads as "washed out" long before it reads as "bright". */
-  sunCol:M.v3(1.15,1.03,0.86),
-  skyCol:M.v3(0.17,0.23,0.34),
-  gndCol:M.v3(0.11,0.10,0.09),
-  zenith:M.v3(0.10,0.26,0.58),
-  horizon:M.v3(0.62,0.72,0.86),
-  ground:M.v3(0.10,0.11,0.14),
-  fogCol:M.v3(0.55,0.66,0.80),
+  /* High key.
+
+     The old split was a strong warm sun against a dim cool ambient,
+     which is how you light something you want to look photographed:
+     deep shadow, high contrast, a clear terminator. The reference is
+     the opposite — ambient does most of the work, the sun is a lift
+     rather than a key, and the darkest part of a green hill is still
+     obviously green. Sun down, ambient up by a factor of three, and
+     the ground bounce warmed so undersides do not go to slate. */
+  sunCol:M.v3(0.62,0.58,0.50),
+  skyCol:M.v3(0.56,0.64,0.74),
+  gndCol:M.v3(0.34,0.34,0.30),
+  zenith:M.v3(0.36,0.62,0.88),
+  horizon:M.v3(0.80,0.90,0.98),
+  ground:M.v3(0.30,0.36,0.42),
+  fogCol:M.v3(0.78,0.87,0.95),
   /* Tuned by eye against a 120m view: enough haze to give the far
      shore depth, not so much that the middle distance goes flat. */
-  fogDensity:0.0012,
-  fogHeight:44,
+  fogDensity:0.0009,
+  fogHeight:52,
   exposure:1.0,
   stars:0,
   bloom:0.85,
@@ -4092,7 +4197,10 @@ R.scene={
      work on the geometry underneath survives them. What is left is
      stylised realism: saturated palette, strong key light, soft
      shadows, no drawn edges. */
-  toon:0.0,
+  /* A touch of banding, not a cel shader. The reference is soft — it
+     has a gradient across a shirt, not two flat steps — so this sits
+     low enough to firm the terminator up and no further. */
+  toon:0.14,
   /* Occlusion strength, the sample radius in metres, and a depth bias
      that stops a surface shadowing itself. */
   /* Weather the world can feel. `wind` is a direction times a
@@ -4117,16 +4225,21 @@ R.scene={
   /* Kernel radius in shadow texels. Two is a hard edge with the
      aliasing filtered off; four is a soft one that starts to leak
      under thin geometry. */
-  /* Relief strength. 0 is the flat-shaded world this replaces; past
-     about 1.4 the derived normals start fighting the geometry ones at
-     grazing angles and surfaces shimmer. */
-  bump:1.0,
+  /* Relief strength. 0 is flat-shaded; past about 1.4 the derived
+     normals start fighting the geometry ones at grazing angles.
+
+     The reference has no surface relief at all — a moulded plastic
+     island has no bark ridges and no brick courses, and the derived
+     normals were most of what made this world read as photographed.
+     A trace is kept rather than zero so a wall is not perfectly
+     lifeless under a raking sun. */
+  bump:0.10,
   shadowSoft:2.0,
   outline:0.0,
   inkWidth:1.35,
   inkNear:24,
   inkFar:150,
-  saturation:0.06
+  saturation:0.26
 };
 
 R.vp=M.m4();R.view=M.m4();R.proj=M.m4();R.invVP=M.m4();R.invProj=M.m4();
@@ -4329,7 +4442,8 @@ R.beginOpaque=function(){
   GL.u1i(p,'uNorm',2);
   GL.bindTex(3,R.shadowN.tex,gl.TEXTURE_2D);
   GL.u1i(p,'uShadowN',3);
-  GL.u1f(p,'uSpec',0.25);
+  /* Matte. A moulded surface has a wide, weak sheen or none. */
+  GL.u1f(p,'uSpec',0.03);
   GL.u1f(p,'uAlpha',1);
   GL.u1f(p,'uEmisScale',R.scene.emisScale);
   GL.u4f(p,'uTint',1,1,1,0);
@@ -4851,10 +4965,17 @@ var P={
   thigh:0.440, shin:0.440,        /* knee 0.515, ankle 0.075 */
   toeF:0.112, toeD:0.046,         /* ball of the foot, forward and down */
   /* Geometry multipliers. headScale is the ratio between the head mesh,
-     which is authored 0.273 tall in its own space, and a real head of
-     0.235 — so hair and hats authored against that same space keep
-     fitting without being re-measured. */
-  headScale:0.86, limbFat:1.00, handScale:1.00, footScale:1.00,
+     which is authored 0.276 tall in its own space, and the head this
+     game actually wants — so hair, hats, beards and glasses, all of
+     them authored against that same space, grow with it and keep
+     fitting without being re-measured. At 0.86 it was a real head on a
+     real body. At 1.90 it is a toy's: 0.524 chin to crown on a figure
+     1.68 tall — three heads and a fifth, with the jaw sitting on the
+     collar and no neck to speak of between them. crownUp is where the
+     top of the skull sits in that space, and it is the one measurement
+     the skeleton below is solved against. */
+  headScale:1.90, crownUp:0.158,
+  limbFat:1.00, handScale:1.00, footScale:1.00,
   /* Girths, as radii at the widest point of each region. Used by the
      body builder and by every garment that has to sit outside it. */
   neckR:0.061, chestW:0.176, chestD:0.108, waistW:0.145, waistD:0.098,
@@ -4904,6 +5025,169 @@ var BONES=[
   ['footR',       19,           0,          -P.shin,        0],
   ['toeR',        20,           0,          -P.toeD,        P.toeF]
 ];
+
+/* ---------------- toy proportions ----------------
+   The skeleton above, and the sixty-odd ring tables that hang off it,
+   were authored against a real body: a figure a little under seven
+   heads tall, measured in metres, with a head 0.237 across the chin
+   and the crown. The look this game wants is not that body. It is a
+   toy — four heads tall, short in the leg, thick in the limb, with a
+   head that arrives before the person does.
+
+   Re-measuring every table to get there is a week of work and a week
+   of new bugs. So both bodies are kept and one map moves between them.
+   Each bone gets two numbers: a structural scale, which decides where
+   its children end up, and a vertex scale, which decides how the skin
+   around it is stretched. A vertex is then moved exactly the way it
+   would be skinned — by the weighted blend of its own bones' maps —
+   so a garment cut from the body's rings arrives at the same place the
+   body does, and a seam that closed before still closes.
+
+   The overall height is deliberately unchanged. Everything in the
+   world — doorways, counters, the camera, the step the player can walk
+   up — is measured against a 1.68 m crown, and a restyle is not a
+   reason to re-survey a town. What changes is where that height goes:
+   0.535 of leg where there was 0.955, a torso an tenth longer, arms
+   shortened and thickened, and a head that takes the top quarter.  */
+var TOY={
+  leg:0.56,        /* femur and shin, as a fraction of what they were */
+  torso:1.10,      /* hip to collarbone, likewise                     */
+  arm:0.86,        /* clavicle to wrist                               */
+  armOut:1.18,     /* how far the shoulder joint sits from the spine  */
+  legOut:1.40,     /* and the hip joint, so thick thighs still clear  */
+  wHip:1.15, wSpine:1.08, wSpine2:1.02, wChest:0.98, wNeck:1.15,
+  wArm:1.60, wDelt:1.14, wLeg:1.30, wFoot:1.25,
+  wHandXZ:1.70, wHandY:1.30,
+  neckUp:1.63,     /* the neck bone, up under the jaw where a toy's is */
+  neckY:0.62,      /* and the neck itself, most of the way gone        */
+  headY:0.30,      /* what is left of it, tucked inside the skull      */
+  crown:1.62       /* the top of the skull. Six centimetres down on   */
+                   /* the real body, which is what buries the jaw in  */
+                   /* the collar and leaves a toy's non-existent neck */
+};
+Rig.TOY=TOY;
+
+/* Structural scale: applied to a bone's offset from its parent, so it
+   decides where the skeleton goes. Vertex scale: applied to the skin
+   bound to that bone, about that bone. Anything unlisted is 1. */
+var SB={
+  hips:      [TOY.legOut, TOY.torso,  1],
+  spine:     [1, TOY.torso, 1],
+  spine2:    [1, TOY.torso, 1],
+  chest:     [TOY.wChest, TOY.torso, TOY.wChest],
+  neck:      [1, TOY.torso, 1],
+  shoulderL: [TOY.armOut, TOY.torso, 1],
+  shoulderR: [TOY.armOut, TOY.torso, 1],
+  armL:      [1, TOY.arm, 1], armR: [1, TOY.arm, 1],
+  forearmL:  [1, TOY.arm, 1], forearmR: [1, TOY.arm, 1],
+  thighL:    [1, TOY.leg, 1], thighR: [1, TOY.leg, 1],
+  shinL:     [1, TOY.leg, 1], shinR: [1, TOY.leg, 1],
+  footL:     [1, TOY.leg, TOY.wFoot], footR: [1, TOY.leg, TOY.wFoot]
+};
+var SV={
+  hips:      [TOY.wHip, TOY.torso, TOY.wHip],
+  spine:     [TOY.wSpine, TOY.torso, TOY.wSpine],
+  spine2:    [TOY.wSpine2, TOY.torso, TOY.wSpine2],
+  chest:     [TOY.wChest, TOY.torso, TOY.wChest],
+  neck:      [TOY.wNeck, TOY.neckY, TOY.wNeck],
+  head:      [1, TOY.headY, 1],
+  shoulderL: [TOY.wDelt, TOY.torso, TOY.wDelt],
+  shoulderR: [TOY.wDelt, TOY.torso, TOY.wDelt],
+  armL:      [TOY.wArm, TOY.arm, TOY.wArm],
+  armR:      [TOY.wArm, TOY.arm, TOY.wArm],
+  forearmL:  [TOY.wArm, TOY.arm, TOY.wArm],
+  forearmR:  [TOY.wArm, TOY.arm, TOY.wArm],
+  handL:     [TOY.wHandXZ, TOY.wHandY, TOY.wHandXZ],
+  handR:     [TOY.wHandXZ, TOY.wHandY, TOY.wHandXZ],
+  thighL:    [TOY.wLeg, TOY.leg, TOY.wLeg],
+  thighR:    [TOY.wLeg, TOY.leg, TOY.wLeg],
+  shinL:     [TOY.wLeg, TOY.leg, TOY.wLeg],
+  shinR:     [TOY.wLeg, TOY.leg, TOY.wLeg],
+  footL:     [TOY.wFoot, TOY.wFoot, TOY.wFoot],
+  footR:     [TOY.wFoot, TOY.wFoot, TOY.wFoot],
+  toeL:      [TOY.wFoot, TOY.wFoot, TOY.wFoot],
+  toeR:      [TOY.wFoot, TOY.wFoot, TOY.wFoot]
+};
+
+/* Where every bone stood before the map, and where it stands after.
+   The head is placed rather than scaled to: its geometry is instanced
+   and scaled by P.headScale, so the only thing the skeleton has to get
+   right is that the crown lands where it always did. */
+var AUTH=[], NEWP=[];
+(function(){
+  var i,b,par,sb;
+  for(i=0;i<BONES.length;i++){
+    b=BONES[i];par=b[1];
+    var a=par<0?[0,0,0]:AUTH[par];
+    AUTH.push([a[0]+b[2],a[1]+b[3],a[2]+b[4]]);
+  }
+  for(i=0;i<BONES.length;i++){
+    b=BONES[i];par=b[1];
+    /* the root is the hip joint, and its height is a leg */
+    if(par<0){NEWP.push([b[2],b[3]*TOY.leg,b[4]]);continue;}
+    sb=SB[BONES[par][0]]||[1,1,1];
+    var n=NEWP[par];
+    NEWP.push([n[0]+b[2]*sb[0],n[1]+b[3]*sb[1],n[2]+b[4]*sb[2]]);
+  }
+  /* The neck bone, and then the head by the crown rather than by the
+     neck. A toy has no neck to speak of: the jaw sits on the collar
+     and the head turns about a point just above the shoulders, so the
+     bone goes there and the skin that used to span the gap is pressed
+     flat against it. */
+  var idx={};
+  for(i=0;i<BONES.length;i++)idx[BONES[i][0]]=i;
+  NEWP[idx.neck][1]=NEWP[idx.chest][1]+P.neck*TOY.neckUp;
+  NEWP[idx.head][1]=TOY.crown-P.crownUp*P.headScale;
+  /* and back into offsets, which is what the bind pose is built from */
+  for(i=0;i<BONES.length;i++){
+    par=BONES[i][1];
+    var q=par<0?[0,0,0]:NEWP[par];
+    BONES[i][2]=NEWP[i][0]-q[0];
+    BONES[i][3]=NEWP[i][1]-q[1];
+    BONES[i][4]=NEWP[i][2]-q[2];
+  }
+  /* The proportions table is the skeleton's public face — the foot IK
+     reads its bone lengths to solve a knee — so it has to describe the
+     body that actually exists, not the one the numbers were typed
+     for. */
+  P.hipY=NEWP[0][1];
+  P.thigh*=TOY.leg; P.shin*=TOY.leg;
+  P.armUp*=TOY.arm; P.armLo*=TOY.arm;
+  P.toeD*=TOY.leg;  P.toeF*=TOY.wFoot;
+})();
+Rig.AUTH=AUTH;Rig.NEWP=NEWP;
+
+/* Move one builder's worth of skinned geometry from the authored body
+   into the toy one. Positions blend the per-bone affine maps by the
+   same weights the GPU will skin them with; normals blend the inverse
+   scales, which is what keeps a stretched surface lit as though it
+   were still round. */
+Rig.warp=function(bld){
+  if(!bld.skinning)return bld;
+  var V=bld.v,SK=bld.sk,n=bld.n,i,j;
+  var svs=[];
+  for(i=0;i<BONES.length;i++)svs.push(SV[BONES[i][0]]||[1,1,1]);
+  for(i=0;i<n;i++){
+    var o=i*15,k=i*8;
+    var px=V[o],py=V[o+1],pz=V[o+2];
+    var nx=V[o+3],ny=V[o+4],nz=V[o+5];
+    var ax=0,ay=0,az=0,bx=0,by=0,bz=0;
+    for(j=0;j<4;j++){
+      var w=SK[k+4+j];
+      if(w<=0)continue;
+      var bi=SK[k+j]|0,A=AUTH[bi],N=NEWP[bi],S=svs[bi];
+      ax+=w*(N[0]+(px-A[0])*S[0]);
+      ay+=w*(N[1]+(py-A[1])*S[1]);
+      az+=w*(N[2]+(pz-A[2])*S[2]);
+      bx+=w*nx/S[0];by+=w*ny/S[1];bz+=w*nz/S[2];
+    }
+    var l=Math.sqrt(bx*bx+by*by+bz*bz)||1;
+    V[o]=ax;V[o+1]=ay;V[o+2]=az;
+    V[o+3]=bx/l;V[o+4]=by/l;V[o+5]=bz/l;
+  }
+  return bld;
+};
+
 
 var NB=BONES.length;
 var NAME={},PARENT=new Int8Array(NB),REST=new Float32Array(NB*3);
@@ -5891,7 +6175,7 @@ Rig.footIK=function(actor,pose,groundAt,dt){
   }
   /* Only ever drop. Lifting the hips to reach a high foot would push
      the whole body off the ground it is standing on. */
-  drop=Math.max(drop,-0.34*sc)*w;
+  drop=Math.max(drop,-(L1+L2)*0.39)*w;
 
   for(var j=0;j<2;j++){
     var vx=txA[j]-hxA[j], vy=tyA[j]-(hyA[j]+drop), vz=tzA[j]-hzA[j];
@@ -6021,8 +6305,13 @@ function dent(pts,dx,dz,amt,width){
    face map cannot reach. Multiplied by the character's own skin colour,
    so #F6C9B8 means "this part is redder than the rest of the face"
    rather than any particular pink. */
-var WARM='#FFF3EC', BLUSH='#F6C9B8', LIPU='#E8A091', LIPL='#F0AB9B',
-    LIPLINE='#8E5348', NOSTRIL='#7A5348', EARC='#F5C0AB',
+/* Flattened for the toy style: a face whose lips are a different
+   colour from its cheeks is a portrait, and this one is a moulded
+   shape with a mouth on it. The values still step — a mouth has to
+   be darker than a chin or it is not there — but they step by a
+   twentieth rather than by a third. */
+var WARM='#FFF8F4', BLUSH='#FAE6DE', LIPU='#F0D2C8', LIPL='#F4DAD1',
+    LIPLINE='#B08278', NOSTRIL='#A07C70', EARC='#F8E0D6',
     LIDU='#F2DED6', LIDL='#F7E6DD', FOLD='#DFC0B4', TEAR='#F0B3A4';
 
 Body.head=function(){
@@ -6075,24 +6364,28 @@ Body.head=function(){
        a wedge cannot do that without shearing. */
     b.push();
     b.loft([
-      {y:-0.038,pts:headSect(0.026,0.104,0.020,12,2.4),col:MID},
-      {y:-0.030,pts:headSect(0.024,0.118,0.020,12,2.4)},
-      {y:-0.016,pts:headSect(0.020,0.116,0.020,12,2.3)},
-      {y: 0.006,pts:headSect(0.016,0.109,0.020,12,2.2)},
-      {y: 0.030,pts:headSect(0.014,0.103,0.020,12,2.2)},
-      {y: 0.050,pts:headSect(0.014,0.100,0.020,12,2.2),col:MID}
+      /* Depths pulled back toward the face plane at 0.089. On a head
+         this size the old nose stood out five and a half centimetres
+         and threw a shadow across half the face, which is a caricature
+         rather than a toy. */
+      {y:-0.038,pts:headSect(0.024,0.093,0.020,12,2.4),col:MID},
+      {y:-0.030,pts:headSect(0.022,0.097,0.020,12,2.4)},
+      {y:-0.016,pts:headSect(0.019,0.096,0.020,12,2.3)},
+      {y: 0.006,pts:headSect(0.015,0.094,0.020,12,2.2)},
+      {y: 0.030,pts:headSect(0.013,0.092,0.020,12,2.2)},
+      {y: 0.050,pts:headSect(0.013,0.091,0.020,12,2.2),col:MID}
     ],WARM,{openTop:true,openBottom:true});
     b.pop();
     /* alae, and the septum between them */
     for(var e=-1;e<=1;e+=2){
-      b.push();b.translate(e*0.021,-0.033,0.096);b.rotate(0,e*0.30,0);
+      b.push();b.translate(e*0.019,-0.033,0.090);b.rotate(0,e*0.30,0);
       b.scale(0.80,0.86,1.0);
-      b.sphere(0,0,0,0.017,9,7,BLUSH);b.pop();
-      b.push();b.translate(e*0.017,-0.041,0.100);
-      b.sphere(0,0,0,0.007,6,5,NOSTRIL);b.pop();   /* nostril */
+      b.sphere(0,0,0,0.013,9,7,BLUSH);b.pop();
+      b.push();b.translate(e*0.015,-0.040,0.094);
+      b.sphere(0,0,0,0.0055,6,5,NOSTRIL);b.pop();   /* nostril */
     }
-    b.push();b.translate(0,-0.038,0.106);
-    b.sphere(0,0,0,0.010,8,6,BLUSH,{squash:0.8});b.pop();
+    b.push();b.translate(0,-0.038,0.096);
+    b.sphere(0,0,0,0.008,8,6,BLUSH,{squash:0.8});b.pop();
 
     /* ---- mouth ----
        A vermilion border that stands a little proud, a groove between
@@ -6105,12 +6398,12 @@ Body.head=function(){
     /* Lips have to stand about six millimetres proud of the face plane,
        which sits at z 0.089 here. The previous pass pulled them back to
        0.080 and they vanished into the skull — a face with no mouth. */
-    b.push();b.translate(0,-0.051,0.085);b.rotate(-0.10,0,0);
-    b.scale(1.0,0.44,0.52);
-    b.sphere(0,0,0,0.027,14,10,LIPU);b.pop();
-    b.push();b.translate(0,-0.065,0.084);b.rotate(0.12,0,0);
-    b.scale(1.0,0.52,0.54);
-    b.sphere(0,0,0,0.025,14,10,LIPL);b.pop();
+    b.push();b.translate(0,-0.051,0.082);b.rotate(-0.10,0,0);
+    b.scale(1.0,0.40,0.44);
+    b.sphere(0,0,0,0.024,14,10,LIPU);b.pop();
+    b.push();b.translate(0,-0.064,0.081);b.rotate(0.12,0,0);
+    b.scale(1.0,0.46,0.46);
+    b.sphere(0,0,0,0.022,14,10,LIPL);b.pop();
     /* the opening between them, and the corners, which are what stop a
        mouth reading as two sausages */
     b.push();b.translate(0,-0.058,0.098);
@@ -6187,6 +6480,10 @@ Body.head=function(){
    doll. The socket is already a dent in the skull, so the eye only
    has to fill it. */
 var EYE_X=0.0370, EYE_Y=0.0040, EYE_Z=0.0788, EYE_R=0.0145, EYE_TILT=-0.22;
+/* The iris, as a fraction of the eyeball. Left at one: enlarging it
+   sounded like the toy thing to do and turned out to read as a pair
+   of goggles, because the ring around it grows with it. */
+var IRISK=1.0;
 
 Body.eyes=function(){
   return part('eyes',function(b){
@@ -6241,8 +6538,8 @@ Body.iris=function(){
     for(var s=-1;s<=1;s+=2){
       b.push();b.translate(s*EYE_X,EYE_Y,EYE_Z+EYE_R*0.80);
       b.rotate(0,s*EYE_TILT,0);
-      b.sphere(0,0,0,0.0068,14,10,'#2F3038',{squash:0.55});     /* limbal */
-      b.sphere(0,0,0.0009,0.0059,14,10,'#FFFFFF',{squash:0.50});/* body   */
+      b.sphere(0,0,0,0.0068*IRISK,14,10,'#2F3038',{squash:0.55});     /* limbal */
+      b.sphere(0,0,0.0009,0.0059*IRISK,14,10,'#FFFFFF',{squash:0.50});/* body   */
       /* radial striation: eight faint spokes, which is what stops a
          flat disc of colour reading as a printed dot */
       for(var k=0;k<8;k++){
@@ -6253,7 +6550,7 @@ Body.iris=function(){
         b.pop();
       }
       b.sphere(0,0,0.0016,0.0034,10,8,'#5A5C68',{squash:0.5}); /* collarette */
-      b.sphere(0,0,0.0022,0.0026,10,8,'#08080A',{squash:0.5}); /* pupil  */
+      b.sphere(0,0,0.0022,0.0026*IRISK,10,8,'#08080A',{squash:0.5}); /* pupil  */
       b.pop();
     }
     b.pop();
@@ -6336,6 +6633,10 @@ function skinPart(key,fn){
   if(hit)return hit;
   var b=Geo.build();
   fn(b);
+  /* Authored on the real body, delivered on the toy one. Every skinned
+     part in the game goes through here, which is why the map only has
+     to exist once. */
+  LH.Rig.warp(b);
   var mesh=b.upload(0);
   mesh.key=key;
   cache[key]=mesh;
@@ -7163,6 +7464,14 @@ function hairCard(b,o){
    the same length function as the strands without consuming the
    style's random sequence and changing every strand downstream. */
 function _half(){return 0.5;}
+/* Where the hair stops at the face. On the real head this sat high,
+   which is what a grown adult's hairline does. On a head twice the
+   size it left a forehead you could project a film onto, so in the
+   toy style it comes down two fifths of the way and the fringe
+   arrives with it. */
+function hairline(cfg){
+  return TOYHAIR?cfg.elFront*0.55:cfg.elFront;
+}
 function scalpCap(b,cfg){
   var n=26,secs=[],rows=12;
   for(var i=0;i<=rows;i++){
@@ -7176,7 +7485,7 @@ function scalpCap(b,cfg){
          where the head hides them, and the shell emerges along exactly
          the line we want. */
       var f=Math.cos(az)*0.5+0.5;                 /* 1 at the face     */
-      var lim=M.lerp(cfg.elLo,cfg.elFront,f*f);
+      var lim=M.lerp(cfg.elLo,hairline(cfg),f*f);
       /* The cap is not the scalp: it is the inside of the hair.
          Sitting it on the skull left every gap between cards showing
          bare head, which at any density short of absurd is a mass of
@@ -7191,8 +7500,13 @@ function scalpCap(b,cfg){
          strand's length runs along the head or hangs off it, so the
          mass is only a few millimetres thick where it sits on the
          skull, and the cap has to stay inside that. */
+      /* In the toy style the cap is not a backing for the strands —
+         it is the hair. Pushed out to most of the style's own length
+         it becomes a solid shell with the shape of the haircut, and
+         the cards on top of it are there for the edge and the fringe
+         rather than for the volume. */
       var L=cfg.len?cfg.len(az,el,_half):0.04;
-      var fill=Math.min(0.045,L*0.5);
+      var fill=TOYHAIR?Math.min(0.52,L*8.0):Math.min(0.045,L*0.5);
       var out=1.052+fill;
       var r=el<lim?0.90:out;
       if(el>=lim&&el<lim+0.12)r=M.lerp(0.90,out,(el-lim)/0.12);
@@ -7204,11 +7518,21 @@ function scalpCap(b,cfg){
   /* Shaded as hair deep in the mass rather than as scalp: what shows
      between strands is hair the light has not reached, and it should
      read as the same material one stop down, not as a different one. */
-  b.loft(secs,hairShade(0.10),{openBottom:true});
+  b.loft(secs,hairShade(TOYHAIR?0.45:0.10),{openBottom:true});
 }
 
 /* A whole head of hair from one description. */
-var ROWMUL=1.45, PERMUL=2.20, FINE=0.56;
+/* Five hundred half-millimetre strands is what hair looks like when
+   you are trying to draw hair. The reference is not trying to: its
+   hair is one solid shape with a clean edge and no strand visible at
+   all. So the same eleven styles run at a ninth of the density and
+   three times the width, over a cap pushed out to meet them — a
+   hundred wide chunks instead of seven hundred fine ones, which reads
+   as a moulded shape rather than as a mass of fibres. Turning TOYHAIR
+   off restores the fine version exactly. */
+var TOYHAIR=true;
+var ROWMUL=TOYHAIR?1.05:1.45, PERMUL=TOYHAIR?1.50:2.20,
+    FINE=TOYHAIR?0.90:0.56;
 function scalpHair(b,cfg){
   scalpCap(b,cfg);
   var rng=M.rng(cfg.seed||7);
@@ -7219,14 +7543,20 @@ function scalpHair(b,cfg){
      exactly what it looked like. The multipliers here take every
      style to roughly five hundred strands at a third of the width
      without retuning eleven hairstyles by hand: DENSE scales the
-     count, FINE scales the width and the thickness together. */
+     count, FINE scales the width and the thickness together.
+
+     The toy head is nearly twice the size of the one those numbers
+     were tuned against, so the same strand covers twice as many
+     pixels — which is why the toy settings are closer to the original
+     coarse ones than to the fine ones. Wider than this and the cards
+     stop being strands and start being roof shingles. */
   var rows=Math.round((cfg.rows||6)*ROWMUL), per=Math.round((cfg.per||16)*PERMUL);
   for(var r=0;r<rows;r++){
     var rt=(r+0.5)/rows;
     for(var k=0;k<per;k++){
       var az=((k+ (r%2)*0.5)/per)*M.TAU;
       var f=Math.cos(az)*0.5+0.5;
-      var lim=M.lerp(cfg.elLo,cfg.elFront,f*f);
+      var lim=M.lerp(cfg.elLo,hairline(cfg),f*f);
       var el=M.lerp(lim,1.50,rt);
       /* Rows further from the hairline start further out. Every strand
          leaving the same shell made hair one onion skin with cards
@@ -19365,7 +19695,7 @@ App.onDraw(function(dt,time){
   R.beginScene();
   var p=R.beginOpaque();
   GL.uM4(p,'uModel',_id);
-  GL.u1f(p,'uSpec',0.18+LH.Sky.wet*0.55);
+  GL.u1f(p,'uSpec',0.03+LH.Sky.wet*0.14);
   GL.u1f(p,'uMacro',1);
   T.drawChunks(true);
   GL.u1f(p,'uMacro',0);
