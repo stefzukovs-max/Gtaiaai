@@ -2879,19 +2879,47 @@ vec3 pointLights(vec3 world,vec3 n){
 // stay clear. Averaging the two endpoint heights is an approximation of
 // the proper integral along the ray, and is stable for every view
 // direction including a perfectly horizontal one.
+// Aerial perspective, not one flat fog colour. Haze is lit air, so its
+// colour is the sky's in that direction — bluer looking up and away,
+// warmer and brighter looking toward the sun, where forward scattering
+// piles up. One constant colour makes a distant hillside sit in front
+// of the sky it should be dissolving into, which is the single tell
+// that separates depth from a grey wash.
 vec3 applyFog(vec3 col,vec3 world,vec3 eye){
-  float dist=length(world-eye);
+  vec3 d=world-eye;
+  float dist=length(d);
+  vec3 vd=d/max(dist,1e-4);
   float hs=max(0.5,uFog.y);
   float hAvg=max(0.0,(world.y+eye.y)*0.5);
   float density=uFog.x*exp(-hAvg/hs);
   float t=1.0-exp(-dist*density);
-  return mix(col,uFogCol,clamp(t,0.0,1.0));
+  // the sky in the direction we are actually looking
+  vec3 haze=mix(uFogCol,uSkyCol*1.9,saturate(vd.y*1.4)*0.55);
+  // and the sun's own glow through it
+  float fwd=saturate(dot(vd,uSunDir));
+  haze+=uSunCol*(pow(fwd,5.0)*0.22+pow(fwd,1.6)*0.05);
+  return mix(col,haze,clamp(t,0.0,1.0));
 }
 `;
 
+/* ---------------- shadows ----------------
+   Two cascades. One map fitted to the whole visible neighbourhood has
+   to cover about ninety metres, which at 2048 leaves four centimetres
+   per texel — enough for a building's shadow and nowhere near enough
+   for the contact between a foot and the ground, which is the shadow
+   the eye actually checks. The near cascade covers thirteen metres at
+   the same resolution, six millimetres a texel, and everything inside
+   it reads sharp.
+
+   The split is a hard test against the near box rather than a blend
+   band: at this ratio the two look near-identical where they meet, and
+   a blend costs a second twelve-tap fetch on every pixel in the
+   overlap to hide a seam that is not visible. */
 var SHADOW=`
 uniform sampler2DShadow uShadow;
+uniform sampler2DShadow uShadowN;
 uniform mat4 uLightVP;
+uniform mat4 uLightVPN;
 uniform vec2 uShadowTexel;   // 1/size, bias scale
 uniform float uShadowSoft;   // kernel radius, in shadow texels
 const vec2 POISSON12[12]=vec2[12](
@@ -2900,29 +2928,41 @@ const vec2 POISSON12[12]=vec2[12](
   vec2( 0.519, 0.767),vec2( 0.185,-0.893),vec2( 0.507, 0.064),
   vec2( 0.896, 0.412),vec2(-0.322,-0.933),vec2(-0.792,-0.598)
 );
-float shadowAt(vec3 world,vec3 n,vec3 l){
-  vec4 lp=uLightVP*vec4(world,1.0);
-  vec3 p=lp.xyz/lp.w*0.5+0.5;
-  if(p.z>1.0||p.x<0.0||p.x>1.0||p.y<0.0||p.y>1.0)return 1.0;
-  // Slope-scaled bias: grazing light needs far more offset than a
-  // face pointing straight at the sun, and a single constant bias
-  // either peters or floats depending which you tune for.
-  float ndl=saturate(dot(n,l));
-  float bias=uShadowTexel.y*(0.6+2.6*(1.0-ndl));
-  p.z-=bias;
-  // A rotated Poisson disc rather than a 3x3 grid. Twelve taps in a
-  // ring cover more of the penumbra than nine in a square for the same
-  // cost, and rotating the ring per pixel turns the banding a fixed
-  // kernel leaves into noise the eye does not read as structure.
+// A rotated Poisson disc rather than a 3x3 grid. Twelve taps in a ring
+// cover more of the penumbra than nine in a square for the same cost,
+// and rotating the ring per pixel turns the banding a fixed kernel
+// leaves into noise the eye does not read as structure.
+float pcf(sampler2DShadow smp,vec3 p,float soft){
   float ang=fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453)*6.28318;
   float ca=cos(ang),sa=sin(ang);
   float s=0.0;
   for(int i=0;i<12;i++){
     vec2 o=POISSON12[i];
-    vec2 r=vec2(o.x*ca-o.y*sa,o.x*sa+o.y*ca)*uShadowTexel.x*uShadowSoft;
-    s+=texture(uShadow,vec3(p.xy+r,p.z));
+    vec2 r=vec2(o.x*ca-o.y*sa,o.x*sa+o.y*ca)*uShadowTexel.x*soft;
+    s+=texture(smp,vec3(p.xy+r,p.z));
   }
   return s/12.0;
+}
+float shadowAt(vec3 world,vec3 n,vec3 l){
+  // Slope-scaled bias: grazing light needs far more offset than a face
+  // pointing straight at the sun, and a single constant bias either
+  // peters or floats depending which you tune for.
+  float ndl=saturate(dot(n,l));
+  float bias=uShadowTexel.y*(0.6+2.6*(1.0-ndl));
+
+  vec4 lpn=uLightVPN*vec4(world,1.0);
+  vec3 pn=lpn.xyz/lpn.w*0.5+0.5;
+  if(pn.x>0.015&&pn.x<0.985&&pn.y>0.015&&pn.y<0.985&&pn.z<1.0){
+    // The near box is a quarter the width, so its texels are a quarter
+    // the size and both the bias and the kernel scale down with them.
+    pn.z-=bias*0.30;
+    return pcf(uShadowN,pn,uShadowSoft*0.9);
+  }
+  vec4 lp=uLightVP*vec4(world,1.0);
+  vec3 p=lp.xyz/lp.w*0.5+0.5;
+  if(p.z>1.0||p.x<0.0||p.x>1.0||p.y<0.0||p.y>1.0)return 1.0;
+  p.z-=bias;
+  return pcf(uShadow,p,uShadowSoft);
 }
 `;
 
@@ -3835,6 +3875,7 @@ R.scene={
 
 R.vp=M.m4();R.view=M.m4();R.proj=M.m4();R.invVP=M.m4();R.invProj=M.m4();
 R.lightVP=M.m4();
+R.lightVPN=M.m4();
 R.eye=M.v3(0,3,8);
 R.time=0;
 R.quality=1;      /* 1 = full, 0.75 / 0.5 scale the internal buffers */
@@ -3862,6 +3903,7 @@ R.init=function(canvas){
      does not, so fall back a step rather than disabling shadows. */
   R.shadow=GL.shadowTarget(SHADOW_SIZE);
   if(!R.shadow.ok){SHADOW_SIZE=1024;R.shadow=GL.shadowTarget(SHADOW_SIZE);}
+  R.shadowN=GL.shadowTarget(SHADOW_SIZE);
 
   sceneRT=GL.colorTarget(2,2,true,true);
   bloomA=GL.colorTarget(2,2,true);
@@ -3893,20 +3935,29 @@ R.resize=function(w,h){
    resolution is finite, so covering the whole 400m island would make
    the character's own shadow a blur — instead the box tracks the
    player and only near geometry casts. */
-var _lv=M.m4(),_lp=M.m4(),_ctr=M.v3(),_eye=M.v3(),_up=M.v3(0,1,0);
-R.updateLight=function(focus,radius){
-  radius=radius||42;
-  var s=R.scene;
+var _lv=M.m4(),_lp=M.m4(),_ctr=M.v3(),_eye=M.v3(),_up=M.v3(0,1,0),_nf=M.v3();
+function fitCascade(out,focus,radius,sunDir){
   /* Snap the focus to shadow-texel increments. Without this the whole
      shadow crawls and shimmers as the player walks. */
   var texel=(radius*2)/SHADOW_SIZE;
   var fx=Math.round(focus[0]/texel)*texel;
   var fz=Math.round(focus[2]/texel)*texel;
   M.set3(_ctr,fx,focus[1],fz);
-  M.addScaled3(_eye,_ctr,s.sunDir,radius*2.2);
+  M.addScaled3(_eye,_ctr,sunDir,radius*2.2);
   M.lookAt(_lv,_eye,_ctr,_up);
   M.ortho(_lp,-radius,radius,-radius,radius,0.5,radius*5);
-  M.mul(R.lightVP,_lp,_lv);
+  M.mul(out,_lp,_lv);
+}
+R.nearRadius=13;
+R.updateLight=function(focus,radius){
+  radius=radius||42;
+  var s=R.scene;
+  fitCascade(R.lightVP,focus,radius,s.sunDir);
+  /* The near cascade is centred a little ahead of the player rather
+     than on them: the camera is behind, so the ground the player is
+     walking on to is what needs the resolution. */
+  M.set3(_nf,focus[0],focus[1],focus[2]);
+  fitCascade(R.lightVPN,_nf,R.nearRadius,s.sunDir);
 };
 
 R.setCamera=function(view,proj,eye){
@@ -3946,14 +3997,14 @@ function bindSceneUniforms(p){
 }
 
 /* ---------------- pass drivers ---------------- */
-R.beginShadow=function(){
-  GL.bindTarget(R.shadow);
+R.beginShadow=function(near){
+  GL.bindTarget(near?R.shadowN:R.shadow);
   gl.clear(gl.DEPTH_BUFFER_BIT);
   /* Front-face culling during the depth pass moves acne to the
      backfaces, where nobody sees it. */
   gl.cullFace(gl.FRONT);
   var p=GL.use(R.progs.depth);
-  GL.uM4(p,'uLightVP',R.lightVP);
+  GL.uM4(p,'uLightVP',near?R.lightVPN:R.lightVP);
   var s=R.scene;
   GL.u3v(p,'uWind',s.wind);
   GL.u1f(p,'uWindTime',s.windTime);
@@ -4010,6 +4061,7 @@ R.beginOpaque=function(){
   bindSceneUniforms(p);
   GL.uM4(p,'uVP',R.vp);
   GL.uM4(p,'uLightVP',R.lightVP);
+  GL.uM4(p,'uLightVPN',R.lightVPN);
   GL.u2f(p,'uShadowTexel',1/SHADOW_SIZE,0.0016);
   GL.u1f(p,'uShadowSoft',R.scene.shadowSoft);
   GL.bindTex(0,LH.Tex.array,gl.TEXTURE_2D_ARRAY);
@@ -4018,6 +4070,8 @@ R.beginOpaque=function(){
   GL.u1i(p,'uShadow',1);
   GL.bindTex(2,LH.Tex.normals,gl.TEXTURE_2D_ARRAY);
   GL.u1i(p,'uNorm',2);
+  GL.bindTex(3,R.shadowN.tex,gl.TEXTURE_2D);
+  GL.u1i(p,'uShadowN',3);
   GL.u1f(p,'uSpec',0.25);
   GL.u1f(p,'uAlpha',1);
   GL.u1f(p,'uEmisScale',R.scene.emisScale);
@@ -4892,6 +4946,61 @@ C.locomote=function(p,ph,pr){
   return p;
 };
 
+/* Turning on the spot. Without this the character pivots like a
+   turret: the facing changes and the feet, which are the only thing
+   telling you a turn happened, do not move at all. The outside foot
+   steps around the inside one, the hips lead and the shoulders follow,
+   and the whole thing loops so a long turn keeps shuffling. */
+C.turn=function(p,ph,pr){
+  p.clear();
+  var dir=(pr&&pr.turn)||1;
+  var t=ph*TAU, sw=sin(t);
+  p.rootY=-Math.abs(sw)*0.016;
+  p.set('hips',0,dir*0.10*sw,0);
+  trunk(p,0.03,-dir*0.14*sw,0);
+  var a1=Math.max(0,sw*dir), a2=Math.max(0,-sw*dir);
+  p.set('thighL',-a1*0.30,dir*0.12,0.030);
+  p.set('thighR',-a2*0.30,dir*0.12,-0.030);
+  p.set('shinL',a1*0.46+0.045,0,0);
+  p.set('shinR',a2*0.46+0.045,0,0);
+  p.set('footL',a1*0.16-0.02,dir*0.10,0);
+  p.set('footR',a2*0.16-0.02,dir*0.10,0);
+  p.set('toeL',a1*0.26,0,0);
+  p.set('toeR',a2*0.26,0,0);
+  p.set('armL',0.05+a2*0.12,0,0.085);
+  p.set('armR',0.05+a1*0.12,0,-0.085);
+  p.set('forearmL',-0.26,0.32,0.03);
+  p.set('forearmR',-0.26,-0.32,-0.03);
+  p.set('head',0.02,dir*0.14,0);
+  return p;
+};
+
+/* Coming to a halt out of a run. Momentum does not stop when the input
+   does: the front foot plants, the body rocks back over it against its
+   own speed, and then settles forward. Sliding to a stop on a walk
+   cycle that fades out is the tell that nothing has any mass. */
+C.stop=function(p,ph,pr){
+  p.clear();
+  var e=ease(M.clamp(ph*1.5,0,1));
+  var rock=bell(M.clamp(ph*1.25,0,1));
+  p.rootLean=0.14-rock*0.30;
+  p.rootY=-rock*0.048;
+  p.set('thighL',-0.44+e*0.36,0,0.030);
+  p.set('thighR', 0.26-e*0.22,0,-0.030);
+  p.set('shinL',0.12+rock*0.22,0,0);
+  p.set('shinR',0.40-e*0.30,0,0);
+  p.set('footL',0.24-rock*0.30,0,0);
+  p.set('footR',-0.20+e*0.18,0,0);
+  p.set('toeR',0.30-e*0.28,0,0);
+  trunk(p,0.12-rock*0.26,0,0);
+  p.set('neck',-0.06+rock*0.14,0,0);
+  p.set('armL',0.34-rock*0.48,0,0.10);
+  p.set('armR',0.28-rock*0.42,0,-0.10);
+  p.set('forearmL',-0.44-rock*0.20, 0.26, 0.04);
+  p.set('forearmR',-0.42-rock*0.18,-0.26,-0.04);
+  return p;
+};
+
 C.jump=function(p,ph,pr){
   p.clear();
   /* Launch: legs still extended from the push, arms thrown up. */
@@ -5270,6 +5379,8 @@ C.point=function(p,ph,pr){
 var STATES={
   idle:      {clip:'idle',      period:4.2,  loop:true,  blend:0.28, pri:0},
   locomote:  {clip:'locomote',  period:1.0,  loop:true,  blend:0.18, pri:0},
+  turn:      {clip:'turn',      period:0.66, loop:true,  blend:0.18, pri:0},
+  stop:      {clip:'stop',      period:0.40, loop:false, blend:0.09, pri:1, next:'idle'},
   jump:      {clip:'jump',      period:0.42, loop:false, blend:0.10, pri:2, next:'fall'},
   fall:      {clip:'fall',      period:1.6,  loop:true,  blend:0.20, pri:1},
   land:      {clip:'land',      period:0.34, loop:false, blend:0.07, pri:2, next:'idle'},
@@ -8163,6 +8274,9 @@ function Actor(opt){
   this.driftT=Math.random()*4;
   this.driftYaw=0;this.driftPitch=0;
   this.lag=[0,0];          /* cape / hair lag, actor-local */
+  this.lagV=[0,0];         /* its velocity — this is a spring, not a follow */
+  this.hair=[0,0];         /* the same again, softer and slower */
+  this.hairV=[0,0];
   this.turnRate=0;
   this.squash=0;           /* landing compression, set by the controller */
   this.ik=false;           /* foot IK, switched on for whoever is close */
@@ -8187,6 +8301,19 @@ Actor.prototype.faceToward=function(yaw,dt,rate){
      the middle of one. */
   this.turnRate=M.damp(this.turnRate||0,step/Math.max(dt,0.0001),0.09,dt);
 };
+
+/* A critically-ish damped spring, integrated semi-implicitly so it
+   stays stable at the frame rates a browser actually delivers rather
+   than the one it was tuned at. `k` is stiffness, `c` damping. */
+function spring(pos,vel,i,target,k,c,dt){
+  var step=Math.min(dt,1/50);
+  var n=Math.max(1,Math.ceil(dt/step));
+  var h=dt/n;
+  for(var q=0;q<n;q++){
+    vel[i]+=((target-pos[i])*k-vel[i]*c)*h;
+    pos[i]+=vel[i]*h;
+  }
+}
 
 /* Everything here is presentation: nothing it does can change where
    the actor is or what it owns. It runs after the clip and before the
@@ -8274,8 +8401,22 @@ Actor.prototype.life=function(dt,pose){
   var sf=Math.sin(this.facing),cf=Math.cos(this.facing);
   var fwd=vx*sf+vz*cf;         /* along the way the actor is facing */
   var side=vx*cf-vz*sf;
-  this.lag[0]=M.damp(this.lag[0],M.clamp(fwd*0.052,-0.42,0.42),0.11,dt);
-  this.lag[1]=M.damp(this.lag[1],M.clamp(side*0.040,-0.30,0.30),0.13,dt);
+  /* A spring rather than a damped follow. A follow always trails the
+     target and never passes it, so cloth eased into place and stopped;
+     a spring overshoots and settles, which is what actually happens
+     when someone stops walking and their coat keeps going. */
+  var wind=LH.Render&&LH.Render.scene?LH.Render.scene.wind:null;
+  var wf=wind?(wind[0]*sf+wind[2]*cf)*0.020:0;
+  var ws=wind?(wind[0]*cf-wind[2]*sf)*0.016:0;
+  var tgt0=M.clamp(fwd*0.058+wf,-0.46,0.46);
+  var tgt1=M.clamp(side*0.046+ws,-0.34,0.34);
+  spring(this.lag,this.lagV,0,tgt0,74,11,dt);
+  spring(this.lag,this.lagV,1,tgt1,66,10,dt);
+  /* Hair is lighter and answers faster, and it also answers to the
+     head turning, which cloth on the chest does not. */
+  var hy=(this.turnRate||0)*0.030;
+  spring(this.hair,this.hairV,0,tgt0*1.35,120,13,dt);
+  spring(this.hair,this.hairV,1,M.clamp(tgt1*1.5+hy,-0.44,0.44),110,12,dt);
 
   /* Bank into the turn. Scaled by how fast the actor is actually
      travelling — leaning while turning on the spot is a comedy pose,
@@ -8401,9 +8542,14 @@ A.submit=function(actor){
   if((actor.blink||0)>0.02)
     P(Body.lids(),'head',
       [headOff[0],headOff[1]+(1-actor.blink)*0.030,headOff[2]],skin);
-  if(k.hair.style!=='bald')
+  if(k.hair.style!=='bald'){
+    /* Hair swings on its own spring, harder than the cape's: it is
+       lighter, it is further from the pivot, and it answers to the
+       head turning as well as to the body moving. */
+    var hr=actor.hair||lag;
     P(Body.hair(k.hair.style),'head',headOff,Geo.col3(k.hair.color),0,
-      [-lag[0]*0.30,0,lag[1]*0.30]);
+      [-hr[0]*0.42,hr[1]*0.20,hr[1]*0.46]);
+  }
   if(k.hat.style!=='none')
     P(Body.hat(k.hat.style),'head',headOff,Geo.col3(k.hat.color));
   if(k.facial&&k.facial.style!=='none')
@@ -9313,6 +9459,43 @@ function trunk(b,h,r0,r1,lean,seed){
 
 P.TREES=['broadleaf','pine','palm','blossom','dead'];
 P.CULL={tree:190,bush:95,tuft:52,rock:150,dflt:150};
+/* ---------------- branching ----------------
+   A limb, and the limbs that grow out of it. Each child is built
+   inside its parent's transform, so the recursion never has to know
+   which way anything is pointing in world space — `translate(0,len,0)`
+   is always "the end of this branch" and `rotate` is always relative
+   to it. Working out the world direction of a third-order twig and
+   rotating a cylinder onto it is the same tree and four times the code.
+
+   Depth 0 means "put leaves here instead of more wood". */
+function limb(b,len,r0,r1,depth,rng,leaf,barkCol){
+  b.cylinder(0,len/2,0,r0,r1,len,5,barkCol||'#FFFFFF');
+  b.push();b.translate(0,len,0);
+  if(depth>0){
+    /* Two children, not three. A tree is placed hundreds of times and
+       every branch is paid for at every instance: three children at
+       depth two is nine tips per primary against four, and the
+       silhouette is barely different at the distance anyone sees it. */
+    var n=2;
+    for(var i=0;i<n;i++){
+      b.push();
+      b.rotate(0,(i/n)*M.TAU+rng()*0.9,0);
+      /* Wider at the first split than at the last: a tree opens out
+         low and closes back toward vertical in its twigs, and branching
+         at a constant angle gives you a diagram of a tree rather than
+         a tree. */
+      b.rotate(0.30+depth*0.16+rng()*0.30,0,0);
+      limb(b,len*(0.60+rng()*0.20),r1,r1*(0.52+rng()*0.16),
+           depth-1,rng,leaf,barkCol);
+      b.pop();
+    }
+    /* one cluster in the crotch of the split, so the canopy has an
+       inside as well as an outline */
+    if(depth===1&&rng()<0.5)leaf(b,rng,0.70);
+  }else leaf(b,rng,1);
+  b.pop();
+}
+
 P.tree=function(kind,variant){
   variant=variant||0;
   return prop('tree:'+kind+':'+variant,function(b){
@@ -9325,16 +9508,26 @@ P.tree=function(kind,variant){
       b.mat('foliage');
       /* stacked skirts, each smaller and rotated, so the silhouette
          is ragged rather than a smooth cone */
-      for(var i=0;i<6;i++){
-        var t=i/5;
-        var y=h*(0.26+t*0.66);
-        var r=(2.5-t*1.9)*scale;
-        b.push();b.translate((rng()-0.5)*0.2,y,(rng()-0.5)*0.2);
-        b.rotate(0,rng()*6.28,0);
+      for(var i=0;i<7;i++){
+        var t=i/6;
+        var y=h*(0.20+t*0.74);
+        var r=(2.7-t*2.15)*scale;
+        b.push();b.translate((rng()-0.5)*0.26,y,(rng()-0.5)*0.26);
+        b.rotate((rng()-0.5)*0.10,rng()*6.28,(rng()-0.5)*0.10);
+        /* A ragged ring rather than a clean circle: a cone of perfect
+           circles is a Christmas-tree decoration, and the whole read of
+           a conifer is the broken edge where the branches end. */
+        var n2=11,pts=[];
+        for(var q2=0;q2<n2;q2++){
+          var a2=q2/n2*M.TAU;
+          var rr=r*(0.76+((q2*7919)%13)/13*0.38);
+          pts.push([Math.cos(a2)*rr,Math.sin(a2)*rr]);
+        }
         b.loft([
-          {y:0,pts:Geo.circle(r,9)},
-          {y:r*0.95,pts:Geo.circle(r*0.12,9)}
-        ],i%2?'#FFFFFF':'#D8D8D8',{openBottom:false});
+          {y:0,pts:pts},
+          {y:r*0.34,pts:Geo.circle(r*0.55,n2)},
+          {y:r*1.05,pts:Geo.circle(r*0.10,n2)}
+        ],i%2?'#FFFFFF':'#D4D4D4',{openBottom:false});
         b.pop();
       }
     }else if(kind==='palm'){
@@ -9381,26 +9574,57 @@ P.tree=function(kind,variant){
         b.pop();
       }
     }else{
-      /* broadleaf and blossom share a shape; only the canopy material
-         differs, which is the whole point of a material index */
+      /* Broadleaf and blossom share a shape; only the canopy material
+         differs, which is the whole point of a material index.
+
+         The canopy used to be five squashed spheres over a bare pole —
+         a lollipop, and the thing that made every wooded shot in this
+         game read as clip art. It is now a real branching structure
+         with leaf clusters hung on the ends, which costs about two
+         thousand vertices per variant and nothing at all in draw calls,
+         because a species is one instanced mesh however complicated it
+         is inside. */
       b.mat('bark');
       var bh=7.0*scale;
-      var bt2=trunk(b,bh*0.62,0.34*scale,0.18*scale,0.22,19+variant);
-      b.mat(kind==='blossom'?'foliagep':'foliage');
-      /* Canopy from overlapping squashed spheres at varied heights.
-         One big sphere reads as a lollipop; five read as a tree. */
-      var blobs=[[0,1.00,0,2.5],[1.5,0.72,0.5,1.9],[-1.3,0.80,-0.7,2.0],
-                 [0.5,0.60,-1.5,1.7],[-0.6,0.62,1.5,1.8]];
-      for(var k=0;k<blobs.length;k++){
-        var B=blobs[k];
+      var bt2=trunk(b,bh*0.46,0.36*scale,0.20*scale,0.20,19+variant);
+      var leafMat=kind==='blossom'?'foliagep':'foliage';
+      function cluster(bb,r2,sz){
+        sz=sz||1;
+        bb.mat(leafMat);
+        var lob=3;
+        for(var q=0;q<lob;q++){
+          bb.push();
+          bb.translate((r2()-0.5)*1.25*sz*scale,
+                       (r2()-0.25)*0.90*sz*scale,
+                       (r2()-0.5)*1.25*sz*scale);
+          bb.rotate(r2()*0.6,r2()*M.TAU,r2()*0.6);
+          /* Five segments and four rings. A leaf cluster is lumpy by
+             nature and gains nothing from being round, and this mesh is
+             instanced across a forest and drawn three times a frame —
+             once for the image and once for each shadow cascade. */
+          bb.sphere(0,0,0,(0.66+r2()*0.46)*sz*scale,5,4,
+            q%2?'#FFFFFF':'#D6D6D6',{squash:0.80+r2()*0.24});
+          bb.pop();
+        }
+        bb.mat('bark');
+      }
+      b.push();
+      b.translate(bt2[0],bh*0.46,bt2[1]);
+      var prim=3;
+      for(var L=0;L<prim;L++){
         b.push();
-        b.translate(bt2[0]+B[0]*scale*(0.8+rng()*0.4),
-                    bh*0.62+B[1]*scale*1.5,
-                    bt2[1]+B[2]*scale*(0.8+rng()*0.4));
-        b.sphere(0,0,0,B[3]*scale*(0.85+rng()*0.3),8,6,
-          k%2?'#FFFFFF':'#DADADA',{squash:0.78});
+        b.rotate(0,(L/prim)*M.TAU+rng()*0.7,0);
+        b.rotate(0.42+rng()*0.26,0,0);
+        limb(b,bh*0.30*(0.85+rng()*0.3),0.19*scale,0.11*scale,
+             2,rng,cluster,'#FFFFFF');
         b.pop();
       }
+      /* and one going more or less straight up, which is what stops
+         the crown looking like a bowl */
+      b.push();b.rotate(0,rng()*M.TAU,0);b.rotate(0.14,0,0);
+      limb(b,bh*0.34,0.17*scale,0.10*scale,2,rng,cluster,'#FFFFFF');
+      b.pop();
+      b.pop();
     }
   },900);
 };
@@ -9409,10 +9633,12 @@ P.bush=function(v){
   return prop('bush:'+v,function(b){
     b.mat('foliage');
     var rng=M.rng(211+v*13);
-    for(var i=0;i<4;i++){
+    for(var i=0;i<7;i++){
       b.push();
-      b.translate((rng()-0.5)*0.9,0.28+rng()*0.34,(rng()-0.5)*0.9);
-      b.sphere(0,0,0,0.42+rng()*0.30,9,7,i%2?'#FFFFFF':'#D0D0D0',{squash:0.80});
+      b.translate((rng()-0.5)*1.15,0.20+rng()*0.52,(rng()-0.5)*1.15);
+      b.rotate(rng()*0.7,rng()*M.TAU,rng()*0.7);
+      b.sphere(0,0,0,0.24+rng()*0.26,8,6,i%2?'#FFFFFF':'#CACACA',
+        {squash:0.74+rng()*0.3});
       b.pop();
     }
   },1400);
@@ -11236,6 +11462,8 @@ Pl.jumpBuf=0;
 Pl.rising=false;       /* mid-jump and still holding the button       */
 Pl.squash=0;           /* landing compression, 0..1, decays           */
 Pl.airTime=0;
+Pl.lastSpeed=0;        /* last frame's ground speed */
+Pl.peak=0;             /* recent top speed, decaying — drives the stop plant */
 
 Pl.flying=false;
 Pl.flyWish=0;          /* -1, 0 or +1 from the action bar */
@@ -11346,6 +11574,16 @@ Pl.update=function(dt){
     top*=M.clamp(1-climb*0.34,0.52,1.14);
   }
   var targetX=_want[0]*top*wl, targetZ=_want[2]*top*wl;
+  /* You cannot run in a direction you are not facing yet. Scaling the
+     target speed by how far the body still has to turn is what gives
+     the turn clip somewhere to happen — without it a reversal reaches
+     walking speed in two frames and the character is fired backwards
+     out of a cannon while still facing forwards. */
+  if(wl>0.01&&Pl.grounded&&!Pl.flying&&!Pl.swimming){
+    var mis=Math.abs(M.angDelta(a.facing,Math.atan2(_want[0],_want[2])));
+    var align=1-M.clamp((mis-0.50)/1.30,0,1)*0.82;
+    targetX*=align;targetZ*=align;
+  }
 
   var acc=Pl.grounded?ACCEL:AIRACCEL;
   if(Pl.swimming)acc=10;
@@ -11474,6 +11712,12 @@ Pl.update=function(dt){
     a.faceToward(Math.atan2(Pl.vel[0],Pl.vel[2]),dt,14);
   }else if(Pl.aiming){
     a.faceToward(Cam.yaw+Math.PI,dt,20);
+  }else if(wl>0.10){
+    /* Standing, but asking to go somewhere behind us. Turning here —
+       slowly, before the first step lands — is what lets the turn clip
+       have something to do; without it the facing snapped the instant
+       the character crossed the speed threshold. */
+    a.faceToward(Math.atan2(_want[0],_want[2]),dt,5.5);
   }
 
   /* ---- animation ---- */
@@ -11496,16 +11740,37 @@ Pl.update=function(dt){
     }else if(!Pl.grounded){
       if(Pl.vel[1]<-1.5&&st!=='jump')a.anim.play('fall');
     }else if(speed>0.35){
-      a.anim.play('locomote');
+      /* Stopping out of a run. The trigger is the moment the input
+         goes and the body is still fast, not the moment the body is
+         finally slow — by then the plant has nothing left to absorb.
+         `peak` decays rather than being sampled, so a stumble through
+         a slow patch does not count as a stop. */
+      if(wl<0.06&&speed<3.4&&Pl.peak>4.4&&Pl.grounded){
+        a.anim.play('stop');
+        Cam.dip(0.09);
+        Pl.peak=0;
+      }else a.anim.play('locomote');
       /* speed drives the clip's amplitude and its playback rate, so a
          run is not just a fast walk */
       a.anim.params.speed=M.clamp((speed-WALK*0.55)/(RUN-WALK*0.55),0,1);
       var st2=LH.Rig.STATES.locomote;
       st2.period=M.lerp(0.86,0.52,a.anim.params.speed);
     }else{
-      a.anim.play('idle');
+      /* Standing. Three ways to stand: coming to a halt out of a run,
+         turning on the spot, and actually standing. */
+      var turnErr=M.angDelta(a.facing,a.wantFacing);
+      if(wl>0.10&&Math.abs(turnErr)>0.40){
+        a.anim.params.turn=turnErr>0?1:-1;
+        a.anim.play('turn');
+      }else if(st!=='stop'||a.anim.done){
+        a.anim.play('idle');
+      }
     }
   }
+  /* Half-life of about a third of a second, so `peak` remembers a run
+     across the handful of frames a stop takes and forgets it after. */
+  Pl.peak=Math.max(speed,Pl.peak*Math.pow(0.5,dt/0.34));
+  Pl.lastSpeed=speed;
   a.grounded=Pl.grounded;
 };
 
@@ -17693,7 +17958,10 @@ App.onDraw(function(dt,time){
   R.setLights(W.pickLights(Cam.target[0],Cam.target[1],Cam.target[2],R.MAXLIGHTS),
     R.scene.lampLevel);
 
-  /* --- shadow --- */
+  /* --- shadow ---
+     Far cascade first, then a tight near one. The near pass draws a
+     much smaller set: everything it would gain from the terrain beyond
+     thirteen metres is outside its own box anyway. */
   var dp=R.beginShadow();
   GL.u1i(dp,'uInstanced',0);
   GL.uM4(dp,'uModel',_id);
@@ -17703,6 +17971,16 @@ App.onDraw(function(dt,time){
   GL.u1i(dp,'uInstanced',1);
   W.drawProps(dp);
   Act.flushShadow(dp);
+  R.endShadow();
+
+  var dpn=R.beginShadow(true);
+  GL.u1i(dpn,'uInstanced',0);
+  GL.uM4(dpn,'uModel',_id);
+  T.drawChunksNear(G.player.pos[0],G.player.pos[2],20);
+  V.drawNear(G.player.pos[0],G.player.pos[2],20);
+  GL.u1i(dpn,'uInstanced',1);
+  W.drawProps(dpn);
+  Act.flushShadow(dpn);
   R.endShadow();
 
   /* --- opaque --- */

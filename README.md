@@ -173,6 +173,84 @@ The scatter band is narrow on purpose. The first pass used one a third
 of a hemisphere wide and turned every face orange; scatter shows at the
 terminator, not across the whole lit side.
 
+### Shadows
+
+Two cascades. One map fitted to the whole visible neighbourhood has to
+cover about ninety metres, which at 2048 leaves four centimetres per
+texel — enough for a building and nowhere near enough for the contact
+between a foot and the ground, which is the shadow the eye actually
+checks. The near cascade covers thirteen metres at the same resolution,
+six millimetres a texel, and everything inside it reads sharp.
+
+The split is a hard test against the near box rather than a blend band.
+At this ratio the two look near-identical where they meet, and a blend
+costs a second twelve-tap fetch on every pixel in the overlap to hide a
+seam that is not visible. The near pass draws a much smaller set — what
+it would gain from terrain past thirteen metres is outside its own box
+anyway — but it still has to draw the props, because a bench missing
+from the near map is a bench with no shadow rather than a soft one.
+
+### Trees
+
+The canopy was five squashed spheres over a bare pole. A lollipop, and
+the thing that made every wooded shot read as clip art — which matters
+because most of this island is forest.
+
+Trees are now a real branching structure with leaf clusters hung on the
+ends. Each limb is built *inside* its parent's transform, so the
+recursion never has to know which way anything points in world space:
+`translate(0, len, 0)` is always "the end of this branch". Working out
+the world direction of a third-order twig and rotating a cylinder onto
+it is the same tree and four times the code.
+
+Everything about it is a budget decision, because a species is one
+instanced mesh drawn hundreds of times and now three times a frame — the
+image and both shadow cascades. Two children per split rather than
+three; five-segment, four-ring lobes, because a leaf cluster is lumpy by
+nature and gains nothing from being round; a crotch cluster on half the
+splits rather than all of them. The first version of this was four times
+heavier and timed out the render harness, which is a useful thing for a
+harness to do.
+
+Conifers got a ragged ring in place of a clean circle — a cone of
+perfect circles is a Christmas decoration, and the whole read of a
+conifer is the broken edge where its branches end.
+
+### Air
+
+Haze is lit air, so its colour is the sky's in that direction — bluer
+looking up and away, warmer and brighter looking toward the sun, where
+forward scattering piles up. One constant fog colour makes a distant
+hillside sit *in front of* the sky it should be dissolving into, which
+is the single tell that separates depth from a grey wash.
+
+### Weight
+
+Three things the character did without any.
+
+**Turning on the spot.** The controller only turned the body while it
+was moving, so a reversal snapped the facing the instant speed crossed a
+threshold — pivoting like a turret, with the feet, the only thing that
+tells you a turn happened, not moving at all. Standing still now turns
+slowly toward the wish direction, the target speed is scaled by how far
+the body still has to turn (you cannot run in a direction you are not
+facing yet), and a turn clip shuffles the outside foot around the
+inside one.
+
+**Stopping.** Momentum does not stop when the input does. The trigger is
+the moment the stick goes and the body is still fast, not the moment the
+body is finally slow — by then the plant has nothing left to absorb. A
+decaying peak-speed term remembers the run across the handful of frames
+a stop takes and forgets it afterwards, so a stumble through a slow
+patch does not count.
+
+**Cloth and hair.** Both were a damped follow, which always trails its
+target and never passes it, so cloth eased into place and stopped. They
+are springs now: they overshoot and settle, which is what actually
+happens when someone stops walking and their coat keeps going. Hair gets
+a stiffer, faster one and also answers to the head turning, which cloth
+on the chest does not.
+
 ### Surface
 
 Every material in this world was flat. Geometry normals only, so a brick
