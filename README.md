@@ -1274,6 +1274,56 @@ corners.
 
 ---
 
+### It was not playable on a phone
+
+A screenshot from an actual phone: the HUD half again too big with the
+hotbar running off the edge, and in portrait a character filling the
+screen with no interface at all and no way to start. The suite was green
+the whole time, because every probe ran at 900x520 with a mouse.
+
+Two faults, compounding.
+
+The first was mine and one commit old. `tools/build.py` stripped the
+viewport meta out of the preview on the theory that the artifact host
+injects its own. Without one a mobile browser lays the page out at its
+default of 980 CSS pixels and scales the result to fit the glass. On a
+landscape phone that is a 1.75x enlargement — the mobile HUD, laid out
+correctly, then blown up until the hotbar hung off both edges. In
+portrait the same rule made the layout viewport 1884 pixels tall, so the
+front-end pane — `top:0;bottom:0`, content centred, `overflow:visible` —
+put its title and its only button at y=828 and let them fall off the
+bottom. The charset meta was stripped for the same bad reason, which is
+why every em dash rendered as `â€"`. Both stay in now.
+
+The second was older and worse. The front end had never been given a
+phone layout at all. It is written in `cqw`, which is right on a desktop
+and collapses on a phone: at 390 pixels wide one cqw is 3.9 pixels, so
+`.fbtn{padding:.66cqw 1.5cqw;font-size:.98cqw}` rendered the Begin button
+at **27 by 12 pixels**. The disclaimer under it carried `font-size:.86cqw`
+*inline*, where no stylesheet could reach it, at three pixels.
+
+So the front end got the treatment the HUD already had: absolute sizes,
+44-pixel targets, and in portrait a bottom sheet so the character you are
+making stays visible above the thing you are reading. Begin is 91 by 46
+now. Four more things came out of the same pass — the hotbar scrolls
+instead of hiding four of its ten slots past the screen edge; the chat
+moved off the walk stick's resting place in both orientations; a faint
+stick rests in the corner so a new player can see there is a walk control
+before they touch one; and the install offer stopped landing on JUMP and
+USE two seconds into the game, and now times out instead of waiting to be
+dismissed.
+
+The tutorial was telling phone players to press WASD and look around with
+the mouse. Every step has touch wording now, chosen on `Device.touch`.
+
+`tools/test/05-phone.mjs` is the probe that should have existed first: the
+game in a sandboxed iframe over http at 390x750 and 844x390, with touch
+and no fine pointer, asserting the layout viewport is the device, that no
+control is under 40 pixels, that nothing sits off the edge without a way
+to scroll to it, that nothing floating covers a control, that the text
+decodes as UTF-8, and that the tutorial names the controls you actually
+have. Twenty checks, ten per orientation.
+
 ## `src/` — where the game is actually written
 
 `game/lumen-harbor.html` is 908 KB in one file, and for a long time that

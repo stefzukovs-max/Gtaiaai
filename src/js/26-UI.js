@@ -205,6 +205,9 @@ U.offerApp=function(){
   go.onclick=function(){Dv.install();answered();};
   document.getElementById('getappno').onclick=answered;
   bar.classList.add('on');
+  /* It is an offer, not a demand. If it is ignored it takes itself
+     away rather than sitting over the game waiting to be dismissed. */
+  setTimeout(function(){ if(bar.classList.contains('on'))answered(); },14000);
   /* If the browser tells us later that it can install, upgrade the
      wording rather than asking again. */
   Dv.onInstallable=function(){
@@ -397,8 +400,9 @@ U.init=function(){
       '<span class="cx" id="uchatx">✕</span>'+
     '</div>'+
     '<div class="log" id="uchatlog"></div>'+
-    '<div class="inp"><input id="uchatin" placeholder="Press Enter to chat…" '+
-      'maxlength="120"></div>';
+    '<div class="inp"><input id="uchatin" placeholder="'+
+      ((LH.Device&&LH.Device.touch)?'Tap to chat…':'Press Enter to chat…')+
+      '" maxlength="120"></div>';
   hud.appendChild(els.chat);
   els.chatLog=els.chat.querySelector('#uchatlog');
   els.chatIn=els.chat.querySelector('#uchatin');
@@ -449,6 +453,7 @@ U.init=function(){
      that moves under a thumb is a layout that gets mis-hit. */
   els.touch=el('div','touch');
   els.touch.innerHTML=
+    '<div class="tsthome" id="utsthome"><i></i></div>'+
     '<div class="tstick" id="utstick"><i></i></div>'+
     '<div class="tbtn big" id="utprimary">USE</div>'+
     '<div class="tbtn mid jump" id="utjump">JUMP</div>'+
@@ -456,6 +461,7 @@ U.init=function(){
     '<div class="tbtn menu" id="utmenu">≡</div>';
   hud.appendChild(els.touch);
   els.tstick=els.touch.querySelector('#utstick');
+  els.tsthome=els.touch.querySelector('#utsthome');
   els.tprimary=els.touch.querySelector('#utprimary');
   els.tact=els.touch.querySelector('#utact');
   if(LH.Device&&LH.Device.touch)els.touch.classList.add('on');
@@ -945,10 +951,10 @@ function renderProfile(bd,tab){
     for(var k in snap.skills){
       var row=el('div');
       row.style.cssText='display:flex;align-items:center;gap:1cqw;margin-bottom:.7cqw';
-      row.innerHTML='<div style="width:9cqw;font-size:.92cqw;text-transform:capitalize">'+
+      row.innerHTML='<div class="skname">'+
         k+'</div><div class="xpbar" style="flex:1;height:.5cqw"><i style="width:'+
         Math.min(100,snap.skills[k]/40*100)+'%"></i></div>'+
-        '<b style="font-size:.92cqw;width:3cqw;text-align:right">'+snap.skills[k]+'</b>';
+        '<b class="skval">'+snap.skills[k]+'</b>';
       wrap.appendChild(row);
     }
     bd.appendChild(wrap);
@@ -985,8 +991,7 @@ function renderProfile(bd,tab){
   var s=snap;
   var o=el('div');
   o.innerHTML=
-    '<div class="detail"><div class="big" style="font-family:var(--disp);'+
-      'font-size:2.6cqw;color:var(--acc)">'+s.level+'</div>'+
+    '<div class="detail"><div class="big lvbig">'+s.level+'</div>'+
     '<div class="txt"><h3>'+s.name+'</h3>'+
     '<div class="rt" style="color:var(--acc2)">Level '+s.level+'</div>'+
     '<div class="meta">'+
@@ -1907,7 +1912,7 @@ U.buildPalette=function(){
   });
   if(!keys.length){
     var n=el('div','empty-note','Gather something placeable first.');
-    n.style.cssText='grid-column:1/-1;font-size:.7cqw;padding:.6cqw 0';
+    n.style.cssText='grid-column:1/-1;font-size:clamp(11px,.7cqw,15px);padding:.6cqw 0';
     els.bpal.appendChild(n);
   }
 };
@@ -1921,8 +1926,10 @@ U.travelFade=function(on,label){
 
 U.touchStick=function(st){
   if(!els.tstick)return;
-  if(!st||!st.active){els.tstick.classList.remove('on');return;}
+  if(!st||!st.active){els.tstick.classList.remove('on');
+    if(els.tsthome)els.tsthome.classList.remove('off');return;}
   els.tstick.classList.add('on');
+  if(els.tsthome)els.tsthome.classList.add('off');
   var r=els.tstick.getBoundingClientRect();
   els.tstick.style.left=(st.ox-r.width/2)+'px';
   els.tstick.style.top=(st.oy-r.height/2)+'px';

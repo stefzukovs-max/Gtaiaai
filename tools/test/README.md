@@ -16,3 +16,4 @@ sizes, counts, positions and pixels.
   02-cosmetics  every wearable style builds with geometry in it
   03-items      duplicate keys, missing icons, valueless items, dead aisles
   04-preview    site/preview.html over http in a sandboxed iframe
+  05-phone      the game at 390x750 and 844x390, with touch

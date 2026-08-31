@@ -366,3 +366,9 @@
 .arrive .sb{font-size:.9cqw;letter-spacing:.24em;text-transform:uppercase;
   color:var(--acc);text-shadow:0 2px 14px rgba(0,0,0,.9);margin-top:.2cqw}
 
+
+/* Sizes that used to be written inline in the JS, where no stylesheet
+   could reach them — on a phone they stayed at three pixels. */
+.skname{width:9cqw;font-size:.92cqw;text-transform:capitalize}
+.skval{font-size:.92cqw;width:3cqw;text-align:right}
+.lvbig{font-family:var(--disp);font-size:2.6cqw;color:var(--acc)}

@@ -101,10 +101,9 @@ function renderTitle(){
     row.appendChild(cont);
   }
   pane.appendChild(row);
-  pane.appendChild(el('div','fbody',
-    '<span style="color:var(--ink3);font-size:.86cqw">'+
+  pane.appendChild(el('div','fnote',
     'Everything here — every surface, every character, every sound — is '+
-    'generated when the page loads. Nothing is downloaded.</span>'));
+    'generated when the page loads. Nothing is downloaded.'));
 }
 
 function swatchRow(label,colours,current,onPick){
@@ -260,18 +259,26 @@ function renderReady(){
     'You are arriving at the plaza. The harbour is north, the quarry '+
     'south, the market east. Find the Harbourmaster on the jetty when '+
     'you want to know what to do first.'));
-  var keys=el('div','fbody');
-  keys.innerHTML=
-    '<div style="display:grid;grid-template-columns:auto 1fr;gap:.3cqw 1cqw;'+
-    'font-size:.9cqw"><b>WASD</b><span>move</span>'+
-    '<b>Space</b><span>jump</span>'+
-    '<b>Shift</b><span>run</span>'+
-    '<b>Mouse</b><span>look — drag or right-drag</span>'+
-    '<b>Left click</b><span>build, break, swing</span>'+
-    '<b>E</b><span>interact</span>'+
-    '<b>Tab</b><span>backpack</span>'+
-    '<b>1–0</b><span>hotbar</span>'+
-    '<b>Esc</b><span>menu</span></div>';
+  /* The controls you are actually holding. A phone player being told
+     to press Shift to run has been told nothing at all. */
+  var keys=el('div','fbody keys');
+  var rows=(LH.Device&&LH.Device.touch)?[
+    ['Left thumb','walk'],
+    ['Right thumb','look around'],
+    ['JUMP','jump — hold to keep going up'],
+    ['USE','build, break, swing, interact'],
+    ['TALK','speak to whoever is in front of you'],
+    ['Hotbar','tap a slot to hold that thing'],
+    ['Top row','bag, shop, wardrobe, map, quests, settings']
+  ]:[
+    ['WASD','move'],['Space','jump'],['Shift','run'],
+    ['Mouse','look — drag or right-drag'],
+    ['Left click','build, break, swing'],
+    ['E','interact'],['Tab','backpack'],
+    ['1–0','hotbar'],['Esc','menu']
+  ];
+  keys.innerHTML='<div class="keygrid">'+rows.map(function(r){
+    return '<b>'+r[0]+'</b><span>'+r[1]+'</span>';}).join('')+'</div>';
   pane.appendChild(keys);
   var row=el('div','frow');
   var b=el('button','fbtn pri','Enter the harbour');
@@ -293,26 +300,38 @@ function renderReady(){
 var STEPS=[
   {id:'move',   title:'Find your feet',
    text:'Walk with <b>WASD</b> and look around by dragging the mouse.',
+   touch:'Walk with the stick under your left thumb. Look around by '+
+         'dragging anywhere on the right.',
    test:function(s){return F.walked>14;}},
   {id:'talk',   title:'Meet the Harbourmaster',
    text:'She is on the jetty, north of the plaza. Press <b>E</b> to talk.',
+   touch:'She is on the jetty, north of the plaza. Walk up to her and '+
+         'tap <b>TALK</b>.',
    test:function(s){return Object.keys(s.met).length>0;}},
   {id:'fish',   title:'Cast a line',
    text:'Stand at the water\\u2019s edge and press <b>E</b>. Hold to cast, '+
         'strike on the bite, then hold to reel — and let go when it runs.',
+   touch:'Stand at the water\\u2019s edge and tap <b>USE</b>. Hold to cast, '+
+         'tap on the bite, then hold to reel — and let go when it runs.',
    test:function(s){return s.stats.caught>0;}},
   {id:'mine',   title:'Work the quarry',
    text:'The face is south, past the woods. Press <b>E</b> to mine it.',
+   touch:'The face is south, past the woods. Tap <b>USE</b> to mine it.',
    test:function(s){return s.stats.broken>0;}},
   {id:'plot',   title:'Claim some land',
    text:'The plots are west. Standing on one, press <b>E</b> to claim it — '+
         'the first is free.',
+   touch:'The plots are west. Stand on one and tap <b>USE</b> to claim it — '+
+         'the first is free.',
    test:function(s){return s.plots.length>0;}},
   {id:'build',  title:'Put something up',
    text:'Pick a block from the hotbar and left-click to place it.',
+   touch:'Pick a block from the hotbar, aim with the right thumb and '+
+         'tap <b>USE</b> to place it.',
    test:function(s){return s.stats.placed>0;}},
   {id:'world',  title:'Make a world of your own',
    text:'The gateway is in the middle of the plaza. Press <b>E</b> at it.',
+   touch:'The gateway is in the middle of the plaza. Tap <b>USE</b> at it.',
    test:function(s){return F.madeWorld;}}
 ];
 F.walked=0;
@@ -339,7 +358,8 @@ function paintGuide(){
   var s=STEPS[idx];
   card.innerHTML=
     '<div class="st">First steps · '+(idx+1)+' of '+STEPS.length+'</div>'+
-    '<h4>'+s.title+'</h4><p>'+s.text+'</p>'+
+    '<h4>'+s.title+'</h4><p>'+
+      ((LH.Device&&LH.Device.touch&&s.touch)||s.text)+'</p>'+
     '<div class="pg"><i style="width:'+Math.round(idx/STEPS.length*100)+'%"></i></div>';
   card.classList.add('on');
 }

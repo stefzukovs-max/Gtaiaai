@@ -24,6 +24,8 @@
 .fstep{font-size:.74cqw;letter-spacing:.22em;text-transform:uppercase;
   color:var(--acc2)}
 .frow{display:flex;gap:.5cqw;flex-wrap:wrap;align-items:center}
+.keygrid{display:grid;grid-template-columns:auto 1fr;gap:.3cqw 1cqw;
+  font-size:.9cqw}
 .fbtn{padding:.66cqw 1.5cqw;border-radius:15px;font-size:.98cqw;font-weight:600;
   letter-spacing:.06em;cursor:pointer;border:1px solid var(--line2);
   background:rgba(255,255,255,.05);color:var(--ink);transition:all .15s;

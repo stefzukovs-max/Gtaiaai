@@ -260,3 +260,164 @@
   .prompt{font-size:11px;bottom:15cqw}
   .panel{width:94cqw}
 }
+
+/* ---- mobile: the front end ----
+   This whole screen was written in cqw and never given a phone layout,
+   so on a 390-wide container its buttons came out 27x12 pixels and its
+   labels at four. You could see the character and nothing else — there
+   was no way to start the game at all in portrait. Everything here is
+   px for the same reason the HUD is: a thumb is 44 pixels wide whatever
+   the screen is.
+
+   In portrait the pane becomes a bottom sheet, so the character you are
+   making stays visible above the thing you are reading. In landscape it
+   stays a left rail, because there is width to spare and none to lose. */
+#app.mobile #front .pane{
+  padding:18px 18px calc(18px + var(--sab));
+  gap:10px;
+  overflow-y:auto;                    /* nothing is ever out of reach */
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+}
+#app.mobile .fbrand{font-size:30px;letter-spacing:.16em}
+#app.mobile .fsub{font-size:10px;letter-spacing:.26em;margin-top:0}
+#app.mobile .fbody{font-size:14.5px;line-height:1.55;max-width:none}
+#app.mobile .fstep{font-size:11px;letter-spacing:.18em}
+#app.mobile .fnote{font-size:11.5px;line-height:1.45}
+#app.mobile .flabel{font-size:12px;letter-spacing:.14em}
+#app.mobile .keygrid{font-size:13px;gap:6px 14px}
+#app.mobile .keygrid b{white-space:nowrap}
+
+/* Every control on this screen is something you press with a thumb. */
+#app.mobile .frow{gap:10px}
+#app.mobile .fbtn{
+  min-height:46px;padding:0 18px;font-size:15px;border-radius:14px;
+  display:inline-flex;align-items:center;justify-content:center;
+}
+#app.mobile .field, #app.mobile .finp{font-size:16px;min-height:46px}
+#app.mobile .opt{min-height:44px;padding:0 14px;font-size:14px}
+#app.mobile .sw2, #app.mobile .swatches>*{min-width:38px;min-height:38px}
+#app.mobile .theme{min-height:52px;font-size:14px}
+#app.mobile .wcard{padding:10px 12px;gap:12px}
+#app.mobile .wcard h4{font-size:15px}
+#app.mobile .wcard .sub{font-size:12px}
+#app.mobile .wcard .badge{width:44px;height:44px;min-width:44px;min-height:44px;
+  font-size:16px}
+
+/* portrait: a sheet along the bottom, with the character above it */
+#app.mobile.portrait #front .pane{
+  left:0;right:0;top:auto;bottom:0;width:auto;
+  max-height:68%;
+  justify-content:flex-end;
+  border-top:1px solid var(--line2);
+  border-radius:22px 22px 0 0;
+  background:linear-gradient(180deg,rgba(10,15,24,.86),rgba(8,11,18,.97));
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  box-shadow:0 -18px 44px rgba(0,0,0,.5);
+}
+#app.mobile.portrait #front .veil{
+  background:linear-gradient(180deg,rgba(8,11,18,.30),rgba(8,11,18,.05) 42%);
+}
+#app.mobile.portrait .fbrand{font-size:32px}
+
+/* landscape: the rail, but wide enough to read */
+#app.mobile:not(.portrait) #front .pane{
+  width:min(54cqw,430px);
+  padding-left:calc(18px + var(--sal));
+}
+
+/* the first-steps card is a coach mark, not a panel */
+#app.mobile .guide{
+  width:min(58cqw,300px);font-size:12.5px;
+  right:calc(8px + var(--sar));
+  bottom:calc(96px + var(--sab));
+}
+#app.mobile.portrait .guide{
+  left:calc(8px + var(--sal));right:calc(8px + var(--sar));width:auto;
+  bottom:calc(150px + var(--sab));
+}
+#app.mobile .guide h4{font-size:14.5px}
+#app.mobile .guide .st{font-size:10.5px}
+
+#app.mobile .skname{width:88px;font-size:13px}
+#app.mobile .skval{font-size:13px;width:28px}
+#app.mobile .lvbig{font-size:28px}
+
+/* ---- mobile: a stick you can see before you touch it ----
+   The live stick draws itself wherever the thumb lands, which is the
+   right behaviour and the wrong first impression: a new player looks at
+   the bottom-left corner, sees nothing there, and does not know the
+   game has a walk control at all. So a faint one rests in the corner to
+   say "put your thumb here", and gets out of the way the moment a real
+   one appears under it. */
+.tsthome{position:absolute;width:132px;height:132px;border-radius:50%;
+  border:2px dashed rgba(232,239,250,.16);pointer-events:none;display:none;
+  opacity:.55;transition:opacity .18s}
+.tsthome>i{position:absolute;left:50%;top:50%;width:46%;height:46%;
+  margin:-23% 0 0 -23%;border-radius:50%;
+  background:rgba(232,239,250,.10);
+  border:1px solid rgba(232,239,250,.18)}
+.tsthome.off{opacity:0}
+#app.mobile .tsthome{display:block;
+  left:calc(20px + var(--sal));bottom:calc(84px + var(--sab))}
+#app.mobile.portrait .tsthome{bottom:calc(150px + var(--sab))}
+
+/* ---- mobile: the hotbar has to fit the phone ----
+   Ten 52px slots is 590 pixels. On a 390-wide screen four of them were
+   simply off the edge — two past the left, two past the right — so the
+   blocks you had bought could not be selected. It scrolls now, and it
+   starts at the left edge rather than centred on one. */
+#app.mobile.portrait .hotbar{
+  left:0;right:0;transform:none;width:auto;
+  padding:0 calc(10px + var(--sal)) 0 calc(10px + var(--sal));
+  overflow-x:auto;overscroll-behavior-x:contain;
+  -webkit-overflow-scrolling:touch;
+  scroll-snap-type:x proximity;
+  justify-content:flex-start;
+}
+#app.mobile.portrait .hotbar::-webkit-scrollbar{display:none}
+#app.mobile.portrait .hotbar .slot{scroll-snap-align:center;flex:0 0 auto}
+
+/* Anything you close, mute or confirm with is a thumb target too. */
+#app.mobile .xbtn, #app.mobile .px{
+  width:44px;height:44px;min-width:44px;min-height:44px}
+
+/* ---- portrait: chat belongs at the top ----
+   Bottom-left in portrait put the log directly on top of where the walk
+   stick rests, so the first thing a thumb touched was a chat panel. The
+   bottom third of a phone is for thumbs; reading goes up top, under the
+   nav, out of the way of both the stick and the action cluster. */
+#app.mobile.portrait .chat{
+  left:calc(8px + var(--sal));right:calc(8px + var(--sar));width:auto;
+  top:calc(160px + var(--sat));bottom:auto;height:96px;
+}
+#app.mobile.portrait .chat.dim{height:32px}
+#app.mobile .chat .log{font-size:12.5px;line-height:1.42}
+#app.mobile .chat .log b{font-weight:700}
+
+/* ---- landscape: 390 pixels of height is not much ----
+   Bottom-left is the walk thumb in both orientations, so the chat log
+   cannot live there either. In landscape it goes under the nav and gets
+   shorter — a 112px log on a 390px screen was a third of the view — and
+   the resting stick drops nearer the corner to clear it. */
+#app.mobile:not(.portrait) .chat{
+  left:calc(8px + var(--sal));top:calc(112px + var(--sat));bottom:auto;
+  width:min(46cqw,300px);height:84px;
+}
+#app.mobile:not(.portrait) .chat.dim{height:30px}
+#app.mobile:not(.portrait) .tsthome{bottom:calc(52px + var(--sab))}
+
+/* ---- the install offer must not sit on the controls ----
+   Centred and 84px up from the bottom edge put a 460px banner squarely
+   over JUMP and USE, two and a half seconds after you started playing.
+   The bottom of a phone belongs to thumbs; an offer goes up top, out of
+   the way, and takes itself away if it is ignored. */
+#app.mobile .getapp{width:min(92cqw,360px)}
+/* landscape has a gap between the nav on the left and the purse on the
+   right; the offer goes in it and nowhere else */
+#app.mobile:not(.portrait) .getapp{
+  top:calc(8px + var(--sat));bottom:auto;
+  left:calc(50% + 30px);width:min(30cqw,260px)}
+#app.mobile.portrait .getapp{
+  top:calc(268px + var(--sat));bottom:auto}
+#app.mobile .getapp .no{width:40px;height:40px;min-width:40px;min-height:40px}

@@ -37,9 +37,13 @@ def preview(game):
     if not m:
         raise SystemExit('preview: no <head> in the built game')
     head = m.group(1)
-    for pat in (r'\s*<meta\s+name="viewport"[^>]*>',
-                r'\s*<meta\s+charset[^>]*>',
-                r'\s*<link\s+rel="manifest"[^>]*>'):
+    # The viewport meta STAYS. Stripping it left the page to lay out at
+    # the mobile default of 980 CSS px and be scaled to fit, which sized
+    # the whole HUD — and the front-end pane — against a container nearly
+    # three times the height of the phone.
+    # The charset meta stays too: without it a bare iframe decodes the
+    # file as latin-1 and every em dash in the game becomes mojibake.
+    for pat in (r'\s*<link\s+rel="manifest"[^>]*>',):
         head = re.sub(pat, '', head)
     body = src[m.end():]
     body = re.sub(r'^\s*<body[^>]*>', '', body, flags=re.M)
