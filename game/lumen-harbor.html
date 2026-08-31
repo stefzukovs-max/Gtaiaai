@@ -1,3 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- The single most important line in this file for a phone. Without a
+     viewport a mobile browser lays the page out at 980 CSS pixels and
+     then zooms out to fit, so every tap lands a finger-width off and
+     every label renders at a third of its intended size. `viewport-fit`
+     lets the canvas run under the notch and the home indicator; the
+     HUD pulls itself back inside them with env(safe-area-inset-*).
+     Zoom is off because a pinch on a 3D view should orbit a camera,
+     not scale a document. -->
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#080B12">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Lumen Harbor — a 3D social sandbox. Build, fish, mine, dress up and trade in a harbour town.">
+<!-- Installed to a home screen these three take the browser away: no
+     URL bar, no tab strip, no pull-to-refresh. The status bar is drawn
+     translucent so the sky runs behind it. -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lumen Harbor">
+<meta name="format-detection" content="telephone=no">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080B12'/%3E%3Cpath d='M18 42c6-14 22-14 28 0' stroke='%234FE3B0' stroke-width='5' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='22' r='6' fill='%23FFC94D'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23080B12'/%3E%3Cpath d='M50 118c17-39 63-39 80 0' stroke='%234FE3B0' stroke-width='14' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='90' cy='62' r='17' fill='%23FFC94D'/%3E%3C/svg%3E">
 <title>Lumen Harbor</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -243,8 +269,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .bsw.on{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
 
 /* ---- bottom action bar ---- */
+/* Build mode's own toolbar. It is hidden until build mode is on —
+   it used to sit on screen permanently, offering Place and Rotate to
+   a player who was fishing. */
 .actbar{position:absolute;left:50%;bottom:.55cqw;transform:translateX(-50%);
-  display:flex;gap:.16cqw;padding:.24cqw .3cqw}
+  display:none;gap:.16cqw;padding:.24cqw .3cqw}
+.actbar.on{display:flex}
 .act2{display:flex;align-items:center;gap:.3cqw;padding:.3cqw .68cqw;
   border-radius:12px;cursor:pointer;font-size:.74cqw;color:var(--ink3);
   white-space:nowrap;transition:all .12s}
@@ -834,6 +864,257 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
   text-transform:uppercase;color:var(--ink)}
 .wheel .hub p{font-size:.68cqw;color:var(--ink3);margin-top:.3cqw}
 
+/* ============================================================
+   MOBILE FIRST.
+
+   Everything above this line is sized in cqw against the game
+   container, which is the right call on a desktop — the interface
+   scales as one piece with the view. On a phone it is the wrong call
+   twice over. In landscape on a 844x390 screen one cqw is 8.4 pixels,
+   so a label written at 0.86cqw renders at seven pixels; and a layout
+   measured from the corners of a rectangle ignores the fact that a
+   phone is held by two thumbs that reach about a third of the way in
+   from the bottom corners and nowhere near the top ones.
+
+   So the phone gets its own layout rather than a scaled copy of the
+   desktop one. It is expressed in pixels, because a thumb is 44
+   physical pixels wide whatever the screen is; it is anchored to the
+   safe area rather than to the glass; and the things you press most —
+   move, jump, use, interact, the hotbar — are the biggest things on
+   screen and sit inside the thumb arcs. The desktop layout is left
+   exactly as it was.
+
+   `--sa*` are the notch and home-indicator insets, read once and used
+   everywhere so nothing has to remember the env() spelling.
+   ============================================================ */
+#app.mobile{
+  --sat:env(safe-area-inset-top,0px);
+  --sar:env(safe-area-inset-right,0px);
+  --sab:env(safe-area-inset-bottom,0px);
+  --sal:env(safe-area-inset-left,0px);
+  /* the thumb arc: how far up from the bottom edge the action cluster
+     and the hotbar sit, so neither is under the home indicator */
+  --thumb:calc(12px + var(--sab));
+}
+/* A tap that scrolls the page behind the game, or selects a label, or
+   fires a 300ms-delayed synthetic click, is a tap that got away. */
+#app.mobile, #app.mobile *{
+  -webkit-touch-callout:none;
+  -webkit-user-select:none;user-select:none;
+  touch-action:manipulation;
+}
+#app.mobile input, #app.mobile textarea{
+  -webkit-user-select:text;user-select:text;
+  font-size:16px;              /* anything smaller makes iOS zoom on focus */
+}
+
+/* ---- mobile: identity, purse, tools ----
+   One slim bar across the top, clear of the notch, with nothing in it
+   you have to hit accurately. */
+#app.mobile .idchip{left:calc(8px + var(--sal));top:calc(8px + var(--sat));
+  gap:8px;padding:5px 12px 5px 5px;border-radius:16px}
+#app.mobile .idchip .av{width:34px;height:34px;min-width:34px;min-height:34px;
+  border-radius:11px;font-size:15px}
+#app.mobile .idchip .lvbadge{font-size:8px;padding:1px 0}
+#app.mobile .idchip .who{min-width:0;gap:3px}
+#app.mobile .idchip .nm{font-size:13px}
+#app.mobile .xpbar{height:4px;min-height:4px}
+#app.mobile .idchip .xpn{font-size:9px}
+#app.mobile .purse{left:auto;right:calc(8px + var(--sar));top:calc(8px + var(--sat));
+  gap:6px}
+#app.mobile .coin{font-size:12px;padding:5px 10px 5px 6px}
+#app.mobile .coin .dot{width:14px;height:14px;min-width:14px;min-height:14px}
+#app.mobile .coin .plus{width:20px;height:20px;min-width:20px;min-height:20px;
+  font-size:13px}
+/* The desktop tool cluster and the left menu list are both keyboard
+   affordances. On a phone their jobs belong to the nav bar below. */
+#app.mobile .tools, #app.mobile .menu, #app.mobile .keyhint,
+#app.mobile .prompt .k{display:none !important}
+
+/* ---- mobile: the nav bar ----
+   Six destinations along the top edge under the identity, each one a
+   48px target. This replaces the keyboard menu and is the only piece
+   of chrome that is always on screen besides the controls. */
+.mnav{position:absolute;display:none;gap:6px;z-index:26;pointer-events:auto}
+#app.mobile .mnav{display:flex}
+.mnav .nb{width:44px;height:44px;border-radius:14px;display:grid;
+  place-items:center;color:var(--ink2);
+  background:linear-gradient(170deg,rgba(28,37,54,.88),rgba(13,19,30,.88));
+  border:1px solid var(--line);backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  box-shadow:0 4px 14px rgba(0,0,0,.42)}
+.mnav .nb .hicon{width:20px;height:20px;min-width:20px;min-height:20px}
+.mnav .nb:active{transform:scale(.92);background:rgba(79,227,176,.22);
+  color:var(--acc)}
+.mnav .nb.on{color:var(--acc);border-color:var(--acc)}
+/* a dot for anything that wants attention — a mission done, a trade */
+.mnav .nb i{position:absolute;margin:-24px 0 0 24px;width:9px;height:9px;
+  border-radius:50%;background:var(--danger);display:none}
+.mnav .nb.alert i{display:block}
+
+/* ---- mobile: hotbar ----
+   Bottom centre, between the thumbs rather than under one of them, so
+   picking a block never fights with steering. */
+#app.mobile .hotbar{left:50%;transform:translateX(-50%);
+  bottom:var(--thumb);gap:7px;padding:7px;border-radius:18px}
+#app.mobile .slot{width:52px;height:52px;min-width:52px;min-height:52px;
+  border-radius:14px}
+#app.mobile .slot .n{font-size:10px}
+#app.mobile .slot .k{display:none}
+#app.mobile .slot.on{box-shadow:0 0 0 2px var(--acc),0 6px 18px rgba(0,0,0,.5)}
+
+/* ---- mobile: the controls ----
+   The stick is invisible until a thumb lands and then draws itself
+   under it, anywhere in the left half — a fixed stick you have to find
+   is a stick you look down at. */
+#app.mobile .tstick{width:132px;height:132px;border-width:2px}
+#app.mobile .tstick>i{width:46%;height:46%;margin:-23% 0 0 -23%}
+#app.mobile .tbtn{border:1px solid var(--line2);
+  font-family:var(--disp);font-weight:700;letter-spacing:.04em}
+#app.mobile .tbtn.big{width:82px;height:82px;font-size:14px;
+  right:calc(16px + var(--sar));bottom:calc(var(--thumb) + 62px)}
+#app.mobile .tbtn.mid{width:58px;height:58px;font-size:12px}
+#app.mobile .tbtn.jump{right:calc(106px + var(--sar));
+  bottom:calc(var(--thumb) + 74px)}
+#app.mobile .tbtn.act{right:calc(24px + var(--sar));
+  bottom:calc(var(--thumb) + 152px)}
+#app.mobile .tbtn.menu{display:none}
+/* A button that does nothing right now says so by fading, rather than
+   by doing nothing when pressed. */
+#app.mobile .tbtn.off{opacity:.34;pointer-events:none}
+
+/* ---- mobile: the pieces that only make sense with a mouse ----
+   The world card is a dashboard widget: it is read once a session and
+   it sits exactly where a right thumb rests. It moves into the Worlds
+   sheet. The reticle shrinks because on a phone the primary button's
+   label already says what is under it, and a big crosshair over a
+   small screen is just something in the way. */
+#app.mobile .myworld{display:none}
+#app.mobile .clock{right:calc(8px + var(--sar));top:calc(48px + var(--sat));
+  font-size:11px;gap:6px;padding:4px 9px}
+#app.mobile .clock .wx{font-size:9px}
+#app.mobile .retic{width:7px;height:7px}
+#app.mobile .plate .nm{font-size:11px}
+#app.mobile .plate .hb{width:52px;height:5px}
+#app.mobile .actbar{bottom:calc(var(--thumb) + 68px);gap:5px;padding:5px;
+  max-width:calc(100vw - 200px);overflow-x:auto;scrollbar-width:none}
+#app.mobile .actbar::-webkit-scrollbar{display:none}
+#app.mobile .act2{min-height:44px;padding:0 12px;font-size:11px;
+  border-radius:13px;gap:6px}
+#app.mobile .act2 .hicon{width:16px;height:16px}
+
+/* ---- mobile: prompt, arrival, toasts ---- */
+#app.mobile .prompt{font-size:13px;padding:9px 14px;border-radius:14px;
+  bottom:calc(var(--thumb) + 74px);left:50%;transform:translateX(-50%)}
+#app.mobile .arrive .nm{font-size:26px}
+#app.mobile .arrive .sb{font-size:12px}
+#app.mobile .toasts{right:calc(8px + var(--sar));top:calc(60px + var(--sat));
+  width:min(64vw,300px)}
+#app.mobile .toast{font-size:12px;padding:9px 12px}
+
+/* ---- mobile: chat ----
+   Collapsed to a single line you tap to open, because a chat log is
+   the one thing on this HUD that nobody needs while they are moving. */
+#app.mobile .chat{left:calc(8px + var(--sal));bottom:calc(var(--thumb) + 62px);
+  width:min(52vw,300px);height:112px;border-radius:14px}
+#app.mobile .chat.dim{height:34px}
+#app.mobile .chat .tabs2{font-size:11px}
+#app.mobile .chat .ct{padding:5px 9px}
+#app.mobile .chat .log{font-size:11.5px}
+#app.mobile .chat .inp input{font-size:16px;padding:7px 9px}
+
+/* ---- mobile: panels as sheets ----
+   A phone has no room for a floating dialogue. Every panel becomes a
+   sheet that owns the screen, slides up from the bottom edge, and has
+   one 44px close target in the corner your thumb is already near. */
+#app.mobile .panel{
+  width:100%;max-width:none;height:100%;max-height:none;
+  left:0;top:0;right:0;bottom:0;transform:none;border-radius:0;
+  padding:calc(10px + var(--sat)) calc(10px + var(--sar))
+          calc(10px + var(--sab)) calc(10px + var(--sal));
+  animation:sheet .22s cubic-bezier(.2,.8,.3,1)}
+@keyframes sheet{from{transform:translateY(4%);opacity:0}
+                 to{transform:none;opacity:1}}
+#app.mobile .panel h3{font-size:19px}
+#app.mobile .panel .px{width:44px;height:44px;min-width:44px;min-height:44px;
+  font-size:20px;border-radius:14px}
+#app.mobile .panel .tabs{gap:6px;overflow-x:auto;flex-wrap:nowrap;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch}
+#app.mobile .panel .tabs::-webkit-scrollbar{display:none}
+#app.mobile .panel .tab{font-size:12.5px;padding:0 15px;border-radius:12px;
+  white-space:nowrap;flex:0 0 auto;min-height:44px;display:grid;
+  place-items:center}
+#app.mobile .panel .body{-webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;font-size:14px}
+#app.mobile .grid{grid-template-columns:repeat(auto-fill,minmax(84px,1fr));
+  gap:8px}
+#app.mobile .cell{border-radius:14px}
+#app.mobile .cell .qty{font-size:11px}
+#app.mobile .row{padding:12px;border-radius:14px;gap:10px}
+#app.mobile .btn{min-height:44px;font-size:14px;padding:0 16px;border-radius:14px}
+#app.mobile .dressnote,#app.mobile .empty-note{font-size:13px}
+#app.mobile .dsw{width:34px;height:34px;min-width:34px;min-height:34px}
+#app.mobile .dressrow>.lb{font-size:11px}
+#app.mobile .dopt{min-height:40px;font-size:13px;padding:0 14px;
+  display:grid;place-items:center}
+#app.mobile .scrim{backdrop-filter:blur(2px)}
+
+/* ---- mobile: emote wheel ---- */
+#app.mobile .wheel .ring{width:min(86vw,86vh);height:min(86vw,86vh);
+  min-width:0;min-height:0}
+#app.mobile .wheel .em{width:76px;height:76px;min-width:76px;min-height:76px}
+#app.mobile .wheel .em b{font-size:26px}
+#app.mobile .wheel .em span{font-size:9px}
+#app.mobile .wheel .em i{display:none}
+#app.mobile .wheel .hub h4{font-size:17px}
+#app.mobile .wheel .hub p{font-size:11px}
+
+/* ---- mobile: portrait ----
+   Portrait is playable rather than blocked. The view keeps the top of
+   the screen, the controls take the bottom third, and the hotbar moves
+   above them instead of between them. */
+#app.mobile.portrait .tbtn.big{width:74px;height:74px;
+  right:calc(14px + var(--sar));bottom:calc(var(--thumb) + 96px)}
+#app.mobile.portrait .tbtn.jump{right:calc(96px + var(--sar));
+  bottom:calc(var(--thumb) + 108px)}
+#app.mobile.portrait .tbtn.act{right:calc(20px + var(--sar));
+  bottom:calc(var(--thumb) + 184px)}
+#app.mobile.portrait .hotbar{bottom:calc(var(--thumb) + 4px)}
+#app.mobile.portrait .chat{width:min(70vw,320px);
+  bottom:calc(var(--thumb) + 190px)}
+#app.mobile.portrait .prompt{bottom:calc(var(--thumb) + 200px)}
+#app.mobile.portrait .mnav{flex-wrap:wrap;max-width:56vw}
+
+/* ---- the rotate hint ----
+   A suggestion, not a gate. It used to cover the screen and refuse to
+   go away, which on a tablet held in portrait meant the game simply
+   did not start. */
+#rotate{gap:14px}
+#rotate .dismiss{margin-top:6px;padding:12px 22px;border-radius:14px;
+  border:1px solid var(--line2);background:rgba(28,37,54,.9);
+  color:var(--ink);font-family:var(--disp);font-size:14px;letter-spacing:.08em}
+
+/* ---- the install / fullscreen affordance ----
+   Two ways off the browser, offered once and then remembered. */
+.getapp{position:absolute;z-index:110;display:none;
+  left:50%;transform:translateX(-50%);bottom:calc(14px + var(--sab,0px));
+  align-items:center;gap:12px;padding:11px 14px;border-radius:16px;
+  box-sizing:border-box;
+  background:linear-gradient(180deg,rgba(20,27,42,.96),rgba(11,16,26,.96));
+  border:1px solid var(--line2);box-shadow:0 10px 30px rgba(0,0,0,.6);
+  bottom:calc(84px + env(safe-area-inset-bottom,0px));
+  width:min(92vw,460px)}
+.getapp.on{display:flex}
+.getapp .txt{font-size:12.5px;color:var(--ink2);line-height:1.35;flex:1}
+.getapp .txt b{color:var(--ink);display:block;font-family:var(--disp);
+  font-size:14px;letter-spacing:.02em}
+.getapp .go{min-height:40px;padding:0 15px;border-radius:12px;
+  background:linear-gradient(180deg,var(--acc),var(--acc2));color:#04140F;
+  font-weight:800;font-size:13px;display:grid;place-items:center;
+  white-space:nowrap}
+.getapp .no{width:32px;height:32px;border-radius:10px;display:grid;
+  place-items:center;color:var(--ink3);font-size:17px}
+
 /* ---- narrow / touch ---- */
 @container app (max-aspect-ratio: 13/9){
   .idchip .who{min-width:11cqw}
@@ -846,6 +1127,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
   .panel{width:94cqw}
 }
 </style>
+</head>
+<body>
 
 <div id="app">
   <canvas id="gl"></canvas>
@@ -862,7 +1145,20 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 
   <div id="rotate"><div class="ph"></div>
     <div style="font-family:var(--disp);letter-spacing:.2em;font-size:18px">TURN YOUR DEVICE</div>
-    <div style="color:var(--ink3);font-size:13px">Lumen Harbor is played in landscape.</div>
+    <div style="color:var(--ink3);font-size:13px;max-width:280px">Lumen Harbor has more
+      room in landscape — but it plays either way.</div>
+    <div class="dismiss" id="rotateok">Play in portrait</div>
+  </div>
+
+  <!-- Offered on a phone once, and never again after it is answered:
+       install for a full screen with no browser in it, or go fullscreen
+       here and now if the platform will not install. -->
+  <div class="getapp" id="getapp">
+    <div class="txt"><b>Play without the browser</b>
+      <span id="getappwhy">Add Lumen Harbor to your home screen and it opens
+      full screen, with no address bar.</span></div>
+    <div class="go" id="getappgo">Install</div>
+    <div class="no" id="getappno">✕</div>
   </div>
 </div>
 
@@ -4242,6 +4538,40 @@ R.scene={
   saturation:0.26
 };
 
+/* ---------------- quality tiers ----------------
+   Three named settings rather than fifteen sliders, because the person
+   changing this is on a bus with one thumb free.
+
+   What comes off first is what a phone pays most for and shows least:
+   the screen-space occlusion pass, which is a full-resolution depth
+   gather; then the bloom and the sun shafts, which are three more
+   full-screen passes for a glow; then the shadow filter drops to a
+   hard edge. What never comes off is the world — no draw distance
+   cut, no dropped props — because a smaller world is a different game
+   and a slightly softer one is not. */
+R.TIERS={
+  1:{name:'Battery', quality:0.72,ao:0,   bloom:0.0, rays:0,   fxaa:1,
+     shadowSoft:1.0,bump:0.0},
+  2:{name:'Balanced',quality:0.88,ao:0.55,bloom:0.55,rays:0.18,fxaa:1,
+     shadowSoft:1.6,bump:0.06},
+  3:{name:'Full',    quality:1.0, ao:1.0, bloom:0.85,rays:0.34,fxaa:1,
+     shadowSoft:2.0,bump:0.10}
+};
+R.tier=3;
+R.applyTier=function(t){
+  var T=R.TIERS[t]||R.TIERS[3];
+  R.tier=t;
+  R.quality=T.quality;
+  R.scene.ao=T.ao;
+  R.scene.bloom=T.bloom;
+  R.scene.rays=T.rays;
+  R.scene.fxaa=T.fxaa;
+  R.scene.shadowSoft=T.shadowSoft;
+  R.scene.bump=T.bump;
+  if(R.resized)R.resized();
+  return T.name;
+};
+
 R.vp=M.m4();R.view=M.m4();R.proj=M.m4();R.invVP=M.m4();R.invProj=M.m4();
 R.lightVP=M.m4();
 R.lightVPN=M.m4();
@@ -4298,7 +4628,11 @@ R.resize=function(w,h){
   GL.resizeColorTarget(aoBlurRT,Math.max(2,iw>>1),Math.max(2,ih>>1),'nodepth');
   GL.resizeColorTarget(ldrRT,iw,ih,'nodepth');
   R.iw=iw;R.ih=ih;
+  R._lw=w;R._lh=h;
 };
+/* Re-run the last resize at the current quality, so changing tier
+   takes effect without waiting for the window to change size. */
+R.resized=function(){if(R._lw)R.resize(R._lw,R._lh);};
 
 /* Fit the sun's ortho box around the camera's near region. Shadow
    resolution is finite, so covering the whole 400m island would make
@@ -4617,6 +4951,245 @@ LH.Render=R;
 })();
 
 /* ============================================================
+   LH.Device — what we are running on, and how to get the browser
+   out of the way.
+
+   This module exists because "works on mobile" and "is a mobile game"
+   are different claims. The first needs a viewport tag and bigger
+   buttons. The second needs the whole interface to assume a thumb,
+   the renderer to assume a phone GPU and a battery, and the page to
+   stop looking like a page — no address bar, no pull-to-refresh, no
+   accidental back-swipe in the middle of a fight.
+
+   Three things are decided here and read everywhere else:
+
+     Device.touch      there is a finger, so the controls are on screen
+     Device.mobile     it is a phone or a tablet, so the HUD is the
+                       mobile one and the renderer runs the light path
+     Device.standalone it was launched from a home screen, so there is
+                       no browser chrome to escape and nothing to offer
+
+   Nothing here sniffs a user-agent string for a brand name. The
+   questions that matter — is the pointer coarse, is there a touch
+   digitiser, how many cores, how much memory, is the display already
+   without a browser around it — all have direct answers.
+   ============================================================ */
+(function(){
+'use strict';
+var D={};
+
+var mq=function(q){return window.matchMedia&&window.matchMedia(q).matches;};
+
+D.touch=('ontouchstart' in window)||navigator.maxTouchPoints>0||mq('(pointer:coarse)');
+/* A laptop with a touchscreen is not a phone. The distinguishing test
+   is whether a *fine* pointer also exists — a mouse or a trackpad —
+   because that is what the desktop layout is built for. */
+D.mobile=D.touch&&!mq('(any-pointer:fine)');
+D.standalone=mq('(display-mode:standalone)')||mq('(display-mode:fullscreen)')||
+             !!window.navigator.standalone;
+D.ios=/iP(hone|ad|od)/.test(navigator.platform||'')||
+      (navigator.maxTouchPoints>1&&/Mac/.test(navigator.platform||''));
+
+/* A rough performance tier, used to pick render settings rather than
+   to gate features. Cores and memory are both advisory and both
+   missing on Safari, so a phone with neither reported is assumed
+   modest rather than assumed fast. */
+D.tier=(function(){
+  var cores=navigator.hardwareConcurrency||(D.mobile?4:8);
+  var mem=navigator.deviceMemory||(D.mobile?3:8);
+  if(!D.mobile&&cores>=8)return 3;
+  if(cores>=8&&mem>=6)return 2;
+  if(cores>=6&&mem>=4)return 2;
+  return 1;
+})();
+/* How much of the screen we actually render. A phone at DPR 3 asks for
+   nine times the pixels of DPR 1 for a difference nobody can see at
+   arm's length, and pays for all nine in heat and battery. */
+D.maxDPR=D.mobile?(D.tier>=2?1.6:1.25):2;
+
+D.portrait=false;
+D.el=null;
+
+/* ---------------- classes ----------------
+   One place decides what the CSS is allowed to assume. */
+D.apply=function(){
+  var a=D.el||(D.el=document.getElementById('app'));
+  if(!a)return;
+  a.classList.toggle('mobile',D.mobile);
+  a.classList.toggle('touchdev',D.touch);
+  a.classList.toggle('standalone',D.standalone);
+  a.classList.toggle('portrait',D.portrait);
+};
+
+/* ---------------- fullscreen ----------------
+   The browser is the thing in the way, and fullscreen is the only
+   lever a web page has on it before it is installed. It must be called
+   from inside a real gesture, so every caller here is a tap handler. */
+D.canFullscreen=function(){
+  var e=document.documentElement;
+  return !!(e.requestFullscreen||e.webkitRequestFullscreen);
+};
+D.isFullscreen=function(){
+  return !!(document.fullscreenElement||document.webkitFullscreenElement);
+};
+D.fullscreen=function(on){
+  var e=document.documentElement;
+  try{
+    if(on===false||(on===undefined&&D.isFullscreen())){
+      if(document.exitFullscreen)document.exitFullscreen();
+      else if(document.webkitExitFullscreen)document.webkitExitFullscreen();
+      return;
+    }
+    var r=e.requestFullscreen||e.webkitRequestFullscreen;
+    if(r){
+      var p=r.call(e,{navigationUI:'hide'});
+      /* Landscape is the better shape for this game, so once we own the
+         screen we ask for it — and shrug if the platform says no, which
+         iOS always does. */
+      if(p&&p.then)p.then(D.lockLandscape,function(){});
+      else D.lockLandscape();
+    }
+  }catch(err){}
+};
+D.lockLandscape=function(){
+  try{
+    var o=screen.orientation;
+    if(o&&o.lock)o.lock('landscape').catch(function(){});
+  }catch(err){}
+};
+
+/* ---------------- screen wake ----------------
+   A game you play with one thumb for two minutes at a time is a game
+   the screen times out in the middle of. */
+var wake=null;
+D.keepAwake=function(){
+  if(!navigator.wakeLock)return;
+  navigator.wakeLock.request('screen').then(function(s){
+    wake=s;
+    s.addEventListener('release',function(){wake=null;});
+  }).catch(function(){});
+};
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState==='visible'&&!wake)D.keepAwake();
+});
+
+/* ---------------- haptics ----------------
+   Short, and only for things that would have made a noise in the
+   world: landing a hit, breaking a block, closing a trade. */
+D.buzz=function(ms){
+  if(!D.touch||!navigator.vibrate)return;
+  try{navigator.vibrate(ms||12);}catch(e){}
+};
+
+/* ---------------- install ----------------
+   Chromium hands us the install prompt and lets us fire it later. iOS
+   does not, so there we explain the Share-sheet route instead. Either
+   way the offer is made once and remembered. */
+var deferred=null;
+D.installable=false;
+window.addEventListener('beforeinstallprompt',function(e){
+  e.preventDefault();
+  deferred=e;
+  D.installable=true;
+  if(D.onInstallable)D.onInstallable();
+});
+D.install=function(){
+  if(deferred){
+    deferred.prompt();
+    deferred.userChoice.then(function(){deferred=null;D.installable=false;});
+    return 'prompt';
+  }
+  /* No install path: take the next best thing and fill the screen. */
+  if(D.canFullscreen()){D.fullscreen(true);return 'fullscreen';}
+  return 'manual';
+};
+
+/* ---------------- the manifest ----------------
+   The game is one HTML file on purpose, and a web app manifest has to
+   be a separate resource. Rather than break that, it is built here and
+   handed to the browser as a blob — same origin, so a manifest link
+   accepts it — which keeps the promise that this file is the game. A
+   sibling manifest.webmanifest is used instead when one is served,
+   because an installed app should survive this page not running. */
+D.manifest=function(){
+  if(document.querySelector('link[rel="manifest"]'))return;
+  if(location.protocol==='file:')return;
+  var icon="data:image/svg+xml,"+encodeURIComponent(
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'>"+
+    "<rect width='512' height='512' fill='#080B12'/>"+
+    "<path d='M142 336c34-112 194-112 228 0' stroke='#4FE3B0' stroke-width='40'"+
+    " fill='none' stroke-linecap='round'/>"+
+    "<circle cx='256' cy='176' r='48' fill='#FFC94D'/></svg>");
+  var man={
+    name:'Lumen Harbor',short_name:'Lumen',
+    description:'A 3D social sandbox. Build, fish, mine, dress up and trade.',
+    start_url:location.pathname,scope:location.pathname,
+    display:'standalone',orientation:'landscape',
+    background_color:'#080B12',theme_color:'#080B12',
+    icons:[{src:icon,sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}]
+  };
+  try{
+    var url=URL.createObjectURL(new Blob([JSON.stringify(man)],
+      {type:'application/manifest+json'}));
+    var l=document.createElement('link');
+    l.rel='manifest';l.href=url;
+    document.head.appendChild(l);
+  }catch(e){}
+};
+
+/* ---------------- offline ----------------
+   A worker cannot be a blob — the browser insists a service worker is
+   a real same-origin script — so this only runs where sw.js is served
+   next to the game. It failing is not an error; it means the game
+   needs the network to start, which it always did. */
+D.offline=function(){
+  if(!('serviceWorker' in navigator))return;
+  if(location.protocol!=='http:'&&location.protocol!=='https:')return;
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+};
+
+/* ---------------- gestures the browser eats ----------------
+   Pull-to-refresh, the double-tap zoom, the pinch zoom, and the
+   edge-swipe that goes back a page are all fine on a document and all
+   fatal in a game. */
+D.guard=function(){
+  if(!D.touch)return;
+  document.addEventListener('gesturestart',function(e){e.preventDefault();},
+    {passive:false});
+  document.addEventListener('dblclick',function(e){e.preventDefault();},
+    {passive:false});
+  /* Only cancel multi-finger scrolls and drags that start on the game
+     surface: a panel that cannot scroll is worse than a page that can
+     be pulled. */
+  document.addEventListener('touchmove',function(e){
+    if(e.touches.length>1){e.preventDefault();return;}
+    var t=e.target;
+    if(t&&t.closest&&t.closest('.body,.log,.tabs,input,textarea'))return;
+    e.preventDefault();
+  },{passive:false});
+};
+
+D.init=function(){
+  D.apply();
+  D.manifest();
+  D.offline();
+  D.guard();
+  if(D.mobile||D.standalone)D.keepAwake();
+  ['fullscreenchange','webkitfullscreenchange'].forEach(function(n){
+    document.addEventListener(n,function(){
+      D.standalone=mq('(display-mode:standalone)')||D.isFullscreen()||
+                   !!window.navigator.standalone;
+      D.apply();
+    });
+  });
+};
+
+LH.Device=D;
+})();
+
+/* ============================================================
    LH.App — device setup, the frame loop, and the boot sequence.
 
    Everything above this point is engine. Everything below is game.
@@ -4641,22 +5214,35 @@ App.onUpdate=function(fn,order){updaters.push({fn:fn,o:order||0});
 App.onDraw=function(fn,order){drawers.push({fn:fn,o:order||0});
   drawers.sort(function(a,b){return a.o-b.o;});};
 
+/* The rotate hint is a suggestion now, not a gate — dismissing it
+   remembers the answer for the session, and portrait reflows rather
+   than refusing to draw. */
+var rotateHidden=false;
+
 App.resize=function(){
   var cv=App.canvas;
   var r=cv.getBoundingClientRect();
-  /* Cap the device pixel ratio: a phone at DPR 3 renders nine times the
-     pixels of DPR 1 for a difference nobody can see at arm's length. */
-  var dpr=Math.min(window.devicePixelRatio||1,2);
+  /* The pixel budget is the device's, not the display's. LH.Device caps
+     a phone well under its true DPR: at DPR 3 a phone asks for nine
+     times the pixels of DPR 1 for a difference nobody can see at arm's
+     length, and pays for all nine in heat and battery. */
+  var Dv=LH.Device;
+  var dpr=Math.min(window.devicePixelRatio||1,(Dv&&Dv.maxDPR)||2);
   var w=Math.max(2,Math.round(r.width*dpr)),h=Math.max(2,Math.round(r.height*dpr));
+  var portrait=r.height>r.width*1.02;
+  if(Dv&&portrait!==Dv.portrait){Dv.portrait=portrait;Dv.apply();}
+  var rot=document.getElementById('rotate');
+  if(rot)rot.style.display=(portrait&&!rotateHidden&&!(Dv&&Dv.mobile))?'flex':'none';
   if(w===App.w&&h===App.h)return;
   cv.width=w;cv.height=h;
   App.w=w;App.h=h;App.dpr=dpr;
   App.aspect=w/h;
   R.resize(w,h);
-  /* The game is landscape. In portrait we keep the landscape layout and
-     ask for the device to be turned, so nothing has to reflow. */
-  var portrait=r.height>r.width*1.02;
-  document.getElementById('rotate').style.display=portrait?'flex':'none';
+};
+App.dismissRotate=function(){
+  rotateHidden=true;
+  var rot=document.getElementById('rotate');
+  if(rot)rot.style.display='none';
 };
 
 function frame(t){
@@ -4682,6 +5268,10 @@ function frame(t){
 }
 
 App.start=function(){
+  /* Before anything is measured or drawn: decide what we are running
+     on, so the HUD builds itself for the right hands and the renderer
+     sizes itself to the right budget. */
+  if(LH.Device)LH.Device.init();
   var cv=App.canvas=document.getElementById('gl');
   var ctx=GL.init(cv);
   if(!ctx){
@@ -4690,6 +5280,9 @@ App.start=function(){
     return false;
   }
   R.init(cv);
+  /* A phone gets the light path by default and can be talked up to the
+     full one in Settings; a desktop gets everything. */
+  R.applyTier(LH.Device?LH.Device.tier:3);
   App.resize();
   requestAnimationFrame(frame);
   return true;
@@ -7271,31 +7864,27 @@ Body.shoes=function(style,build){
    it is the fallback, not a look anyone picks first. */
 Body.SHOES=['shoe','boot','bare'];
 
-/* ---------------- hair ---------------- */
 /* ---------------- hair ----------------
-   Cards, not blobs.
+   Shapes, not strands.
 
-   Every hairstyle here used to be a cluster of spheres over a lofted
-   cap, which is what a hairstyle looks like when it is modelled as a
-   solid — and a solid is not what hair is. Real-time hair is strips: a
-   ribbon with a width, a taper and a path, laid along the flow of the
-   style. Eleven spheres read as a helmet, and that helmet was the
-   single most amateur thing on screen.
+   This is the third answer to the same question and the first one that
+   is about the game rather than about hair. The first was a cluster of
+   spheres — a helmet. The second was five hundred rounded ribbons a
+   head, which is what real-time hair actually is, and it was right for
+   a photographic character and wrong for this one: at any distance
+   past two metres it dissolved into texture, and texture has no name.
 
-   How many ribbons turned out to matter as much as the idea. Two
-   hundred at a centimetre wide is seven strands across a skull, which
-   reads as a bundle of worms; five hundred at half that width reads as
-   hair. The count and the width are two multipliers at the top of
-   `scalpHair`, applied to every style, so the density can be retuned
-   without re-measuring twelve hairstyles by hand.
+   A hairstyle in this game is an item somebody paid for. It has to be
+   recognisable across a plaza, on somebody else, at a glance — so it
+   is built as a silhouette. One solid moulded shell with a shaped,
+   often ragged lower edge, and on top of that whatever spikes, tails,
+   braids or locs the style is actually about. Twenty of them, each one
+   a designed shape with a name and a price, and none of them free.
 
-   Everything below is authored in the head's own space against an
-   ellipsoid that stands in for the skull. A card starts on that
-   surface, leaves along the tangent, and is bent downward by gravity
-   and sideways by whatever the style's flow says as it goes.
-
-   `az` runs 0 at the face and +/-PI at the back of the head; `el` runs
-   0 at the equator through the ears and PI/2 at the crown. */
+   Everything is authored in the head's own space against an ellipsoid
+   standing in for the skull. `az` runs 0 at the face and +/-PI at the
+   nape; `el` runs 0 at the equator through the ears and PI/2 at the
+   crown, with the brow at about +0.20 and the eyes at -0.12. */
 var SKULL={cx:0,cy:0.020,cz:-0.004,rx:0.092,ry:0.140,rz:0.108};
 
 /* A plain ellipsoid tapers to a point at the crown and the skull it is
@@ -7460,262 +8049,371 @@ function hairCard(b,o){
 
 /* The scalp cap: a thin shell just outside the skull, so nothing shows
    between the cards. Cut off below the hairline. */
-/* A constant standing in for the random draw, so the cap is built from
-   the same length function as the strands without consuming the
-   style's random sequence and changing every strand downstream. */
-function _half(){return 0.5;}
-/* Where the hair stops at the face. On the real head this sat high,
-   which is what a grown adult's hairline does. On a head twice the
-   size it left a forehead you could project a film onto, so in the
-   toy style it comes down two fifths of the way and the fringe
-   arrives with it. */
-function hairline(cfg){
-  return TOYHAIR?cfg.elFront*0.55:cfg.elFront;
+/* ---------------- the shell ----------------
+   The strand system that used to live here drew five hundred rounded
+   ribbons a head and shaded each one along its length. It was the
+   right answer for a photographic character and it is the wrong one
+   here: Growtopia hair is not a mass of fibres, it is a *shape* —
+   one solid moulded piece with a hard silhouette, a jagged edge, and
+   spikes on it if the style has spikes. You should be able to name a
+   hairstyle from forty metres away in a crowd, and you cannot name a
+   texture.
+
+   So everything is built from two pieces. The shell is a lofted shape
+   over the skull whose lower edge is a function of azimuth: raise it
+   at the face and you get a hairline, drop it and you get a fringe
+   over the brow, add a triangle wave and you get the ragged cut that
+   makes half these styles read as hair rather than as a helmet. The
+   tuft is a solid horn with a point on it, and it is what spikes,
+   tails, braids and locs are all made of.
+
+   Azimuth runs 0 at the face and +/-PI at the nape; elevation 0 at the
+   ears, 1.565 at the crown, negative below. The brow sits at about
+   +0.20 and the eyes at -0.12, which is the range every fringe in
+   this file is tuned against. */
+
+/* Triangle wave in -1..1, for the teeth along a cut edge. */
+function tri(x){x=x-Math.floor(x);return 4*Math.abs(x-0.5)-1;}
+/* 1 at the face, 0 at the nape — every hairline is written in terms
+   of this rather than in raw azimuth, so a style reads as "low at the
+   front, lower at the back" instead of as trigonometry. */
+function fw(az){return (1+Math.cos(az))*0.5;}
+/* The usual hairline: one number at the face, one at the nape. */
+function line(front,back){
+  return function(az){var f=fw(az);return back+(front-back)*f*f;};
 }
-function scalpCap(b,cfg){
-  var n=26,secs=[],rows=12;
-  for(var i=0;i<=rows;i++){
-    var el=M.lerp(cfg.elLo-0.10,1.565,i/rows);
-    var pts=[];
-    for(var k=0;k<n;k++){
+
+function shell(b,cfg){
+  var n=cfg.n||36, rows=cfg.rows||13;
+  var eMin=cfg.eMin===undefined?-0.85:cfg.eMin;
+  var jag=cfg.jag||0, teeth=cfg.teeth||7, ph=cfg.phase||0;
+  var out=cfg.out||function(){return 0.18;};
+  var lo=cfg.lo, i, k;
+  var sh0=cfg.sh0===undefined?0.16:cfg.sh0;
+  var sh1=cfg.sh1===undefined?0.80:cfg.sh1;
+  /* Below its own edge a point is pulled inside the skull, where the
+     head hides it. A ring has one height, so a shell cannot simply
+     stop at a hairline that is higher at the face than at the nape —
+     it has to emerge through one. */
+  var IN=0.86;
+  function rAt(az,k,el){
+    var lim=lo(az)+(jag?jag*tri(k/n*teeth+ph):0);
+    var o=1.03+out(az,el);
+    if(el<lim)return IN;
+    if(el<lim+0.09)return M.lerp(IN,o,(el-lim)/0.09);
+    return o;
+  }
+  /* Rings are unshifted rather than pushed. `scalpPt` walks the ring as
+     (sin az, cos az) and Geo.circle — which is what Builder.loft's
+     winding rule was written against — walks it as (cos a, sin a), the
+     opposite way round. Built the obvious way the whole shell faces
+     inward and renders as an unlit black helmet, which is exactly what
+     the old strand cap did for the whole of its life. */
+  var secs=[], yB=scalpPt(0,eMin,1)[1];
+  /* The hanging part first, because a loft runs bottom to top. Hair
+     past the jaw cannot be a scale of the skull — the ellipsoid stops
+     at the chin — so it continues straight down at whatever azimuths
+     the style says hang, and collapses to a thin core everywhere else,
+     which the neck covers. */
+  if(cfg.drop){
+    var hang=cfg.hang||function(){return 1;};
+    var steps=cfg.dropRows||6;
+    for(i=steps;i>=1;i--){
+      var u=i/steps, pts2=[];
+      for(k=0;k<n;k++){
+        var az2=(k/n)*M.TAU, h=hang(az2), r2;
+        if(h<=0.001||u>h)r2=0.24;
+        else r2=rAt(az2,k,eMin+0.001)*(1-u*(cfg.taperIn||0.10));
+        var q2=scalpPt(az2,eMin,r2);
+        pts2.unshift([q2[0],q2[2]]);
+      }
+      secs.push({y:yB-cfg.drop*u,pts:pts2,
+                 col:hairShade(M.lerp(sh0*0.7,sh0,1-u))});
+    }
+  }
+  for(i=0;i<=rows;i++){
+    var t=i/rows, el=M.lerp(eMin,1.566,t), pts=[];
+    for(k=0;k<n;k++){
       var az=(k/n)*M.TAU;
-      /* The hairline is higher at the face than at the nape. A ring has
-         one height, so the shell cannot simply stop at it — instead the
-         points in front of the hairline are pulled inside the skull,
-         where the head hides them, and the shell emerges along exactly
-         the line we want. */
-      var f=Math.cos(az)*0.5+0.5;                 /* 1 at the face     */
-      var lim=M.lerp(cfg.elLo,hairline(cfg),f*f);
-      /* The cap is not the scalp: it is the inside of the hair.
-         Sitting it on the skull left every gap between cards showing
-         bare head, which at any density short of absurd is a mass of
-         dark speckles across the crown — and speckles are what made
-         this read as steel wool rather than hair. Pushing it out to
-         forty per cent of the style's own length at that point fills
-         the volume from within, so a gap shows hair in shadow. */
-      /* Sized against the strand *roots*, not the strand length. The
-         first version scaled it by the length and pushed the cap out
-         past the cards entirely: the hair became a smooth dark helmet
-         with a few tips poking through it as speckles. Almost all of a
-         strand's length runs along the head or hangs off it, so the
-         mass is only a few millimetres thick where it sits on the
-         skull, and the cap has to stay inside that. */
-      /* In the toy style the cap is not a backing for the strands —
-         it is the hair. Pushed out to most of the style's own length
-         it becomes a solid shell with the shape of the haircut, and
-         the cards on top of it are there for the edge and the fringe
-         rather than for the volume. */
-      var L=cfg.len?cfg.len(az,el,_half):0.04;
-      var fill=TOYHAIR?Math.min(0.52,L*8.0):Math.min(0.045,L*0.5);
-      var out=1.052+fill;
-      var r=el<lim?0.90:out;
-      if(el>=lim&&el<lim+0.12)r=M.lerp(0.90,out,(el-lim)/0.12);
-      var q=scalpPt(az,el,r);
-      pts.push([q[0],q[2]]);
+      var q=scalpPt(az,el,rAt(az,k,el));
+      pts.unshift([q[0],q[2]]);
     }
-    secs.push({y:scalpPt(0,el,1.0)[1],pts:pts});
+    secs.push({y:scalpPt(0,el,1)[1],pts:pts,
+               col:hairShade(M.lerp(sh0,sh1,t))});
   }
-  /* Shaded as hair deep in the mass rather than as scalp: what shows
-     between strands is hair the light has not reached, and it should
-     read as the same material one stop down, not as a different one. */
-  b.loft(secs,hairShade(TOYHAIR?0.45:0.10),{openBottom:true});
+  b.loft(secs,hairShade(0.55),{openBottom:true,uvScale:1.6});
 }
 
-/* A whole head of hair from one description. */
-/* Five hundred half-millimetre strands is what hair looks like when
-   you are trying to draw hair. The reference is not trying to: its
-   hair is one solid shape with a clean edge and no strand visible at
-   all. So the same eleven styles run at a ninth of the density and
-   three times the width, over a cap pushed out to meet them — a
-   hundred wide chunks instead of seven hundred fine ones, which reads
-   as a moulded shape rather than as a mass of fibres. Turning TOYHAIR
-   off restores the fine version exactly. */
-var TOYHAIR=true;
-var ROWMUL=TOYHAIR?1.05:1.45, PERMUL=TOYHAIR?1.50:2.20,
-    FINE=TOYHAIR?0.90:0.56;
-function scalpHair(b,cfg){
-  scalpCap(b,cfg);
-  var rng=M.rng(cfg.seed||7);
-  for(var i=0;i<10;i++)rng();
-  /* Density is the whole game. Two hundred cards a centimetre wide on
-     a fifteen-centimetre head is seven strands across the skull, and
-     seven strands across a skull is a bundle of worms — which is
-     exactly what it looked like. The multipliers here take every
-     style to roughly five hundred strands at a third of the width
-     without retuning eleven hairstyles by hand: DENSE scales the
-     count, FINE scales the width and the thickness together.
+/* One solid horn leaving the scalp. `out` is how much of its direction
+   comes from the surface normal and `dir` is the rest, so a spike can
+   stand straight up off the side of a head. */
+function tuft(b,az,el,o){
+  var st=scalpPt(az,el,o.r===undefined?1.03:o.r);
+  var nv=scalpNormal(az,el);
+  var ou=o.out===undefined?1:o.out;
+  var d=o.dir||[0,0,0];
+  hairCard(b,{
+    start:st,
+    dir:[nv[0]*ou+d[0],nv[1]*ou+d[1],nv[2]*ou+d[2]],
+    side:nv,
+    len:o.len,w:o.w,th:o.th===undefined?o.w*0.88:o.th,
+    taper:o.taper===undefined?0.95:o.taper,
+    droop:o.droop||0,sweep:o.sweep||null,
+    curl:o.curl||0,curlFreq:o.curlFreq||2,curlPh:o.ph||0,
+    seg:o.seg||5});
+}
 
-     The toy head is nearly twice the size of the one those numbers
-     were tuned against, so the same strand covers twice as many
-     pixels — which is why the toy settings are closer to the original
-     coarse ones than to the fine ones. Wider than this and the cards
-     stop being strands and start being roof shingles. */
-  var rows=Math.round((cfg.rows||6)*ROWMUL), per=Math.round((cfg.per||16)*PERMUL);
-  for(var r=0;r<rows;r++){
-    var rt=(r+0.5)/rows;
-    for(var k=0;k<per;k++){
-      var az=((k+ (r%2)*0.5)/per)*M.TAU;
-      var f=Math.cos(az)*0.5+0.5;
-      var lim=M.lerp(cfg.elLo,hairline(cfg),f*f);
-      var el=M.lerp(lim,1.50,rt);
-      /* Rows further from the hairline start further out. Every strand
-         leaving the same shell made hair one onion skin with cards
-         drawn on it; a third of a millimetre of stagger per row is
-         enough for the mass to have an inside and an outside. */
-      var rad=1.048+rt*0.030;
-      var start=scalpPt(az,el,rad);
-      var nrmv=scalpNormal(az,el);
-      /* leave along the surface, running away from the crown */
-      var down=nrm3([scalpPt(az,el-0.22,rad)[0]-start[0],
-                     scalpPt(az,el-0.22,rad)[1]-start[1],
-                     scalpPt(az,el-0.22,rad)[2]-start[2]]);
-      /* Fan sideways within the scalp's own surface rather than in
-         world axes: a comb is not perfectly regular, and a head where
-         every strand leaves on exactly the same bearing is the tell
-         that says wig. */
-      var tang=nrm3(crs(nrmv,down));
-      var mess=(cfg.mess===undefined?0.07:cfg.mess)*(rng()-0.5);
-      var lift=(cfg.lift||0.35)*(0.93+rng()*0.14);
-      var dir=nrm3([down[0]+nrmv[0]*lift+tang[0]*mess,
-                    down[1]+nrmv[1]*lift+tang[1]*mess,
-                    down[2]+nrmv[2]*lift+tang[2]*mess]);
-      /* Length varies, but not much. Every strand a different length
-         gives a silhouette made of individual tips, and a silhouette
-         made of individual tips is a wig on a mannequin — real hair
-         reads as one mass with a soft edge, not as six hundred
-         separate things that happen to be adjacent. */
-      var jit=(rng()-0.5);
-      var len=cfg.len(az,el,rng)* (1+jit*0.075);
-      hairCard(b,{
-        start:start,dir:dir,side:nrmv,len:len,
-        w:(cfg.w||0.014)*FINE*(0.82+rng()*0.36),
-        th:(cfg.th||0.005)*FINE,
-        taper:(cfg.taper===undefined?0.72:cfg.taper)*0.80,
-        droop:cfg.droop||0,
-        sweep:cfg.sweep?[cfg.sweep[0],cfg.sweep[1],cfg.sweep[2]]:null,
-        curl:cfg.curl||0,curlFreq:cfg.curlFreq||3,curlPh:rng()*6.28,
-        seg:cfg.seg||7
-      });
-    }
+/* A row of them between two bearings, jittered, because a row of
+   identical spikes reads as a machine part. */
+function crest(b,o){
+  var rng=M.rng(o.seed||5);
+  for(var i=0;i<o.n;i++){
+    var t=o.n===1?0.5:i/(o.n-1);
+    var az=M.lerp(o.az0,o.az1,t)+(rng()-0.5)*(o.azJit||0);
+    var el=(typeof o.el==='function'?o.el(t):o.el)+(rng()-0.5)*(o.elJit||0);
+    tuft(b,az,el,{
+      len:o.len*(1+(rng()-0.5)*(o.lenJit===undefined?0.30:o.lenJit)),
+      w:o.w*(1+(rng()-0.5)*0.24),th:o.th,r:o.r,
+      out:o.out,dir:o.dir,droop:o.droop,sweep:o.sweep,
+      taper:o.taper,seg:o.seg,curl:o.curl,curlFreq:o.curlFreq,
+      ph:rng()*6.28});
   }
 }
 
-/* A gathered bundle — a bun, a topknot, the head of a ponytail. */
-function bundle(b,centre,radius,count,len,dir,droop,seed){
+/* Spikes scattered over a patch rather than along a line — the
+   difference between a mohawk and a messy mop. */
+function scatter(b,o){
+  var rng=M.rng(o.seed||11);
+  for(var i=0;i<o.n;i++){
+    var az=rng()*M.TAU;
+    var el=M.lerp(o.el0,o.el1,rng());
+    tuft(b,az,el,{
+      len:o.len*(0.65+rng()*0.7),w:o.w*(0.8+rng()*0.5),th:o.th,
+      out:o.out,dir:o.dir,droop:o.droop,sweep:o.sweep,
+      taper:o.taper,seg:o.seg,r:o.r,ph:rng()*6.28,
+      curl:o.curl,curlFreq:o.curlFreq});
+  }
+}
+
+/* A gathered knot — a bun, a topknot, the head of a ponytail. Solid,
+   because a bun made of cards is a bird's nest. */
+function knot(b,c,r,squash){
+  b.sphere(c[0],c[1],c[2],r,14,10,hairShade(0.62),{squash:squash||0.86});
+  b.sphere(c[0],c[1]-r*0.62,c[2],r*0.52,10,8,hairShade(0.34),{squash:0.8});
+}
+/* The elastic. One dark ring, and it is most of what says "tied". */
+function tie(b,c,r){
+  b.push();b.translate(c[0],c[1],c[2]);
+  b.loft([{y:-r*0.42,pts:Geo.circle(r,12)},
+          {y: r*0.42,pts:Geo.circle(r,12)}],hairShade(0.06),
+         {openTop:true,openBottom:true});
+  b.pop();
+}
+/* A braid or a loc: beads of hair down a falling path. */
+function rope(b,st,dir,len,r,beads,sway,seed){
   var rng=M.rng(seed||3);
-  for(var i=0;i<count;i++){
-    var a=i/count*M.TAU;
-    var st=[centre[0]+Math.cos(a)*radius*0.5,
-            centre[1]+Math.sin(a)*radius*0.5,centre[2]];
-    hairCard(b,{start:st,dir:nrm3([dir[0]+Math.cos(a)*0.6,
-      dir[1]+Math.sin(a)*0.6,dir[2]]),side:[0,0,1],
-      len:len*(0.7+rng()*0.6),w:0.011,th:0.005,taper:0.55,
-      droop:droop,curl:0.8,curlFreq:1.4,curlPh:rng()*6.28,seg:6});
+  var d=nrm3(dir.slice()), p=st.slice();
+  var step=len/beads;
+  for(var i=0;i<beads;i++){
+    var t=i/(beads-1||1);
+    var rr=r*(1-0.42*t*t);
+    b.sphere(p[0],p[1],p[2],rr,9,7,hairShade(0.20+t*0.42),{squash:1.18});
+    d[0]+=sway*(rng()-0.5)*0.5;d[2]+=sway*(rng()-0.5)*0.5;d[1]-=sway*0.55;
+    d=nrm3(d);
+    p[0]+=d[0]*step;p[1]+=d[1]*step;p[2]+=d[2]*step;
   }
 }
 
+/* ---------------- the roster ----------------
+   Twenty styles, and not one of them is free. Every one is an item in
+   LH.Data with a rarity and a price, you start bald, and the wardrobe
+   will not offer you a hairstyle you do not own — see D.HAIRS and
+   G.ownsHair. That is the whole reason each of these is a designed
+   shape with a name rather than a slider position: a haircut somebody
+   paid for has to be worth recognising on somebody else.
+
+   Each entry is a shell and, if the style has any, its spikes. The
+   numbers that matter are the two ends of the hairline — a fringe at
+   +0.20 sits on the brow, one at -0.10 sits over the eyes — and the
+   radial `out`, which is how far the mass stands off the skull. */
 var HAIR_BUILD={
+  /* --- short, everyday --- */
   crop:function(b){
-    scalpHair(b,{elLo:-0.42,elFront:0.56,rows:8,per:28,seed:11,
-      len:function(){return 0.036;},w:0.0095,th:0.0050,droop:0.9,lift:0.26,
-      sweep:[0,0.10,-0.30]});
+    shell(b,{lo:line(0.34,-0.50),out:function(){return 0.115;},
+      jag:0.030,teeth:11,rows:12});
+  },
+  bowl:function(b){
+    /* A bowl is a cut, not a shape: one height all the way round, and
+       the flat fringe across the brow is the entire style. */
+    shell(b,{lo:function(){return -0.02;},out:function(){return 0.175;},
+      rows:14,n:40,sh0:0.22});
+  },
+  pixie:function(b){
+    shell(b,{lo:line(0.16,-0.42),out:function(az){return 0.13+fw(az)*0.05;},
+      jag:0.075,teeth:13,rows:13});
+    crest(b,{n:5,az0:-0.7,az1:0.7,el:0.30,len:0.030,w:0.014,out:0.5,
+      dir:[0,0.35,0.55],droop:0.5,seed:3,elJit:0.10});
+  },
+  undercut:function(b){
+    /* The shaved band and the mass above it are two shells with a hard
+       line between them, and that line is the style. */
+    shell(b,{lo:line(0.02,-0.46),out:function(){return 0.030;},rows:8,
+      sh0:0.10,sh1:0.34});
+    shell(b,{lo:function(az){return 0.30+Math.sin(az)*0.05;},
+      out:function(az,el){return 0.20+Math.max(0,Math.cos(az))*0.09;},
+      rows:11,eMin:0.20,sh0:0.30});
   },
   swept:function(b){
-    scalpHair(b,{elLo:-0.40,elFront:0.50,rows:8,per:28,seed:23,
-      len:function(az,el){return 0.056+Math.max(0,Math.cos(az))*0.032;},
-      w:0.0100,th:0.0052,droop:1.1,lift:0.38,sweep:[0.9,0.25,-0.2]});
+    /* Everything falls to one side. The hairline drops on the left and
+       the mass thickens toward the front-left, which is what makes a
+       parting read from the front. */
+    shell(b,{lo:function(az){return line(0.24,-0.46)(az)-Math.sin(az)*0.16;},
+      out:function(az){return 0.15+Math.max(0,Math.cos(az))*0.11+
+        Math.max(0,Math.sin(az))*0.05;},
+      jag:0.045,teeth:8,rows:13});
+    crest(b,{n:7,az0:-1.15,az1:0.35,el:0.24,len:0.052,w:0.016,out:0.35,
+      dir:[-0.55,0.05,0.65],droop:0.9,seed:23,elJit:0.12,lenJit:0.34});
   },
-  long:function(b){
-    scalpHair(b,{elLo:-0.62,elFront:0.54,rows:8,per:30,seed:31,
-      len:function(az,el){
-        var back=(1-Math.cos(az))*0.5;              /* 1 at the nape */
-        return 0.055+back*0.30+Math.max(0,-Math.sin(el))*0.05;},
-      sweep:[0,0.05,-0.30],
-      w:0.0110,th:0.0055,droop:2.1,lift:0.20,taper:0.60,seg:9});
-  },
-  bun:function(b){
-    scalpHair(b,{elLo:-0.30,elFront:0.60,rows:7,per:28,seed:41,
-      len:function(az){return 0.046+(1-Math.cos(az))*0.5*0.034;},
-      w:0.0095,th:0.0046,droop:0.6,lift:0.10,sweep:[0,0.28,-0.95]});
-    var c=scalpPt(Math.PI,0.95,1.12);
-    bundle(b,[c[0],c[1]+0.010,c[2]],0.052,16,0.070,[0,0.25,-1],0.9,5);
+  /* --- messy and spiked --- */
+  mop:function(b){
+    shell(b,{lo:line(0.02,-0.54),out:function(){return 0.20;},
+      jag:0.115,teeth:12,rows:13});
+    scatter(b,{n:26,el0:0.15,el1:1.40,len:0.040,w:0.014,out:0.9,
+      dir:[0,0.25,0],droop:0.7,seed:11,curl:0.5,curlFreq:1.6});
+    crest(b,{n:9,az0:-1.05,az1:1.05,el:0.06,len:0.038,w:0.013,out:0.55,
+      dir:[0,-0.15,0.5],droop:1.5,seed:12,elJit:0.14});
   },
   spiked:function(b){
-    scalpHair(b,{elLo:-0.38,elFront:0.52,rows:7,per:24,seed:53,
-      len:function(){return 0.048;},
-      w:0.0090,th:0.0055,droop:-0.9,lift:1.25,taper:0.88,seg:5});
+    shell(b,{lo:line(0.40,-0.40),out:function(){return 0.085;},rows:11});
+    scatter(b,{n:20,el0:0.35,el1:1.45,len:0.072,w:0.020,out:0.55,
+      dir:[0,0.9,0],droop:-0.25,seed:53,seg:4,taper:0.98});
   },
-  braids:function(b){
-    scalpHair(b,{elLo:-0.34,elFront:0.56,rows:6,per:26,seed:61,
-      len:function(){return 0.034;},w:0.0095,th:0.0046,droop:0.6,lift:0.10,
-      sweep:[0,0.14,-0.75]});
-    for(var s=-1;s<=1;s+=2){
-      var st=scalpPt(s*1.35,0.28,1.06);
-      for(var i=0;i<3;i++)
-        hairCard(b,{start:[st[0],st[1],st[2]],dir:[s*0.35,-0.9,0.1],
-          side:[0,0,1],len:0.26,w:0.019,th:0.012,taper:0.45,droop:1.4,
-          curl:1.9,curlFreq:4.5,curlPh:i*2.1,seg:10});
+  bolt:function(b){
+    /* Nine of them, swept hard back, and nothing else. The silhouette
+       is the item. */
+    shell(b,{lo:line(0.44,-0.34),out:function(){return 0.070;},rows:10,
+      sh0:0.12,sh1:0.62});
+    crest(b,{n:9,az0:-1.5,az1:1.5,
+      el:function(t){return 0.55+Math.sin(t*Math.PI)*0.75;},
+      len:0.135,w:0.026,out:0.45,dir:[0,0.85,-0.55],droop:-0.35,
+      seed:67,seg:5,taper:0.97,lenJit:0.22});
+    crest(b,{n:4,az0:2.3,az1:3.98,el:1.05,len:0.105,w:0.022,out:0.35,
+      dir:[0,0.6,-0.8],droop:-0.2,seed:68,seg:5,taper:0.97});
+  },
+  flame:function(b){
+    shell(b,{lo:line(0.36,-0.42),out:function(){return 0.095;},rows:11,
+      sh0:0.14});
+    scatter(b,{n:22,el0:0.45,el1:1.50,len:0.115,w:0.019,out:0.35,
+      dir:[0,1.15,-0.30],droop:-0.55,seed:171,seg:6,taper:0.96,
+      curl:1.1,curlFreq:1.2});
+  },
+  mohawk:function(b){
+    shell(b,{lo:line(0.10,-0.44),out:function(){return 0.028;},rows:8,
+      sh0:0.08,sh1:0.30});
+    crest(b,{n:7,az0:0,az1:0,
+      el:function(t){return 0.40+t*1.10;},
+      len:0.105,w:0.024,out:0.30,dir:[0,1.0,0.10],droop:-0.30,
+      seed:81,seg:5,azJit:0.06,lenJit:0.18});
+    crest(b,{n:6,az0:Math.PI,az1:Math.PI,
+      el:function(t){return 1.45-t*0.95;},
+      len:0.092,w:0.022,out:0.30,dir:[0,1.0,-0.10],droop:-0.25,
+      seed:82,seg:5,azJit:0.06,lenJit:0.18});
+  },
+  /* --- heavy and long --- */
+  veil:function(b){
+    /* The fringe comes down past the brow and the edge is cut into
+       points. It is meant to read as a hood of hair. */
+    shell(b,{lo:line(-0.13,-0.66),out:function(az){return 0.20+fw(az)*0.07;},
+      jag:0.135,teeth:7,rows:14,n:42,drop:0.045,dropRows:3,
+      hang:function(az){return 1-fw(az)*fw(az);},
+      sh0:0.08,sh1:0.58});
+  },
+  long:function(b){
+    shell(b,{lo:line(0.26,-0.78),out:function(){return 0.185;},
+      jag:0.045,teeth:9,rows:14,n:40,
+      drop:0.150,dropRows:7,taperIn:0.14,
+      hang:function(az){var f=fw(az);return M.clamp(1.35-f*2.1,0,1);}});
+  },
+  wave:function(b){
+    /* Long, but parted and falling forward over one shoulder, so it
+       reads differently from the back in a crowd. */
+    shell(b,{lo:function(az){return line(0.20,-0.74)(az)-Math.sin(az)*0.12;},
+      out:function(az){return 0.19+Math.max(0,-Math.sin(az))*0.06;},
+      jag:0.030,teeth:14,rows:14,n:40,
+      drop:0.135,dropRows:7,taperIn:0.16,
+      hang:function(az){
+        var f=fw(az);
+        return M.clamp(1.30-f*1.9+Math.max(0,-Math.sin(az))*0.55,0,1);}});
+  },
+  afro:function(b){
+    shell(b,{lo:line(0.24,-0.44),out:function(){return 0.470;},
+      jag:0.055,teeth:22,rows:16,n:44,sh0:0.20});
+  },
+  curls:function(b){
+    shell(b,{lo:line(0.14,-0.50),out:function(){return 0.245;},
+      jag:0.070,teeth:15,rows:14,n:40});
+    /* the bumps that turn a smooth mass into a curly one */
+    var rng=M.rng(113);
+    for(var i=0;i<40;i++){
+      var az=rng()*M.TAU, el=M.lerp(-0.30,1.45,rng());
+      var q=scalpPt(az,el,1.26);
+      b.sphere(q[0],q[1],q[2],0.017+rng()*0.008,8,6,
+               hairShade(0.42+rng()*0.30),{squash:0.9});
     }
   },
   locs:function(b){
-    scalpHair(b,{elLo:-0.44,elFront:0.62,rows:4,per:14,seed:73,
-      len:function(az){return 0.15+(1-Math.cos(az))*0.5*0.10;},
-      w:0.0135,th:0.0125,droop:2.4,lift:0.10,taper:0.30,seg:9,
-      curl:0.5,curlFreq:2.5,sweep:[0,0.10,-0.45]});
-  },
-  undercut:function(b){
-    /* the shaved band is its own short cap, and the mass on top starts
-       above it — the hard line between the two is the whole style */
-    scalpHair(b,{elLo:-0.44,elFront:0.30,rows:3,per:28,seed:83,
-      len:function(){return 0.010;},w:0.0085,th:0.0030,droop:0.4,lift:0.1});
-    scalpHair(b,{elLo:0.28,elFront:0.58,rows:7,per:26,seed:84,
-      len:function(az,el){return 0.066+Math.max(0,Math.cos(az))*0.028;},
-      w:0.0105,th:0.0055,droop:0.9,lift:0.50,sweep:[0.85,0.30,-0.25]});
-  },
-  ponytail:function(b){
-    scalpHair(b,{elLo:-0.34,elFront:0.58,rows:7,per:28,seed:97,
-      len:function(az){return 0.048+(1-Math.cos(az))*0.5*0.038;},
-      w:0.0095,th:0.0046,droop:0.7,lift:0.10,sweep:[0,0.20,-1.00]});
-    var c=scalpPt(Math.PI,0.62,1.10);
-    /* the tie, then the tail */
-    b.push();b.translate(c[0],c[1],c[2]);
-    b.loft([{y:-0.012,pts:Geo.circle(0.024,10)},
-            {y: 0.012,pts:Geo.circle(0.024,10)}],DEEP,
-           {openTop:true,openBottom:true});
-    b.pop();
-    for(var i=0;i<14;i++){
-      var a=i/14*M.TAU;
-      hairCard(b,{start:[c[0]+Math.cos(a)*0.014,c[1]+Math.sin(a)*0.014,c[2]],
-        dir:[Math.cos(a)*0.25,-0.35,-0.9],side:[1,0,0],
-        len:0.24,w:0.013,th:0.006,taper:0.62,droop:1.9,
-        curl:0.7,curlFreq:1.8,curlPh:a,seg:9});
+    shell(b,{lo:line(0.28,-0.46),out:function(){return 0.115;},rows:11,
+      sh0:0.12,sh1:0.48});
+    var rng=M.rng(73);
+    for(var i=0;i<22;i++){
+      var az=rng()*M.TAU;
+      var el=M.lerp(-0.10,0.95,rng());
+      var st=scalpPt(az,el,1.14);
+      var nv=scalpNormal(az,el);
+      rope(b,st,[nv[0]*0.55,-0.85,nv[2]*0.55],
+        0.10+rng()*0.085,0.0165,6,0.16,7+i);
     }
   },
-  afro:function(b){
-    scalpHair(b,{elLo:-0.30,elFront:0.40,rows:8,per:30,seed:107,
-      len:function(){return 0.052;},
-      w:0.0105,th:0.0085,droop:0.20,lift:0.85,taper:0.30,seg:7,
-      curl:4.2,curlFreq:5.5});
-  },
-  curls:function(b){
-    scalpHair(b,{elLo:-0.40,elFront:0.44,rows:8,per:28,seed:113,
-      len:function(){return 0.060;},
-      w:0.0105,th:0.0075,droop:0.6,lift:0.60,taper:0.45,seg:8,
-      curl:3.0,curlFreq:4.2});
+  /* --- tied --- */
+  bun:function(b){
+    shell(b,{lo:line(0.30,-0.38),out:function(){return 0.105;},rows:11,
+      sh0:0.18});
+    var c=scalpPt(Math.PI,1.02,1.20);
+    tie(b,c,0.026);
+    knot(b,[c[0],c[1]+0.028,c[2]],0.046,0.90);
   },
   topknot:function(b){
-    scalpHair(b,{elLo:-0.40,elFront:0.20,rows:3,per:28,seed:127,
-      len:function(){return 0.011;},w:0.0085,th:0.0030,droop:0.3,lift:0.1});
-    scalpHair(b,{elLo:0.55,elFront:0.72,rows:4,per:20,seed:128,
-      len:function(){return 0.052;},w:0.0100,th:0.0046,droop:0.2,lift:0.35,
-      sweep:[0,0.9,-0.2]});
-    var c=scalpPt(0.35,1.36,1.16);
-    b.push();b.translate(c[0],c[1],c[2]);
-    b.loft([{y:-0.010,pts:Geo.circle(0.020,10)},
-            {y: 0.010,pts:Geo.circle(0.020,10)}],DEEP,
-           {openTop:true,openBottom:true});
-    b.pop();
-    bundle(b,[c[0],c[1]+0.014,c[2]],0.038,12,0.052,[0,1,-0.15],0.5,9);
+    shell(b,{lo:line(0.06,-0.42),out:function(){return 0.035;},rows:8,
+      sh0:0.08,sh1:0.34});
+    var c=scalpPt(0.30,1.40,1.10);
+    tie(b,c,0.020);
+    knot(b,[c[0],c[1]+0.032,c[2]],0.034,0.78);
+    crest(b,{n:5,az0:-0.6,az1:0.6,el:1.30,len:0.038,w:0.010,out:0.4,
+      dir:[0,0.9,0.1],droop:0.9,seed:127});
+  },
+  ponytail:function(b){
+    shell(b,{lo:line(0.28,-0.40),out:function(){return 0.115;},rows:11});
+    var c=scalpPt(Math.PI,0.62,1.14);
+    tie(b,c,0.024);
+    rope(b,[c[0],c[1]-0.010,c[2]],[0,-0.55,-0.85],0.185,0.030,7,0.10,97);
+  },
+  twin:function(b){
+    shell(b,{lo:line(0.26,-0.42),out:function(){return 0.120;},rows:11,
+      jag:0.030,teeth:10});
+    for(var s=-1;s<=1;s+=2){
+      var c=scalpPt(s*1.60,0.30,1.16);
+      tie(b,c,0.021);
+      rope(b,[c[0]+s*0.010,c[1]-0.006,c[2]],[s*0.55,-0.75,-0.35],
+        0.155,0.026,7,0.12,140+s);
+    }
+  },
+  braids:function(b){
+    shell(b,{lo:line(0.26,-0.46),out:function(){return 0.105;},rows:11,
+      jag:0.025,teeth:16,sh0:0.14});
+    for(var s=-1;s<=1;s+=2){
+      var st=scalpPt(s*1.42,0.20,1.14);
+      rope(b,st,[s*0.34,-0.92,0.10],0.215,0.023,9,0.07,61+s);
+    }
   },
   bald:function(b){}
 };
@@ -14803,6 +15501,29 @@ var MENU=[
   ['Settings','gear','ESC','menu']
 ];
 
+/* Six of those ten, for the phone. Not a subset chosen by taste: the
+   ones a thumb reaches for mid-session. Build mode, the bag and the
+   wardrobe are the game; the map and quests are where you are going;
+   settings is where the graphics tier and the fullscreen switch live.
+   Trade, friends and worlds are one level in, off the Menu sheet,
+   because opening them mid-walk is not a thing anyone does. */
+var MOBILE_NAV=[
+  ['Build','build','buildmode'],
+  ['Bag','bag','inv'],
+  ['Wardrobe','wear','wardrobe'],
+  ['Map','map','map'],
+  ['Quests','quest','missions'],
+  ['Menu','gear','menu']
+];
+/* One dispatcher for both menus, so a destination cannot behave
+   differently depending on which one you opened it from. */
+function navTo(dest){
+  LH.Audio&&LH.Audio.play('ui');
+  if(dest==='buildmode')U.toggleBuild();
+  else if(dest==='emotes')U.wheel(true);
+  else U.open(dest);
+}
+
 /* The bottom action bar mirrors what build mode can actually do, so a
    greyed row is never a lie about a missing feature. */
 var ACTS=[
@@ -14847,9 +15568,50 @@ U.wheel=function(on){
 U.wheelOn=function(){return wheelOn;};
 U.EMOTE_UI=EMOTE_UI;
 
+/* ---------------- getting the browser out of the way ----------------
+   Offered once, on a phone, after the player is actually in the world
+   rather than during the title card — an install prompt over a loading
+   screen is an install prompt for something you have not seen yet.
+   The answer is remembered, so it is never asked twice. */
+var GETAPP_KEY='lh.getapp.v1';
+U.offerApp=function(){
+  var Dv=LH.Device, bar=document.getElementById('getapp');
+  if(!bar||!Dv)return;
+  if(!Dv.mobile||Dv.standalone)return;
+  try{if(localStorage.getItem(GETAPP_KEY))return;}catch(e){}
+  var why=document.getElementById('getappwhy');
+  var go=document.getElementById('getappgo');
+  if(!Dv.installable&&Dv.ios){
+    why.textContent='Tap Share, then "Add to Home Screen" — it then opens '+
+      'like an app, with no address bar in the way.';
+    go.textContent='Full screen';
+  }else if(!Dv.installable){
+    why.textContent='Fill the screen now, or use your browser menu to '+
+      'install it as an app.';
+    go.textContent='Full screen';
+  }
+  function answered(){
+    try{localStorage.setItem(GETAPP_KEY,'1');}catch(e){}
+    bar.classList.remove('on');
+  }
+  go.onclick=function(){Dv.install();answered();};
+  document.getElementById('getappno').onclick=answered;
+  bar.classList.add('on');
+  /* If the browser tells us later that it can install, upgrade the
+     wording rather than asking again. */
+  Dv.onInstallable=function(){
+    if(!bar.classList.contains('on'))return;
+    go.textContent='Install';
+    why.textContent='Add Lumen Harbor to your home screen and it opens '+
+      'full screen, with no address bar.';
+  };
+};
+
 U.init=function(){
   hud=document.getElementById('hud');
   clear(hud);
+  var rok=document.getElementById('rotateok');
+  if(rok)rok.addEventListener('click',function(){LH.App.dismissRotate();});
 
   /* ---- identity ---- */
   var id=el('div','idchip hp');
@@ -14925,12 +15687,7 @@ U.init=function(){
     var row=el('div','mi');
     row.innerHTML=svg(m[1])+'<span class="lbl">'+m[0]+'</span>'+
       '<span class="kk">'+m[2]+'</span>';
-    row.addEventListener('click',function(){
-      LH.Audio&&LH.Audio.play('ui');
-      if(m[3]==='buildmode')U.toggleBuild();
-      else if(m[3]==='emotes')U.wheel(true);
-      else U.open(m[3]);
-    });
+    row.addEventListener('click',function(){navTo(m[3]);});
     menu.appendChild(row);
   });
   hud.appendChild(menu);
@@ -15065,25 +15822,49 @@ U.init=function(){
   toastWrap=el('div','toasts');
   hud.appendChild(toastWrap);
 
-  /* ---- touch ---- */
+  /* ---- touch controls ----
+     The primary control surface, not a fallback for one. Three
+     decisions carry it:
+
+     The stick is nowhere until a thumb lands, and then it is exactly
+     where the thumb landed. A stick drawn in a fixed corner is a stick
+     you have to look down at, and looking down is the whole problem
+     with playing a 3D game on a phone.
+
+     The big button reads what it will do. `USE` on nothing, `MINE` on
+     a block you can break, `PLACE` when you are holding something that
+     goes in the world, `HIT` on an enemy — so the button answers the
+     question rather than the player having to.
+
+     Everything fades rather than disappearing when it cannot be used.
+     A control that vanishes moves the two next to it, and a layout
+     that moves under a thumb is a layout that gets mis-hit. */
   els.touch=el('div','touch');
   els.touch.innerHTML=
     '<div class="tstick" id="utstick"><i></i></div>'+
     '<div class="tbtn big" id="utprimary">USE</div>'+
     '<div class="tbtn mid jump" id="utjump">JUMP</div>'+
-    '<div class="tbtn mid act" id="utact">E</div>'+
+    '<div class="tbtn mid act" id="utact">TALK</div>'+
     '<div class="tbtn menu" id="utmenu">≡</div>';
   hud.appendChild(els.touch);
   els.tstick=els.touch.querySelector('#utstick');
-  var coarse=window.matchMedia&&window.matchMedia('(pointer:coarse)').matches;
-  if(coarse||navigator.maxTouchPoints>0)els.touch.classList.add('on');
+  els.tprimary=els.touch.querySelector('#utprimary');
+  els.tact=els.touch.querySelector('#utact');
+  if(LH.Device&&LH.Device.touch)els.touch.classList.add('on');
   function hold(id,name){
     var b=els.touch.querySelector(id);
-    b.addEventListener('touchstart',function(e){
-      e.preventDefault();LH.Input.touchAction(name,true);});
-    b.addEventListener('touchend',function(e){
-      e.preventDefault();LH.Input.touchAction(name,false);});
-    b.addEventListener('mousedown',function(){LH.Input.touchAction(name,true);});
+    function dn(e){
+      e.preventDefault();
+      if(b.classList.contains('off'))return;
+      LH.Input.touchAction(name,true);
+      if(LH.Device)LH.Device.buzz(10);
+    }
+    function up(e){e.preventDefault();LH.Input.touchAction(name,false);}
+    b.addEventListener('touchstart',dn,{passive:false});
+    b.addEventListener('touchend',up,{passive:false});
+    b.addEventListener('touchcancel',up,{passive:false});
+    b.addEventListener('mousedown',function(){
+      if(!b.classList.contains('off'))LH.Input.touchAction(name,true);});
     b.addEventListener('mouseup',function(){LH.Input.touchAction(name,false);});
   }
   hold('#utprimary','primary');
@@ -15091,6 +15872,27 @@ U.init=function(){
   hold('#utact','interact');
   els.touch.querySelector('#utmenu').addEventListener('click',function(){
     U.open('menu');});
+
+  /* ---- mobile nav ----
+     The desktop keeps its keyboard menu down the left. A phone gets
+     this instead: the same destinations, as six 44-pixel targets along
+     the top, from the same MENU table so neither can drift from the
+     other. */
+  els.mnav=el('div','mnav');
+  els.mnav.style.cssText='left:calc(8px + env(safe-area-inset-left,0px));'+
+    'top:calc(58px + env(safe-area-inset-top,0px))';
+  MOBILE_NAV.forEach(function(row){
+    var b=el('div','nb pe');
+    b.innerHTML=svg(row[1])+'<i></i>';
+    b.title=row[0];
+    b.setAttribute('data-nav',row[2]);
+    b.addEventListener('click',function(){
+      if(LH.Device)LH.Device.buzz(8);
+      navTo(row[2]);
+    });
+    els.mnav.appendChild(b);
+  });
+  hud.appendChild(els.mnav);
 
   /* ---- panels ---- */
   els.scrim=el('div','scrim pe');
@@ -15276,6 +16078,24 @@ U.setPrompt=function(text,keyName){
   els.prompt.innerHTML='<kbd>'+(keyName||'E')+'</kbd><span>'+text+'</span>';
   els.prompt.classList.add('show');
 };
+/* The two touch buttons that change meaning. `verb` labels the big
+   one, `live` fades it when the action would do nothing, and `act`
+   labels the interact button — empty hides it, so a player never
+   presses TALK at a wall. */
+var _verb='',_verbLive=true,_act='';
+U.setTouchVerb=function(verb,live,act){
+  if(!els.tprimary)return;
+  if(verb!==_verb){_verb=verb;els.tprimary.textContent=verb;}
+  live=!!live;
+  if(live!==_verbLive){_verbLive=live;els.tprimary.classList.toggle('off',!live);}
+  act=act||'';
+  if(act!==_act){
+    _act=act;
+    els.tact.textContent=act||'TALK';
+    els.tact.classList.toggle('off',!act);
+  }
+};
+
 U.setClock=function(hours,weather){
   if(!els.clock)return;
   var h=Math.floor(hours)%24, m=Math.floor((hours%1)*60);
@@ -16142,20 +16962,95 @@ function renderWardrobe(bd){
   bd.appendChild(row);
 }
 
+function section(bd,title){
+  var h=el('div','dressnote');
+  h.style.cssText='margin:.9cqw 0 .5cqw;font-weight:700;color:var(--ink)';
+  h.textContent=title;
+  bd.appendChild(h);
+}
+/* A row of mutually exclusive choices — the same control the wardrobe
+   uses for a hairstyle, reused here for a graphics tier, so Settings
+   does not invent a fourth kind of button. */
+function choiceRow(bd,label,opts,cur,onPick){
+  var w=el('div','dressrow');
+  w.appendChild(el('div','lb',label));
+  var row=el('div','dressopts');
+  opts.forEach(function(o){
+    var b=el('div','dopt'+(o[0]===cur?' on':''),o[1]);
+    b.addEventListener('click',function(){onPick(o[0]);});
+    row.appendChild(b);
+  });
+  w.appendChild(row);
+  bd.appendChild(w);
+}
+
 function renderMenu(bd){
+  var Dv=LH.Device;
   var wrap=el('div');
-  wrap.style.cssText='display:flex;flex-direction:column;gap:.55cqw;max-width:26cqw';
+  wrap.style.cssText='display:flex;flex-direction:column;gap:.55cqw;'+
+    'max-width:min(26cqw,420px)';
+
+  /* ---- screen ----
+     On a phone this is the first block, because it is the answer to
+     "why is there a browser around my game" and to "why is my battery
+     going". On a desktop it is still useful and still first. */
+  section(wrap,'Screen');
+  if(Dv&&Dv.standalone){
+    var okrow=el('div','dressnote',
+      'Running full screen with no browser around it. Nothing to do here.');
+    wrap.appendChild(okrow);
+  }else{
+    var inst=el('button','btn pri',
+      (Dv&&Dv.installable)?'Install Lumen Harbor':'Go full screen');
+    inst.addEventListener('click',function(){
+      var how=Dv?Dv.install():'manual';
+      if(how==='manual')U.toast(
+        Dv&&Dv.ios
+          ? 'Tap Share, then "Add to Home Screen".'
+          : 'Use your browser menu to install or add to home screen.','info');
+    });
+    wrap.appendChild(inst);
+    if(Dv&&Dv.ios&&!Dv.installable){
+      var tip=el('div','dressnote',
+        'On iPhone and iPad: <b>Share</b> → <b>Add to Home Screen</b>. '+
+        'It then opens like an app — no address bar, no tabs.');
+      tip.innerHTML=tip.textContent;
+      wrap.appendChild(tip);
+    }
+  }
+
+  /* ---- graphics ----
+     Named tiers, not sliders. See LH.Render.TIERS for what each one
+     actually turns off. */
+  section(wrap,'Graphics');
+  var R=LH.Render;
+  choiceRow(wrap,'Detail',[[1,'Battery'],[2,'Balanced'],[3,'Full']],
+    R.tier,function(t){
+      U.toast('Graphics: '+R.applyTier(t),'info');
+      render('menu');
+    });
+  var perf=el('div','dressnote');
+  perf.textContent=(Dv&&Dv.mobile)
+    ? 'Battery drops the occlusion, glow and sun-shaft passes and renders '+
+      'a little under native resolution. The world itself never shrinks.'
+    : 'Full renders every pass at native resolution.';
+  wrap.appendChild(perf);
+
+  /* ---- destinations ---- */
+  section(wrap,'Go to');
   [['Backpack','inv'],['Wardrobe','wardrobe'],['Workbench','craft'],
    ['Missions','missions'],['Worlds','worlds'],['Store','shop'],
-   ['Profile','profile'],['Map','map']].forEach(function(r){
+   ['Trade','trade'],['Friends','profile'],['Map','map']].forEach(function(r){
     var b=el('button','btn',r[0]);
     b.addEventListener('click',function(){U.open(r[1]);});
     wrap.appendChild(b);
   });
+
+  section(wrap,'Progress');
   var save=el('button','btn pri','Save Progress');
   save.addEventListener('click',function(){
-    U.toast(Net.save()?'Progress saved.':'Could not save.',
-      Net.save()?'good':'bad');
+    var ok=Net.save();
+    U.toast(ok?'Progress saved.':'Could not save.',ok?'good':'bad');
   });
   wrap.appendChild(save);
   bd.appendChild(wrap);
@@ -16333,6 +17228,8 @@ U.chatFocused=function(){return document.activeElement===els.chatIn;};
 U.toggleBuild=function(on){
   buildOn=(on===undefined)?!buildOn:!!on;
   if(els.buildp)els.buildp.classList.toggle('on',buildOn);
+  if(els.actbar)els.actbar.classList.toggle('on',buildOn);
+  if(els.mnav)els.mnav.children[0].classList.toggle('on',buildOn);
   if(els.menu)els.menu.children[1].classList.toggle('on',buildOn);
   if(!buildOn&&LH.Player)LH.Player.setFly(false);
   U.setTool(buildOn?'place':'place');
@@ -19381,10 +20278,15 @@ App.onUpdate(function(dt,time){
     Cam.pitch=0.22;Cam.wantDist=6.2;Cam.dist=6.2;
     M.copy3(Cam.focus,G.player.pos);
     if(Front.resumed)G.loadSave();
+    else if(LH.Device&&LH.Device.mobile)
+      UI.say('','Welcome to Lumen Harbor. Left thumb walks, right thumb '+
+        'looks. The big button does whatever it says it will.','sys');
     else UI.say('','Welcome to Lumen Harbor. Press <b>E</b> to interact, '+
       '<b>Tab</b> for your backpack, <b>Esc</b> for the menu.','sys');
     UI.say('','Other people here are simulated — there is no server '+
       'behind them yet.','sys');
+    /* Now that there is a world behind it, and not before. */
+    setTimeout(function(){UI.offerApp();},2600);
   }
 
   /* --- panel and hotbar input --- */
@@ -19501,23 +20403,34 @@ App.onUpdate(function(dt,time){
     }
   }
 
-  /* reticle and prompt reflect what the aim found */
+  /* reticle and prompt reflect what the aim found — and so does the
+     big touch button, which is labelled with the verb it will perform
+     rather than with a generic USE. On a phone the reticle is the only
+     thing telling you what is under the crosshair, and reading a word
+     is faster than reading a colour. */
   if(Fish.active()){
     UI.setReticle('');UI.setPrompt('');
+    UI.setTouchVerb(Fish.stage==='reel'?'REEL':(Fish.stage==='strike'?'STRIKE':'CAST'),
+      true,'');
   }else if(G.aim.mode==='interact'){
     UI.setReticle('act');
     UI.setPrompt(G.aim.target.prompt,'E');
+    UI.setTouchVerb('USE',false,G.aim.target.verb||'TALK');
   }else if(G.aim.mode==='place'){
     var ok=G.aim.place&&Net.canBuild(G.aim.place.x,G.aim.place.y,G.aim.place.z);
     UI.setReticle(ok?'act':'deny');
     UI.setPrompt(ok?'Place '+UI.heldItem().name:'You cannot build here','LMB');
+    UI.setTouchVerb('PLACE',ok,'');
   }else if(G.aim.mode==='break'){
     var okb=Net.canBuild(G.aim.x,G.aim.y,G.aim.z);
     UI.setReticle(okb?'act':'deny');
     UI.setPrompt(okb?'Break '+(G.aim.item?G.aim.item.name:'block'):'Not yours','LMB');
+    UI.setTouchVerb('MINE',okb,'');
   }else{
     UI.setReticle('');
     UI.setPrompt('');
+    UI.setTouchVerb(UI.heldItem()&&UI.heldItem().cat==='weapon'?'SWING':'USE',
+      true,'');
   }
 
   /* Rebuild at most a couple of voxel chunks per frame: a player
@@ -19736,3 +20649,6 @@ if(LH.App.start()){
 LH.Game=G;
 })();
 </script>
+
+</body>
+</html>

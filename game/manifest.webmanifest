@@ -1,0 +1,21 @@
+{
+  "name": "Lumen Harbor",
+  "short_name": "Lumen",
+  "description": "A 3D social sandbox. Build, fish, mine, dress up and trade in a harbour town.",
+  "start_url": "./lumen-harbor.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone", "minimal-ui"],
+  "orientation": "landscape",
+  "background_color": "#080B12",
+  "theme_color": "#080B12",
+  "categories": ["games"],
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

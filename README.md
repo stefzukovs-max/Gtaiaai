@@ -74,6 +74,7 @@ weather states riding on top as multipliers.
 | Wardrobe | Fifteen rows of live appearance, applied on the click, on a camera that turns the character three-quarters on to the lens |
 | Hair | Cards over a solid cap pushed out to the style's own length, so the cap carries the silhouette and the strands ride on it; the hairline sits low enough to give every style a fringe |
 | Proportion | One per-bone map turns the anatomical body into a three-and-a-fifth-head toy at draw time — legs to 56 per cent, arms shortened and thickened, head at 1.90 — without changing a single number in any garment |
+| Mobile | A pixel-measured HUD inside the safe area, a stick that draws itself under the thumb, verb-labelled action buttons, three graphics tiers, and an install path that takes the browser away |
 | Build | A per-region profile over the size scalar, so slim, base and bulk differ in taper rather than in scale — and every garment inherits it, because a garment is the body's own rings grown outward |
 | Outfits | Six named sets priced and granted by the server, charging only for the pieces you are missing |
 | Progression | XP from every activity, six skills on their own curves, so a dedicated angler out-ranks a generalist at fishing without out-levelling them |
@@ -966,6 +967,66 @@ flat field. Each is its own pass.
 
 Every switch has an off position — `TOYHAIR`, `TOYFACE`, `TOY_MIX`, and
 `LH.Rig.TOY` — and turning them off restores the previous look exactly.
+
+### Mobile first, and then no browser at all
+
+The game was playable on a phone in the sense that it drew. It was not
+a mobile game, and the gap between those was mostly four things.
+
+**There was no viewport tag.** The file began at `<title>`, with no
+doctype and no head, so a phone laid it out at 980 CSS pixels and
+zoomed out to fit. Every tap landed a finger-width off its target and
+every label rendered at a third of the size it was designed at. That
+one line is the largest single mobile fix in this project.
+
+**The HUD was measured in `cqw`.** Sizing the interface against the
+game container is right on a desktop — it scales as one piece with the
+view. On a 844×390 phone one `cqw` is 8.4 pixels, so a label written
+at `0.86cqw` came out at seven. Worse, a layout measured from the
+corners of a rectangle ignores that a phone is held by two thumbs that
+reach a third of the way in from the bottom corners and nowhere near
+the top ones. So the phone gets its own layout rather than a scaled
+copy: expressed in pixels, because a thumb is 44 physical pixels wide
+whatever the screen is; anchored to `env(safe-area-inset-*)` rather
+than to the glass; and with the things you press most — move, jump,
+use, interact, the hotbar — as the biggest objects on screen. Nothing
+about the desktop layout changed.
+
+**The controls were a fallback.** They are the primary surface now.
+The stick is nowhere until a thumb lands and then draws itself exactly
+where the thumb landed, because a stick in a fixed corner is a stick
+you look down at, and looking down is the whole problem with playing a
+3D game on a phone. The big button is labelled with the verb it will
+perform — `MINE`, `PLACE`, `HIT`, `REEL`, `TALK` — so it answers the
+question instead of the player having to. Controls that cannot be used
+fade rather than disappearing, because a control that vanishes moves
+the two next to it and a layout that moves under a thumb gets mis-hit.
+
+**And the browser was still there.** `LH.Device` answers three
+questions — is there a finger, is this a phone, is there already no
+browser around us — and never by sniffing a user-agent for a brand
+name. From those: the HUD picks a layout, the renderer picks a budget
+(a phone at DPR 3 asks for nine times the pixels of DPR 1 for a
+difference nobody can see at arm's length, and pays for all nine in
+heat), and the game offers a way out of the browser. Installed to a
+home screen it opens standalone — no address bar, no tabs, no
+pull-to-refresh, no back-swipe mid-fight. Where install is not offered
+it fills the screen and asks for landscape. A `sw.js` next to the game
+caches the one file it needs, so it starts on a train.
+
+Three named graphics tiers replace what would otherwise be fifteen
+sliders, because the person changing this has one thumb free on a bus.
+Battery drops the occlusion, glow and sun-shaft passes and renders a
+little under native; Balanced keeps a softened version of each; Full is
+what a desktop gets. What never comes off is the world — no draw
+distance cut, no dropped props — because a smaller world is a different
+game and a slightly softer one is not.
+
+Two bugs fell out of the pass. The build-mode toolbar had been on
+screen permanently, offering Place and Rotate to somebody who was
+fishing; it is tied to build mode now. And the rotate gate was a gate:
+on a tablet held in portrait the game simply did not start. Portrait
+reflows instead.
 
 ---
 
