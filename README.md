@@ -1118,6 +1118,52 @@ because nothing in this game plants. The `seed` category is gone —
 a category is a promise about what the game does — and the aisles are
 now the ones the catalogue has stock for.
 
+### Silhouette, not colour
+
+A rack of forty tops that are all the same shape in forty colours is a
+rack of one top. There were four shapes — a tee, a crop, a jacket and a
+hoodie — and three of them were the same shell from a hem to a
+neckline with something stuck on the front.
+
+The shape is a table now. `hem` and `neck` cut the shell as before;
+`strap` makes it sleeveless and puts two bands over the collarbones
+instead of shoulders; `skirt` continues it past the hips into cloth
+that hangs from the pelvis and swings with them; `wide` gives the
+sleeves a bell. That yields eleven tops that are actually different
+objects — a tank, a waistcoat, a jersey with a number panel and
+shoulder stripes, three lengths of dress, a robe, a suit with a real
+tie — and five leg cuts where there were two, including a skirt, which
+is not a short pair of trousers because it has no legs in it at all.
+
+The hands went the same way. Four separate finger rods was the
+anatomical answer and it was right on a hand four centimetres across;
+the toy warp makes this one seventy per cent wider, and at that size
+four thin cylinders read as spider legs. It is a mitten with a thumb
+and three creases now — the last part of the body still built for the
+old proportions.
+
+The catalogue reached 548 rows: sixty pieces of furniture that are
+shapes rather than cubes (a lamp that stands, a fence that runs, a pot
+that holds a plant — the icon painter and the voxel mesher both switch
+on `shape`, so none of them needed a special case), thirty-odd things
+to eat, and thirty-six collectibles whose entire use is having them.
+
+### The preview
+
+`tools/build-preview.py` writes `site/preview.html` from the game by
+stripping the outer document — doctype, `<html>`, `<head>`, `<body>` —
+and changing nothing else, because a hosted artifact supplies its own
+skeleton and refuses a page that brings a second one. There is no
+second copy of the game to drift out of step: run the script after a
+change and the preview is that change.
+
+The one thing the host cannot get right is the viewport, whose tag is
+written for a document rather than for a game — it will allow
+pinch-zoom and it will not run the canvas under a notch. So `LH.Device`
+asserts its own at run time rather than only declaring it in a head
+that a host may replace. The game now carries its answer wherever it
+is embedded.
+
 ---
 
 ## `site/index.html` — the landing page
