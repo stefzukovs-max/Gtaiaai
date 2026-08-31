@@ -2673,6 +2673,15 @@ R.solid=function(lo,hi,grain,seed,oct){
    right ear, 0.75 at the back of the skull; v = 0 at the chin and 1 at
    the crown. Those are the coordinates LH.Body.head lofts with, so a
    feature painted at (0.25, 0.212) lands on the mouth. */
+/* The face map in its three-mark version rather than its portrait one.
+   This is declared here, above the layer table, and not down with the
+   rest of the toy palette — the table calls R.face() while it is being
+   built, which is before the module body has run far enough to assign
+   anything below it. Declared late, this read as undefined, the
+   portrait branch shipped, and every character wore a painted jaw
+   shadow and cheek hollows under flat toy lighting. */
+var TOYFACE=true;
+
 R.face=function(){
   var BASE=rgb('#F1ECE8');
   function blob(u,v,cu,cv,ru,rv){
@@ -3328,8 +3337,6 @@ var TOY={
   water:null, neon:null, neonw:null, blank:null
 };
 var TOY_MIX=0.16;
-/* The face map, likewise, in its three-mark version. */
-var TOYFACE=true;
 function toyify(cv,name){
   var target=TOY[name];
   if(!target)return cv;
@@ -5649,7 +5656,7 @@ var TOY={
   armOut:1.18,     /* how far the shoulder joint sits from the spine  */
   legOut:1.40,     /* and the hip joint, so thick thighs still clear  */
   wHip:1.15, wSpine:1.08, wSpine2:1.02, wChest:0.98, wNeck:1.15,
-  wArm:1.60, wDelt:1.14, wLeg:1.30, wFoot:1.25,
+  wArm:1.50, wDelt:1.04, wLeg:1.30, wFoot:1.25,
   wHandXZ:1.70, wHandY:1.30,
   neckUp:1.63,     /* the neck bone, up under the jaw where a toy's is */
   neckY:0.62,      /* and the neck itself, most of the way gone        */
@@ -6911,7 +6918,10 @@ Body.head=function(){
   return part('head',function(b){
     b.mat('face');
     b.push();b.scale(P.headScale,P.headScale,P.headScale);
-    var n=22;
+    /* Twenty-two segments was a fine number for a head 0.20 metres
+       across. At 0.44 the flats between them are visible from three
+       metres, which is the distance the camera actually sits at. */
+    var n=32;
     function R(y,hw,hf,hb,ex,col){
       return {y:y,pts:headSect(hw,hf,hb,n,ex),col:col||null};
     }
@@ -6951,114 +6961,100 @@ Body.head=function(){
     b.loft(secs,LIT,{openBottom:false,uvV:[-0.118,0.158]});
     b.mat('skin');
 
+    /* ---- the face, as a face and not as a collection ----
+       What was here was a real one: a nose with alae and nostrils and
+       a septum, lips as two spheres with a vermilion border and corner
+       beads, a philtrum as two ridges, eyelids as four spheres each
+       with a fold and a caruncle, and an ear built from eight beads
+       around a hollow. All of it correct, and all of it wrong the
+       moment the head doubled in size and the lighting went flat: two
+       dozen small spheres stuck on a smooth skull read as lumps, and a
+       face made of lumps is a grimace whatever the lumps are of.
+
+       So the features are three now, and each is one continuous thing.
+       A nose that is a soft ridge rather than an assembly. A mouth
+       that is a single swept curve. An ear that is one shape with one
+       hollow in it. Everything else that used to be modelled — the
+       philtrum, the vermilion border, the lid fold, the nostrils — is
+       either in the face map or gone, because at the size a player
+       actually sees this head none of them survived as anything but
+       noise. */
+
+    /* A curve of overlapping beads, close enough together to read as
+       one swept form rather than as beads. This is how the mouth and
+       the brow ridge are drawn: a chamfer gives a straight slot and a
+       single sphere gives a blob, and a face needs a line that bends. */
+    function sweep(x0,y0,z0,halfW,rise,r,col,n,squash){
+      n=n||11;
+      for(var i=0;i<n;i++){
+        var t=(i/(n-1))*2-1;               /* -1..1 across the curve   */
+        var y=y0+rise*(1-t*t);
+        var rr=r*(0.62+0.38*(1-t*t));      /* thinner at the corners   */
+        b.sphere(x0+t*halfW,y,z0-Math.abs(t)*halfW*0.34,rr,7,6,col,
+                 {squash:squash===undefined?0.72:squash});
+      }
+    }
+
     /* ---- nose ----
-       Bridge, dorsum, tip, alae. Built as its own little loft rather
-       than a wedge: the width has to grow from the root to the tip and
-       a wedge cannot do that without shearing. */
+       One ridge from the brow to the tip, and nothing else. It stands
+       four millimetres proud of the face plane at 0.089 — enough to
+       catch a highlight down the dorsum and to cast nothing. */
     b.push();
     b.loft([
-      /* Depths pulled back toward the face plane at 0.089. On a head
-         this size the old nose stood out five and a half centimetres
-         and threw a shadow across half the face, which is a caricature
-         rather than a toy. */
-      {y:-0.038,pts:headSect(0.024,0.093,0.020,12,2.4),col:MID},
-      {y:-0.030,pts:headSect(0.022,0.097,0.020,12,2.4)},
-      {y:-0.016,pts:headSect(0.019,0.096,0.020,12,2.3)},
-      {y: 0.006,pts:headSect(0.015,0.094,0.020,12,2.2)},
-      {y: 0.030,pts:headSect(0.013,0.092,0.020,12,2.2)},
-      {y: 0.050,pts:headSect(0.013,0.091,0.020,12,2.2),col:MID}
+      {y:-0.034,pts:headSect(0.021,0.0935,0.020,14,2.5),col:MID},
+      {y:-0.024,pts:headSect(0.020,0.0955,0.020,14,2.5)},
+      {y:-0.008,pts:headSect(0.018,0.0950,0.020,14,2.4)},
+      {y: 0.012,pts:headSect(0.0155,0.0935,0.020,14,2.3)},
+      {y: 0.034,pts:headSect(0.0135,0.0918,0.020,14,2.2)},
+      {y: 0.052,pts:headSect(0.0130,0.0905,0.020,14,2.2),col:MID}
     ],WARM,{openTop:true,openBottom:true});
     b.pop();
-    /* alae, and the septum between them */
-    for(var e=-1;e<=1;e+=2){
-      b.push();b.translate(e*0.019,-0.033,0.090);b.rotate(0,e*0.30,0);
-      b.scale(0.80,0.86,1.0);
-      b.sphere(0,0,0,0.013,9,7,BLUSH);b.pop();
-      b.push();b.translate(e*0.015,-0.040,0.094);
-      b.sphere(0,0,0,0.0055,6,5,NOSTRIL);b.pop();   /* nostril */
-    }
-    b.push();b.translate(0,-0.038,0.096);
-    b.sphere(0,0,0,0.008,8,6,BLUSH,{squash:0.8});b.pop();
+    /* the underside of it, so the tip has a shape from below rather
+       than ending in a point */
+    b.push();b.translate(0,-0.036,0.086);
+    b.scale(1.30,0.60,0.70);
+    b.sphere(0,0,0,0.0125,10,8,BLUSH);b.pop();
 
     /* ---- mouth ----
-       A vermilion border that stands a little proud, a groove between
-       the lips, and a philtrum above. Lips that are only a painted
-       line disappear the moment the light moves. */
-    /* Lips take the skin tint like everything else here, so they are
-       shaded rather than coloured: a touch darker than the cheek, which
-       is what a vermilion border does under a light from above. A face
-       whose mouth is exactly the value of its chin has no mouth. */
-    /* Lips have to stand about six millimetres proud of the face plane,
-       which sits at z 0.089 here. The previous pass pulled them back to
-       0.080 and they vanished into the skull — a face with no mouth. */
-    b.push();b.translate(0,-0.051,0.082);b.rotate(-0.10,0,0);
-    b.scale(1.0,0.40,0.44);
-    b.sphere(0,0,0,0.024,14,10,LIPU);b.pop();
-    b.push();b.translate(0,-0.064,0.081);b.rotate(0.12,0,0);
-    b.scale(1.0,0.46,0.46);
-    b.sphere(0,0,0,0.022,14,10,LIPL);b.pop();
-    /* the opening between them, and the corners, which are what stop a
-       mouth reading as two sausages */
-    b.push();b.translate(0,-0.058,0.098);
-    b.chamfer(0,0,0,0.044,0.0035,0.007,LIPLINE,0.0015,{noBand:true});b.pop();
-    for(var lc=-1;lc<=1;lc+=2){
-      b.push();b.translate(lc*0.024,-0.059,0.086);
-      b.sphere(0,0,0,0.005,6,5,LIPLINE,{squash:0.7});b.pop();
-    }
-    /* philtrum: two ridges, not a groove — a groove needs geometry the
-       other way round and reads as a scar */
-    for(var q=-1;q<=1;q+=2){
-      b.push();b.translate(q*0.005,-0.044,0.094);
-      b.chamfer(0,0,0,0.0035,0.012,0.005,WARM,0.001,{noBand:true});b.pop();
-    }
+       A closed, faintly upturned line. `rise` positive bends the ends
+       down and the middle up, which is a mouth at rest on a friendly
+       face; the face map paints the same curve underneath it so the
+       two reinforce rather than fight. A mouth built from two spheres
+       and a slot read as a wound at this scale. */
+    sweep(0,-0.0585,0.0905,0.0245,0.0042,0.0052,LIPLINE,13,0.62);
+    /* the lower lip, as a soft swell under it rather than as an object */
+    b.push();b.translate(0,-0.0665,0.0838);
+    b.scale(1.34,0.40,0.30);
+    b.sphere(0,0,0,0.0170,14,10,LIPL);b.pop();
 
     /* ---- eyelids ----
-       Skin over the top and bottom of each eyeball, leaving the almond
-       opening that is all a real eye ever shows. These belong to the
-       head rather than to Body.eyes because they are skin: they take
-       the skin tint, and an eye part tinted white cannot. */
+       One cap over the top of each eye. The lower lid, the fold and
+       the caruncle are gone: three spheres each to describe the age of
+       an eye on a head where the eye is a coloured disc. */
     for(var k=-1;k<=1;k+=2){
-      /* The opening between the lids is about eight millimetres on a
-         twenty-four millimetre eyeball, and the iris is thirteen — so
-         the lids cut across the top and bottom of the iris and sclera
-         shows only either side of it. Leaving a ring of white all the
-         way round is the classic doll eye. */
-      b.push();b.translate(k*0.0370,0.0258,0.0805);b.rotate(-0.18,k*-0.22,0);
-      b.scale(1.10,1.00,0.66);
-      b.sphere(0,0,0,0.0182,12,9,LIDU);b.pop();
-      b.push();b.translate(k*0.0370,-0.0160,0.0800);b.rotate(0.22,k*-0.22,0);
-      b.scale(1.06,0.86,0.62);
-      b.sphere(0,0,0,0.0176,12,9,LIDL);b.pop();
-      /* the fold above the lid, which is what gives an eye an age */
-      b.push();b.translate(k*0.0370,0.0348,0.0770);b.rotate(-0.34,k*-0.22,0);
-      b.scale(1.10,0.50,0.70);
-      b.sphere(0,0,0,0.0168,10,8,FOLD);b.pop();
-      /* the caruncle at the inner corner. Three millimetres of pink
-         that nobody consciously notices and everybody notices the
-         absence of. */
-      b.push();b.translate(k*0.0182,0.0000,0.0836);
-      b.sphere(0,0,0,0.0042,6,5,TEAR,{squash:1.15});b.pop();
+      b.push();b.translate(k*0.0370,0.0292,0.0790);b.rotate(-0.20,k*-0.22,0);
+      b.scale(1.16,0.90,0.58);
+      b.sphere(0,0,0,0.0192,14,10,LIDU);b.pop();
+      /* The lower lid is a rim, not a pad. Set back into the face and
+         flattened, it closes the socket without putting a bag under
+         the eye. */
+      b.push();b.translate(k*0.0370,-0.0168,0.0760);b.rotate(0.26,k*-0.22,0);
+      b.scale(1.04,0.46,0.40);
+      b.sphere(0,0,0,0.0176,14,10,LIDL);b.pop();
     }
 
     /* ---- ears ----
-       Set back from the eyeline, tilted, with a raised helix around a
-       hollow. The lobe is a separate small mass or the ear reads as a
-       leaf stuck to the skull. */
+       One shape with one hollow. The helix was eight beads around a
+       rim, which at this scale is a cog. */
     for(var s2=-1;s2<=1;s2+=2){
-      b.push();b.translate(s2*0.077,-0.008,-0.014);
-      b.rotate(0,s2*0.34,s2*0.12);
-      b.scale(0.40,1.0,1.0);
-      b.sphere(0,0,0,0.030,10,8,EARC,{squash:1.28});
-      /* helix */
-      for(var h=0;h<8;h++){
-        var a=(-0.9+h/7*4.2);
-        b.push();
-        b.translate(0.030,Math.cos(a)*0.030,Math.sin(a)*0.026);
-        b.sphere(0,0,0,0.0085,5,4,EARC);
-        b.pop();
-      }
-      b.push();b.translate(0.010,-0.034,0.002);
-      b.sphere(0,0,0,0.013,8,6,EARC,{squash:1.1});b.pop();
+      b.push();b.translate(s2*0.0745,-0.008,-0.026);
+      b.rotate(0,s2*0.30,s2*0.12);
+      b.scale(0.34,1.0,1.0);
+      b.sphere(0,0,0,0.0288,14,11,EARC,{squash:1.26});
+      /* the bowl, pressed in from the outside */
+      b.push();b.translate(0.022,0.000,0.004);
+      b.scale(0.55,0.72,0.70);
+      b.sphere(0,0,0,0.0222,12,9,FOLD,{squash:1.14});b.pop();
       b.pop();
     }
     b.pop();
@@ -7076,7 +7072,7 @@ var EYE_X=0.0370, EYE_Y=0.0040, EYE_Z=0.0788, EYE_R=0.0145, EYE_TILT=-0.22;
 /* The iris, as a fraction of the eyeball. Left at one: enlarging it
    sounded like the toy thing to do and turned out to read as a pair
    of goggles, because the ring around it grows with it. */
-var IRISK=1.0;
+var IRISK=1.46;
 
 Body.eyes=function(){
   return part('eyes',function(b){
@@ -7085,45 +7081,35 @@ Body.eyes=function(){
     for(var s=-1;s<=1;s+=2){
       /* the socket behind, so nothing shows through the gap */
       b.push();b.translate(s*EYE_X,EYE_Y,EYE_Z-0.008);b.rotate(0,s*EYE_TILT,0);
-      b.sphere(0,0,0,EYE_R*1.30,10,8,'#2A2428',{squash:0.80});
+      b.sphere(0,0,0,EYE_R*1.34,12,9,'#241E22',{squash:0.82});
       b.pop();
-      /* The sclera is not white. Photographic white on an eyeball is
-         the fastest way to make a face look like a doll: it is a warm
-         off-white, darker at the top where the lid shades it and where
-         it curves away. */
+      /* The sclera. Warm off-white rather than paper: photographic
+         white on an eyeball is the fastest way to make a face read as
+         a doll. It is also *small* — the iris covers most of it, which
+         is what separates a friendly eye from a staring one. The old
+         build added a lash line, a lid shadow, an inner-corner
+         caruncle and two specular dots on top of this; at the size a
+         player sees a head, all of that was four grey specks. */
       b.push();b.translate(s*EYE_X,EYE_Y,EYE_Z);b.rotate(0,s*EYE_TILT,0);
-      b.sphere(0,0,0,EYE_R,14,11,'#E8E2DC');
+      b.scale(0.94,0.70,1.0);
+      b.sphere(0,0,0,EYE_R,16,12,'#EDE7E1');
       b.pop();
-      b.push();b.translate(s*EYE_X,EYE_Y+0.0055,EYE_Z-0.0015);
-      b.rotate(-0.20,s*EYE_TILT,0);
-      b.scale(1.0,0.60,0.92);
-      b.sphere(0,0,0,EYE_R*1.02,12,9,'#B9ACA6');   /* lid shadow */
-      b.pop();
-      /* a hint of red at the inner corner */
-      b.push();b.translate(s*(EYE_X-0.0110),EYE_Y-0.0016,EYE_Z+0.0060);
-      b.sphere(0,0,0,0.0038,6,5,'#C99080',{squash:1.1});b.pop();
-      /* lash line: the upper lid's edge. Without it an eye reads as a
-         bead sitting on the face. */
-      b.push();b.translate(s*EYE_X,EYE_Y+0.0072,EYE_Z+0.0068);
-      b.rotate(-0.24,s*EYE_TILT,s*0.10);
-      b.chamfer(0,0,0,0.030,0.0030,0.009,'#241C1C',0.0011,{noBand:true});
-      b.pop();
-      /* Corneal highlights. They live here rather than with the iris
-         because this part is tinted white and the iris part is tinted
-         with the eye colour, and a specular is white whatever colour
-         the eye is. */
+      /* One catchlight, up and out, where a sky would put it. It lives
+         here rather than with the iris because this part is tinted
+         white and the iris part is tinted with the player's eye
+         colour, and a highlight is white whatever the eye is. */
       b.push();b.translate(s*EYE_X,EYE_Y,EYE_Z);b.rotate(0,s*EYE_TILT,0);
-      b.sphere(-0.0030,0.0038,EYE_R*0.93,0.0018,6,5,'#FFFFFF');
-      b.sphere(0.0028,-0.0032,EYE_R*0.93,0.0009,5,4,'#DCE4EC');
+      b.sphere(-0.0042,0.0050,EYE_R*0.94,0.0030,7,6,'#FFFFFF');
       b.pop();
     }
     b.pop();
   });
 };
-/* The iris carries the player's eye colour. Five concentric layers,
-   because an iris is not a disc: it has a dark limbal ring at its
-   edge, a lighter body, a darker collarette around the pupil, and the
-   pupil itself is a hole rather than a dot. */
+/* The iris carries the player's eye colour. Four concentric discs: a
+   dark limbal ring, the body, a pupil, and a shadow under the upper
+   lid that stops the whole thing reading as a printed sticker. The
+   striations and the collarette that used to be here were five more
+   draws for detail that survives to about forty centimetres. */
 Body.iris=function(){
   return part('iris',function(b){
     b.mat('blank');
@@ -7131,19 +7117,14 @@ Body.iris=function(){
     for(var s=-1;s<=1;s+=2){
       b.push();b.translate(s*EYE_X,EYE_Y,EYE_Z+EYE_R*0.80);
       b.rotate(0,s*EYE_TILT,0);
-      b.sphere(0,0,0,0.0068*IRISK,14,10,'#2F3038',{squash:0.55});     /* limbal */
-      b.sphere(0,0,0.0009,0.0059*IRISK,14,10,'#FFFFFF',{squash:0.50});/* body   */
-      /* radial striation: eight faint spokes, which is what stops a
-         flat disc of colour reading as a printed dot */
-      for(var k=0;k<8;k++){
-        var a=k/8*M.TAU;
-        b.push();b.translate(Math.cos(a)*0.0036,Math.sin(a)*0.0036,0.0013);
-        b.rotate(0,0,a);
-        b.chamfer(0,0,0,0.0034,0.0009,0.0006,'#B9BCC8',0.0002,{noBand:true});
-        b.pop();
-      }
-      b.sphere(0,0,0.0016,0.0034,10,8,'#5A5C68',{squash:0.5}); /* collarette */
-      b.sphere(0,0,0.0022,0.0026*IRISK,10,8,'#08080A',{squash:0.5}); /* pupil  */
+      /* Three discs and no fourth. A grey band under the upper lid was
+         the fourth, and at this scale it read as the eye looking down.
+         The limbal ring is nearly as tall as the opening, so what you
+         see is a dark eye with white only at the corners — which is
+         the whole difference between friendly and staring. */
+      b.sphere(0,0,0,0.0076*IRISK,16,12,'#23242C',{squash:0.62});  /* limbal */
+      b.sphere(0,0,0.0011,0.0062*IRISK,16,12,'#FFFFFF',{squash:0.58});/* body */
+      b.sphere(0,0,0.0022,0.0034*IRISK,12,9,'#07070A',{squash:0.56}); /* pupil */
       b.pop();
     }
     b.pop();
@@ -7156,8 +7137,8 @@ Body.lids=function(){
     for(var s=-1;s<=1;s+=2){
       b.push();b.translate(s*EYE_X,EYE_Y+0.008,EYE_Z-0.001);
       b.rotate(0.12,s*EYE_TILT,0);
-      b.scale(1.0,1.0,0.66);
-      b.sphere(0,0,0,EYE_R*1.24,12,9,LIT);
+      b.scale(1.06,1.0,0.66);
+      b.sphere(0,0,0,EYE_R*1.28,14,10,LIT);
       b.pop();
     }
     b.pop();
@@ -7173,14 +7154,17 @@ Body.brows=function(){
          brow is a field of hairs that starts thick and vertical at the
          inner end and turns flat and thin as it runs out over the
          temple, and three fat blobs cannot say any of that. */
-      for(var i=0;i<11;i++){
-        var t=i/10;
+      /* Seven, not eleven, and half the thickness. At this head size
+         eleven dark cylinders over an eye read as a drawn-on scowl —
+         the single biggest contributor to the grimace. */
+      for(var i=0;i<7;i++){
+        var t=i/6;
         var arc=Math.sin(t*2.2)*0.010;
         var x=EYE_X-0.020+t*0.046;
         var y=0.0330+arc-t*t*0.010;
         var z=EYE_Z+0.0175-t*0.0130-Math.abs(t-0.35)*0.004;
         var len=0.0092-t*0.0030;
-        var thick=(0.0044-t*0.0018)*(1-0.35*Math.abs(t-0.25));
+        var thick=(0.0034-t*0.0013)*(1-0.35*Math.abs(t-0.25));
         b.push();
         b.translate(s*x,y,z);
         b.rotate(0.30-t*0.55,s*(EYE_TILT-t*0.34),s*(0.34-t*0.92));
@@ -7490,10 +7474,10 @@ function handMesh(b,side){
   /* palm: wider than it is deep, and tapering toward the knuckles */
   b.push();b.translate(x,0,0);
   b.loft([
-    {y:0.858,pts:sect(0.030,0.016,0.016,10,2.4)},
-    {y:0.836,pts:sect(0.038,0.019,0.019,10,2.6)},
-    {y:0.800,pts:sect(0.042,0.019,0.019,10,2.8)},
-    {y:0.772,pts:sect(0.040,0.017,0.017,10,2.8)}
+    {y:0.858,pts:sect(0.030,0.016,0.016,14,2.4)},
+    {y:0.836,pts:sect(0.038,0.019,0.019,14,2.6)},
+    {y:0.800,pts:sect(0.042,0.019,0.019,14,2.8)},
+    {y:0.772,pts:sect(0.040,0.017,0.017,14,2.8)}
   ],LIT,{});
   b.pop();
   /* four fingers, longest in the middle */
@@ -7503,9 +7487,9 @@ function handMesh(b,side){
     b.push();b.translate(fx,0.772,0.002);
     b.rotate(0,0,side*(-0.05+i*0.035));
     b.loft([
-      {y:0,pts:sect(0.0095,0.0085,0.0085,8,2.2)},
-      {y:-len[i]*0.55,pts:sect(0.0090,0.0080,0.0080,8,2.2)},
-      {y:-len[i],pts:sect(0.0070,0.0062,0.0062,8,2.2)}
+      {y:0,pts:sect(0.0095,0.0085,0.0085,10,2.2)},
+      {y:-len[i]*0.55,pts:sect(0.0090,0.0080,0.0080,10,2.2)},
+      {y:-len[i],pts:sect(0.0070,0.0062,0.0062,10,2.2)}
     ],LIT,{});
     b.pop();
   }
@@ -7513,9 +7497,9 @@ function handMesh(b,side){
   b.push();b.translate(x-side*0.036,0.828,0.012);
   b.rotate(0.30,0,side*0.72);
   b.loft([
-    {y:0,pts:sect(0.014,0.013,0.013,8,2.2)},
-    {y:-0.030,pts:sect(0.012,0.011,0.011,8,2.2)},
-    {y:-0.058,pts:sect(0.0085,0.0080,0.0080,8,2.2)}
+    {y:0,pts:sect(0.014,0.013,0.013,10,2.2)},
+    {y:-0.030,pts:sect(0.012,0.011,0.011,10,2.2)},
+    {y:-0.058,pts:sect(0.0085,0.0080,0.0080,10,2.2)}
   ],LIT,{});
   b.pop();
 }
@@ -7535,13 +7519,13 @@ function footMesh(b,side){
   b.push();b.translate(x,0.040,0);
   b.push();b.rotate(-Math.PI/2,0,0);
   b.loft([
-    {y:0.070,pts:sect(0.036,0.052,0.030,10,2.4),skin:[F,1]},   /* heel  */
-    {y:0.020,pts:sect(0.041,0.062,0.030,10,2.6),skin:[F,1]},
-    {y:-0.040,pts:sect(0.043,0.058,0.030,10,2.8),skin:[F,1]},  /* arch  */
-    {y:-0.090,pts:sect(0.047,0.046,0.032,10,3.0),skin:[F,0.75,T,0.25]},
-    {y:-0.118,pts:sect(0.048,0.038,0.032,10,3.0),skin:[F,0.45,T,0.55]}, /* ball */
-    {y:-0.165,pts:sect(0.044,0.026,0.028,10,2.8),skin:[T,1]},
-    {y:-0.192,pts:sect(0.032,0.018,0.020,10,2.6),skin:[T,1]}   /* toes  */
+    {y:0.070,pts:sect(0.036,0.052,0.030,14,2.4),skin:[F,1]},   /* heel  */
+    {y:0.020,pts:sect(0.041,0.062,0.030,14,2.6),skin:[F,1]},
+    {y:-0.040,pts:sect(0.043,0.058,0.030,14,2.8),skin:[F,1]},  /* arch  */
+    {y:-0.090,pts:sect(0.047,0.046,0.032,14,3.0),skin:[F,0.75,T,0.25]},
+    {y:-0.118,pts:sect(0.048,0.038,0.032,14,3.0),skin:[F,0.45,T,0.55]}, /* ball */
+    {y:-0.165,pts:sect(0.044,0.026,0.028,14,2.8),skin:[T,1]},
+    {y:-0.192,pts:sect(0.032,0.018,0.020,14,2.6),skin:[T,1]}   /* toes  */
   ],LIT,{});
   b.pop();
   b.pop();
@@ -7564,21 +7548,29 @@ Body.figure=function(build){
   build=build||'base';
   return skinPart('figure:'+build,function(b){
     b.mat('skin');
-    var g=girth(build),n=26;
+    /* Segment counts. Every one of these was chosen for a body 1.80
+        metres tall with limbs the width of real limbs. The toy warp
+        makes an arm two thirds thicker and a thigh a third, and a
+        cylinder that gets fatter without getting more segments gets
+        visibly flatter — the shoulders and the calves were reading as
+        cut gems. Raised to where the facets stop showing at the three
+        metres the camera actually sits at, which costs about nine
+        thousand triangles a character. */
+    var g=girth(build),n=34;
     b.loft(torsoRingsShaped(g,n,0,build),LIT,{});
     /* neck: its own short loft so the head can turn on it */
     var nk=buildShape(build).neck;
     b.push();
     b.loft([
-      {y:1.500,pts:sect(0.066*g*nk,0.052*g*nk,0.056*g*nk,16,2.1),skin:[B.neck,1],col:LOW},
-      {y:1.545,pts:sect(0.060*g*nk,0.048*g*nk,0.052*g*nk,16,2.0),skin:[B.neck,0.70,B.head,0.30],col:MID},
-      {y:1.588,pts:sect(0.057*g*nk,0.048*g*nk,0.049*g*nk,16,2.0),skin:[B.head,1]},
-      {y:1.612,pts:sect(0.050*g*nk,0.044*g*nk,0.044*g*nk,16,2.0),skin:[B.head,1]}
+      {y:1.500,pts:sect(0.066*g*nk,0.052*g*nk,0.056*g*nk,24,2.1),skin:[B.neck,1],col:LOW},
+      {y:1.545,pts:sect(0.060*g*nk,0.048*g*nk,0.052*g*nk,24,2.0),skin:[B.neck,0.70,B.head,0.30],col:MID},
+      {y:1.588,pts:sect(0.057*g*nk,0.048*g*nk,0.049*g*nk,24,2.0),skin:[B.head,1]},
+      {y:1.612,pts:sect(0.050*g*nk,0.044*g*nk,0.044*g*nk,24,2.0),skin:[B.head,1]}
     ],LIT,{});
     b.pop();
     for(var s=1;s>=-1;s-=2){
-      limbLoft(b,s*0.172,armRings(s,build),16,g);
-      limbLoft(b,s*0.092,legRings(s,build),18,g);
+      limbLoft(b,s*0.172,armRings(s,build),24,g);
+      limbLoft(b,s*0.092,legRings(s,build),26,g);
       handMesh(b,s);
       footMesh(b,s);
     }
@@ -7663,7 +7655,7 @@ Body.shirt=function(style,sleeve,build){
   build=build||'base';
   return skinPart('shirt:'+style+':'+sleeve+':'+build,function(b){
     b.mat('fabric');
-    var g=girth(build),n=26,inf=0.011;
+    var g=girth(build),n=34,inf=0.011;
     var secs=shellRings(g,n,inf,SHIRT_HEM[style],SHIRT_NECK[style],build);
     var neckPts=sect(0.100*g+inf,0.068*g+inf,0.076*g+inf,n,2.3);
     secs.push({y:1.492,pts:neckPts,skin:[B.chest,0.5,B.neck,0.5],col:MID});
@@ -7683,7 +7675,10 @@ Body.shirt=function(style,sleeve,build){
     edgeBand(b,secs[0].pts,secs[0].y,-1,0.018,0.030,secs[0].skin,MID,LOW);
 
     /* sleeves: the arm's own rings from the shoulder down to the cuff */
-    var cuff=sleeve==='long'?0.878:1.240;
+    /* A short sleeve that stops on top of the deltoid is a puff
+       sleeve. Taken down past the widest part of the arm it reads as a
+       t-shirt, which is what it is. */
+    var cuff=sleeve==='long'?0.878:1.168;
     for(var s=1;s>=-1;s-=2){
       var rings=armRings(s,build);
       var keep=[];
@@ -7691,9 +7686,9 @@ Body.shirt=function(style,sleeve,build){
         if(rings[i][0]>=cuff-0.0001)keep.push(rings[i]);
       if(sleeve!=='none'&&keep.length>1){
         keep.unshift(ringAt(rings,cuff));
-        limbLoft(b,s*0.172,keep,16,g,0.009,{openTop:false,openBottom:true,uvScale:2});
+        limbLoft(b,s*0.172,keep,24,g,0.009,{openTop:false,openBottom:true,uvScale:2});
         /* and its cuff, turned back up the arm */
-        limbBand(b,s*0.172,rings,cuff,1,0.022,g,0.009,0.075,16,MID,LOW);
+        limbBand(b,s*0.172,rings,cuff,1,0.022,g,0.009,0.075,24,MID,LOW);
       }
     }
 
@@ -7781,7 +7776,7 @@ Body.trousers=function(leg,build){
        still cut to a base waist. */
     var _wsh=shapeAt(buildShape(build),1.100,[1,1]);
     var wb=_wsh[0], wd=_wsh[1];
-    var seat=shellRings(g,24,inf,0.795,1.075,build);
+    var seat=shellRings(g,32,inf,0.795,1.075,build);
     /* The torso rings carry the body's own occlusion shading — a dark
        ring at the groin, because that is where light does not reach on
        skin. Cloth hanging over it is not shaded that way, and taking
@@ -7790,7 +7785,7 @@ Body.trousers=function(leg,build){
        the shading is not. */
     for(var q=0;q<seat.length;q++)seat[q].col=(q===0?MID:null);
     /* waistband, a shade darker, so the top of the trousers is an edge */
-    seat.push({y:1.100,pts:sect(0.140*g*wb+inf,0.102*g*wd+inf,0.100*g*wd+inf,24,2.3),
+    seat.push({y:1.100,pts:sect(0.140*g*wb+inf,0.102*g*wd+inf,0.100*g*wd+inf,32,2.3),
                skin:[B.spine,1],col:MID});
     b.loft(seat,LIT,{openTop:true,openBottom:true,uvScale:2});
     /* the waistband as an object, and a fly seam under it */
@@ -7806,10 +7801,10 @@ Body.trousers=function(leg,build){
       for(var i=0;i<rings.length;i++)
         if(rings[i][0]>=hem-0.0001&&rings[i][0]<=1.031)keep.push(rings[i]);
       keep.unshift(ringAt(rings,hem));
-      limbLoft(b,s*0.092,keep,18,g,inf,{openTop:true,openBottom:true,uvScale:2});
+      limbLoft(b,s*0.092,keep,26,g,inf,{openTop:true,openBottom:true,uvScale:2});
       /* turn-ups. Trousers that stop mid-shin with a zero-thickness
          edge are the same paint-on-skin problem as a shirt that does. */
-      limbBand(b,s*0.092,rings,hem,1,0.026,g,inf,0.060,18,MID,LOW);
+      limbBand(b,s*0.092,rings,hem,1,0.026,g,inf,0.060,26,MID,LOW);
     }
   });
 };
@@ -7828,13 +7823,13 @@ Body.shoes=function(style,build){
       b.push();b.rotate(-Math.PI/2,0,0);
       /* upper */
       b.loft([
-        {y:0.086,pts:sect(0.044,0.062,0.026,12,2.4),skin:[F,1]},
-        {y:0.020,pts:sect(0.050,0.072,0.026,12,2.6),skin:[F,1]},
-        {y:-0.040,pts:sect(0.052,0.066,0.026,12,2.8),skin:[F,1]},
-        {y:-0.095,pts:sect(0.056,0.052,0.028,12,3.0),skin:[F,0.7,T,0.3]},
-        {y:-0.125,pts:sect(0.057,0.043,0.028,12,3.0),skin:[F,0.4,T,0.6]},
-        {y:-0.175,pts:sect(0.052,0.030,0.026,12,2.8),skin:[T,1]},
-        {y:-0.205,pts:sect(0.038,0.020,0.020,12,2.6),skin:[T,1]}
+        {y:0.086,pts:sect(0.044,0.062,0.026,16,2.4),skin:[F,1]},
+        {y:0.020,pts:sect(0.050,0.072,0.026,16,2.6),skin:[F,1]},
+        {y:-0.040,pts:sect(0.052,0.066,0.026,16,2.8),skin:[F,1]},
+        {y:-0.095,pts:sect(0.056,0.052,0.028,16,3.0),skin:[F,0.7,T,0.3]},
+        {y:-0.125,pts:sect(0.057,0.043,0.028,16,3.0),skin:[F,0.4,T,0.6]},
+        {y:-0.175,pts:sect(0.052,0.030,0.026,16,2.8),skin:[T,1]},
+        {y:-0.205,pts:sect(0.038,0.020,0.020,16,2.6),skin:[T,1]}
       ],LIT,{});
       b.pop();
       /* sole: a flat slab under the whole footprint, in a darker shade */
@@ -7846,13 +7841,13 @@ Body.shoes=function(style,build){
         b.skin(s>0?B.shinL:B.shinR,0.55,F,0.45);
         b.push();b.translate(0,-0.044,0);
         b.loft([
-          {y:0.084,pts:sect(0.052,0.046,0.052,12,2.3)},
-          {y:0.148,pts:sect(0.055,0.048,0.056,12,2.3)},
-          {y:0.198,pts:sect(0.062,0.054,0.062,12,2.3)}
+          {y:0.084,pts:sect(0.052,0.046,0.052,18,2.3)},
+          {y:0.148,pts:sect(0.055,0.048,0.056,18,2.3)},
+          {y:0.198,pts:sect(0.062,0.054,0.062,18,2.3)}
         ],LIT,{openTop:true,openBottom:true});
         b.loft([
-          {y:0.198,pts:sect(0.066,0.058,0.066,12,2.3),col:MID},
-          {y:0.230,pts:sect(0.063,0.056,0.063,12,2.3),col:MID}
+          {y:0.198,pts:sect(0.066,0.058,0.066,18,2.3),col:MID},
+          {y:0.230,pts:sect(0.063,0.056,0.063,18,2.3),col:MID}
         ],MID,{openTop:true,openBottom:true});
         b.pop();
       }
@@ -8096,9 +8091,21 @@ function shell(b,cfg){
      stop at a hairline that is higher at the face than at the nape —
      it has to emerge through one. */
   var IN=0.86;
+  /* The skull ellipsoid these styles are authored against is a
+     stand-in, and it is a slightly small one: the real head mesh is
+     about five per cent wider than it between the temples and the
+     crown. A shell that only cleared the ellipsoid let the head poke
+     through the top of every short style. `pad` is that difference,
+     applied where it exists rather than everywhere. */
+  function pad(el){
+    var t=(el-0.45)/0.95;
+    if(t<=0)return 0;
+    if(t>1)t=1;
+    return 0.075*t*t*(3-2*t);
+  }
   function rAt(az,k,el){
     var lim=lo(az)+(jag?jag*tri(k/n*teeth+ph):0);
-    var o=1.03+out(az,el);
+    var o=1.05+pad(el)+out(az,el);
     if(el<lim)return IN;
     if(el<lim+0.09)return M.lerp(IN,o,(el-lim)/0.09);
     return o;
@@ -8217,7 +8224,7 @@ function rope(b,st,dir,len,r,beads,sway,seed){
   for(var i=0;i<beads;i++){
     var t=i/(beads-1||1);
     var rr=r*(1-0.42*t*t);
-    b.sphere(p[0],p[1],p[2],rr,9,7,hairShade(0.20+t*0.42),{squash:1.18});
+    b.sphere(p[0],p[1],p[2],rr,11,8,hairShade(0.20+t*0.42),{squash:1.04});
     d[0]+=sway*(rng()-0.5)*0.5;d[2]+=sway*(rng()-0.5)*0.5;d[1]-=sway*0.55;
     d=nrm3(d);
     p[0]+=d[0]*step;p[1]+=d[1]*step;p[2]+=d[2]*step;
@@ -8239,7 +8246,7 @@ function rope(b,st,dir,len,r,beads,sway,seed){
 var HAIR_BUILD={
   /* --- short, everyday --- */
   crop:function(b){
-    shell(b,{lo:line(0.34,-0.50),out:function(){return 0.115;},
+    shell(b,{lo:line(0.12,-0.50),out:function(){return 0.115;},
       jag:0.030,teeth:11,rows:12});
   },
   bowl:function(b){
@@ -8249,7 +8256,7 @@ var HAIR_BUILD={
       rows:14,n:40,sh0:0.22});
   },
   pixie:function(b){
-    shell(b,{lo:line(0.16,-0.42),out:function(az){return 0.13+fw(az)*0.05;},
+    shell(b,{lo:line(0.03,-0.42),out:function(az){return 0.13+fw(az)*0.05;},
       jag:0.075,teeth:13,rows:13});
     crest(b,{n:5,az0:-0.7,az1:0.7,el:0.30,len:0.030,w:0.014,out:0.5,
       dir:[0,0.35,0.55],droop:0.5,seed:3,elJit:0.10});
@@ -8257,7 +8264,7 @@ var HAIR_BUILD={
   undercut:function(b){
     /* The shaved band and the mass above it are two shells with a hard
        line between them, and that line is the style. */
-    shell(b,{lo:line(0.02,-0.46),out:function(){return 0.030;},rows:8,
+    shell(b,{lo:line(-0.06,-0.46),out:function(){return 0.030;},rows:8,
       sh0:0.10,sh1:0.34});
     shell(b,{lo:function(az){return 0.30+Math.sin(az)*0.05;},
       out:function(az,el){return 0.20+Math.max(0,Math.cos(az))*0.09;},
@@ -8267,7 +8274,7 @@ var HAIR_BUILD={
     /* Everything falls to one side. The hairline drops on the left and
        the mass thickens toward the front-left, which is what makes a
        parting read from the front. */
-    shell(b,{lo:function(az){return line(0.24,-0.46)(az)-Math.sin(az)*0.16;},
+    shell(b,{lo:function(az){return line(0.08,-0.46)(az)-Math.sin(az)*0.16;},
       out:function(az){return 0.15+Math.max(0,Math.cos(az))*0.11+
         Math.max(0,Math.sin(az))*0.05;},
       jag:0.045,teeth:8,rows:13});
@@ -8276,7 +8283,7 @@ var HAIR_BUILD={
   },
   /* --- messy and spiked --- */
   mop:function(b){
-    shell(b,{lo:line(0.02,-0.54),out:function(){return 0.20;},
+    shell(b,{lo:line(-0.06,-0.54),out:function(){return 0.20;},
       jag:0.115,teeth:12,rows:13});
     scatter(b,{n:26,el0:0.15,el1:1.40,len:0.040,w:0.014,out:0.9,
       dir:[0,0.25,0],droop:0.7,seed:11,curl:0.5,curlFreq:1.6});
@@ -8284,14 +8291,14 @@ var HAIR_BUILD={
       dir:[0,-0.15,0.5],droop:1.5,seed:12,elJit:0.14});
   },
   spiked:function(b){
-    shell(b,{lo:line(0.40,-0.40),out:function(){return 0.085;},rows:11});
+    shell(b,{lo:line(0.20,-0.40),out:function(){return 0.085;},rows:11});
     scatter(b,{n:20,el0:0.35,el1:1.45,len:0.072,w:0.020,out:0.55,
       dir:[0,0.9,0],droop:-0.25,seed:53,seg:4,taper:0.98});
   },
   bolt:function(b){
     /* Nine of them, swept hard back, and nothing else. The silhouette
        is the item. */
-    shell(b,{lo:line(0.44,-0.34),out:function(){return 0.070;},rows:10,
+    shell(b,{lo:line(0.24,-0.34),out:function(){return 0.070;},rows:10,
       sh0:0.12,sh1:0.62});
     crest(b,{n:9,az0:-1.5,az1:1.5,
       el:function(t){return 0.55+Math.sin(t*Math.PI)*0.75;},
@@ -8301,14 +8308,14 @@ var HAIR_BUILD={
       dir:[0,0.6,-0.8],droop:-0.2,seed:68,seg:5,taper:0.97});
   },
   flame:function(b){
-    shell(b,{lo:line(0.36,-0.42),out:function(){return 0.095;},rows:11,
+    shell(b,{lo:line(0.17,-0.42),out:function(){return 0.095;},rows:11,
       sh0:0.14});
     scatter(b,{n:22,el0:0.45,el1:1.50,len:0.115,w:0.019,out:0.35,
       dir:[0,1.15,-0.30],droop:-0.55,seed:171,seg:6,taper:0.96,
       curl:1.1,curlFreq:1.2});
   },
   mohawk:function(b){
-    shell(b,{lo:line(0.10,-0.44),out:function(){return 0.028;},rows:8,
+    shell(b,{lo:line(0.01,-0.44),out:function(){return 0.028;},rows:8,
       sh0:0.08,sh1:0.30});
     crest(b,{n:7,az0:0,az1:0,
       el:function(t){return 0.40+t*1.10;},
@@ -8329,7 +8336,7 @@ var HAIR_BUILD={
       sh0:0.08,sh1:0.58});
   },
   long:function(b){
-    shell(b,{lo:line(0.26,-0.78),out:function(){return 0.185;},
+    shell(b,{lo:line(0.09,-0.78),out:function(){return 0.185;},
       jag:0.045,teeth:9,rows:14,n:40,
       drop:0.150,dropRows:7,taperIn:0.14,
       hang:function(az){var f=fw(az);return M.clamp(1.35-f*2.1,0,1);}});
@@ -8337,7 +8344,7 @@ var HAIR_BUILD={
   wave:function(b){
     /* Long, but parted and falling forward over one shoulder, so it
        reads differently from the back in a crowd. */
-    shell(b,{lo:function(az){return line(0.20,-0.74)(az)-Math.sin(az)*0.12;},
+    shell(b,{lo:function(az){return line(0.05,-0.74)(az)-Math.sin(az)*0.12;},
       out:function(az){return 0.19+Math.max(0,-Math.sin(az))*0.06;},
       jag:0.030,teeth:14,rows:14,n:40,
       drop:0.135,dropRows:7,taperIn:0.16,
@@ -8346,11 +8353,11 @@ var HAIR_BUILD={
         return M.clamp(1.30-f*1.9+Math.max(0,-Math.sin(az))*0.55,0,1);}});
   },
   afro:function(b){
-    shell(b,{lo:line(0.24,-0.44),out:function(){return 0.470;},
+    shell(b,{lo:line(0.08,-0.44),out:function(){return 0.470;},
       jag:0.055,teeth:22,rows:16,n:44,sh0:0.20});
   },
   curls:function(b){
-    shell(b,{lo:line(0.14,-0.50),out:function(){return 0.245;},
+    shell(b,{lo:line(0.02,-0.50),out:function(){return 0.245;},
       jag:0.070,teeth:15,rows:14,n:40});
     /* the bumps that turn a smooth mass into a curly one */
     var rng=M.rng(113);
@@ -8362,7 +8369,7 @@ var HAIR_BUILD={
     }
   },
   locs:function(b){
-    shell(b,{lo:line(0.28,-0.46),out:function(){return 0.115;},rows:11,
+    shell(b,{lo:line(0.11,-0.46),out:function(){return 0.115;},rows:11,
       sh0:0.12,sh1:0.48});
     var rng=M.rng(73);
     for(var i=0;i<22;i++){
@@ -8371,19 +8378,19 @@ var HAIR_BUILD={
       var st=scalpPt(az,el,1.14);
       var nv=scalpNormal(az,el);
       rope(b,st,[nv[0]*0.55,-0.85,nv[2]*0.55],
-        0.10+rng()*0.085,0.0165,6,0.16,7+i);
+        0.10+rng()*0.085,0.0165,9,0.16,7+i);
     }
   },
   /* --- tied --- */
   bun:function(b){
-    shell(b,{lo:line(0.30,-0.38),out:function(){return 0.105;},rows:11,
+    shell(b,{lo:line(0.13,-0.38),out:function(){return 0.105;},rows:11,
       sh0:0.18});
     var c=scalpPt(Math.PI,1.02,1.20);
     tie(b,c,0.026);
     knot(b,[c[0],c[1]+0.028,c[2]],0.046,0.90);
   },
   topknot:function(b){
-    shell(b,{lo:line(0.06,-0.42),out:function(){return 0.035;},rows:8,
+    shell(b,{lo:line(-0.03,-0.42),out:function(){return 0.035;},rows:8,
       sh0:0.08,sh1:0.34});
     var c=scalpPt(0.30,1.40,1.10);
     tie(b,c,0.020);
@@ -8392,27 +8399,27 @@ var HAIR_BUILD={
       dir:[0,0.9,0.1],droop:0.9,seed:127});
   },
   ponytail:function(b){
-    shell(b,{lo:line(0.28,-0.40),out:function(){return 0.115;},rows:11});
+    shell(b,{lo:line(0.11,-0.40),out:function(){return 0.115;},rows:11});
     var c=scalpPt(Math.PI,0.62,1.14);
     tie(b,c,0.024);
-    rope(b,[c[0],c[1]-0.010,c[2]],[0,-0.55,-0.85],0.185,0.030,7,0.10,97);
+    rope(b,[c[0],c[1]-0.010,c[2]],[0,-0.55,-0.85],0.185,0.030,13,0.10,97);
   },
   twin:function(b){
-    shell(b,{lo:line(0.26,-0.42),out:function(){return 0.120;},rows:11,
+    shell(b,{lo:line(0.09,-0.42),out:function(){return 0.120;},rows:11,
       jag:0.030,teeth:10});
     for(var s=-1;s<=1;s+=2){
       var c=scalpPt(s*1.60,0.30,1.16);
       tie(b,c,0.021);
       rope(b,[c[0]+s*0.010,c[1]-0.006,c[2]],[s*0.55,-0.75,-0.35],
-        0.155,0.026,7,0.12,140+s);
+        0.155,0.026,12,0.12,140+s);
     }
   },
   braids:function(b){
-    shell(b,{lo:line(0.26,-0.46),out:function(){return 0.105;},rows:11,
+    shell(b,{lo:line(0.09,-0.46),out:function(){return 0.105;},rows:11,
       jag:0.025,teeth:16,sh0:0.14});
     for(var s=-1;s<=1;s+=2){
       var st=scalpPt(s*1.42,0.20,1.14);
-      rope(b,st,[s*0.34,-0.92,0.10],0.215,0.023,9,0.07,61+s);
+      rope(b,st,[s*0.34,-0.92,0.10],0.215,0.023,15,0.07,61+s);
     }
   },
   bald:function(b){}
@@ -8671,6 +8678,432 @@ var HAT_BUILD={
     b.pop();
     b.pop();
   },
+  /* ---------------- the second shelf ----------------
+     Ten hats is a wardrobe. Thirty is a shop, and a shop is what this
+     game is about: the reason to walk into the store is that somebody
+     else is wearing something you have not got.
+
+     Every one of these is built to the same three rules as the ten
+     above. A band at y 0.02 that clears the skull at 0.21 across, so
+     it sits on the hairline rather than over the eyes. A crown that
+     closes, because a hat you can see into is a hole in the head. And
+     a silhouette that survives at forty metres — the detail is there
+     for the wardrobe screen, the outline is there for the plaza. */
+
+  tophat:function(b){
+    b.push();b.translate(0,0.016,0);
+    b.loft([{y:0,pts:Geo.circle(0.148,20,1.0,1.06)},
+            {y:0.014,pts:Geo.circle(0.152,20,1.0,1.06)}],MID,{});
+    b.pop();
+    b.loft([
+      {y:0.026,pts:Geo.circle(0.104,20,1.0,1.04)},
+      {y:0.150,pts:Geo.circle(0.100,20,1.0,1.04)},
+      {y:0.256,pts:Geo.circle(0.106,20,1.0,1.04)},
+      {y:0.268,pts:Geo.circle(0.104,20,1.0,1.04)}
+    ],LIT,{openBottom:true});
+    /* the grosgrain band, which is the whole difference between a top
+       hat and a black cylinder */
+    b.loft([{y:0.036,pts:Geo.circle(0.108,20,1.0,1.04)},
+            {y:0.072,pts:Geo.circle(0.108,20,1.0,1.04)}],DEEP,
+           {openTop:true,openBottom:true});
+  },
+  fedora:function(b){
+    b.push();b.translate(0,0.020,0.004);
+    b.loft([{y:0,pts:Geo.circle(0.150,20,1.06,1.10)},
+            {y:0.013,pts:Geo.circle(0.146,20,1.06,1.10)}],MID,{});
+    b.pop();
+    /* the pinch: two dents either side of a centre crease */
+    b.loft([
+      {y:0.030,pts:Geo.roundRect(0.208,0.216,0.090,16)},
+      {y:0.110,pts:Geo.roundRect(0.196,0.204,0.086,16)},
+      {y:0.156,pts:Geo.roundRect(0.150,0.170,0.062,16)}
+    ],LIT,{openBottom:true});
+    b.push();b.translate(0,0.150,0);b.scale(1.0,0.34,1.0);
+    b.sphere(0,0,0,0.086,14,10,LIT);b.pop();
+    for(var d=-1;d<=1;d+=2){
+      b.push();b.translate(d*0.052,0.156,0);b.scale(1.0,0.5,1.4);
+      b.sphere(0,0,0,0.030,10,8,MID,{squash:0.9});b.pop();
+    }
+    b.loft([{y:0.040,pts:Geo.roundRect(0.212,0.220,0.092,16)},
+            {y:0.070,pts:Geo.roundRect(0.212,0.220,0.092,16)}],DEEP,
+           {openTop:true,openBottom:true});
+  },
+  cowboy:function(b){
+    /* The brim rolls up at the sides — a flat disc reads as a
+       lampshade, and the roll is the entire silhouette. */
+    b.push();b.translate(0,0.022,0.006);
+    var n=22,lo=[],hi=[];
+    for(var i=0;i<n;i++){
+      var a=i/n*M.TAU, cx=Math.sin(a), cz=Math.cos(a);
+      var roll=Math.abs(cx);
+      lo.push([cx*0.180,cz*0.196]);
+      hi.push([cx*0.176*(1+roll*0.06),cz*0.192]);
+    }
+    b.loft([{y:0,pts:lo},{y:0.014,pts:hi}],MID,{});
+    b.pop();
+    /* the rolled edges, as two beads down the sides */
+    for(var s2=-1;s2<=1;s2+=2){
+      b.push();b.translate(s2*0.166,0.040,0.006);b.scale(0.7,1.0,2.6);
+      b.sphere(0,0,0,0.026,10,8,MID);b.pop();
+    }
+    b.loft([
+      {y:0.032,pts:Geo.roundRect(0.202,0.212,0.088,16)},
+      {y:0.116,pts:Geo.roundRect(0.186,0.198,0.082,16)},
+      {y:0.176,pts:Geo.roundRect(0.132,0.156,0.058,16)}
+    ],LIT,{openBottom:true});
+    b.push();b.translate(0,0.174,0);b.scale(1.0,0.36,1.0);
+    b.sphere(0,0,0,0.078,14,10,LIT);b.pop();
+    b.push();b.translate(0,0.126,0);b.scale(1.0,0.9,1.0);
+    b.chamfer(0,0,0,0.014,0.062,0.010,DEEP,0.004,{noBand:true});b.pop();
+  },
+  wizard:function(b){
+    b.push();b.translate(0,0.018,0);
+    b.loft([{y:0,pts:Geo.circle(0.164,20,1.0,1.05)},
+            {y:0.014,pts:Geo.circle(0.158,20,1.0,1.05)}],MID,{});
+    b.pop();
+    /* A cone with a bent tip. The bend is a chain of beads rather than
+       a chain of oriented cones: same silhouette, and no hand-rolled
+       axis-to-euler conversion to get subtly wrong. */
+    b.push();b.rotate(-0.06,0,0.10);
+    b.cylinder(0,0.184,0,0.104,0.020,0.310,16,LIT);
+    b.pop();
+    var tip=[[0.028,0.330,-0.020],[0.062,0.372,-0.060],
+             [0.108,0.390,-0.112],[0.152,0.376,-0.166]];
+    for(var i5=0;i5<tip.length;i5++){
+      b.push();b.translate(tip[i5][0],tip[i5][1],tip[i5][2]);
+      b.sphere(0,0,0,0.026-i5*0.004,10,8,LIT);b.pop();
+    }
+    b.mat('neon',0.8);
+    b.push();b.translate(0.152,0.376,-0.166);
+    b.sphere(0,0,0,0.024,10,8,LIT);b.pop();
+    b.mat('blank');
+    /* stars on the band */
+    for(var q=0;q<5;q++){
+      var aa=(q/5)*M.TAU;
+      b.push();b.translate(Math.sin(aa)*0.106,0.062,Math.cos(aa)*0.108);
+      b.rotate(0,aa,0);
+      b.chamfer(0,0,0,0.030,0.030,0.006,MID,0.008,{noBand:true});b.pop();
+    }
+  },
+  witch:function(b){
+    b.push();b.translate(0,0.018,0);
+    b.loft([{y:0,pts:Geo.circle(0.196,22,1.0,1.02)},
+            {y:0.012,pts:Geo.circle(0.188,22,1.0,1.02)}],MID,{});
+    b.pop();
+    b.push();b.rotate(-0.10,0,0.14);
+    b.cylinder(0,0.176,0,0.104,0.012,0.300,16,LIT);
+    b.pop();
+    b.loft([{y:0.034,pts:Geo.circle(0.110,18,1.0,1.02)},
+            {y:0.070,pts:Geo.circle(0.110,18,1.0,1.02)}],DEEP,
+           {openTop:true,openBottom:true});
+    b.push();b.translate(0.052,0.052,0.098);
+    b.chamfer(0,0,0,0.048,0.038,0.010,MID,0.010);b.pop();
+  },
+  pirate:function(b){
+    /* Bicorne: two peaks and a low middle, which is one loft with a
+       shaped top rather than two cones. */
+    b.push();b.translate(0,0.024,0);
+    b.loft([
+      {y:0,    pts:Geo.roundRect(0.330,0.184,0.070,18)},
+      {y:0.056,pts:Geo.roundRect(0.322,0.176,0.068,18)},
+      {y:0.104,pts:Geo.roundRect(0.238,0.152,0.060,18)},
+      {y:0.130,pts:Geo.roundRect(0.140,0.126,0.048,18)}
+    ],LIT,{openBottom:true});
+    b.pop();
+    for(var s3=-1;s3<=1;s3+=2){
+      b.push();b.translate(s3*0.152,0.104,0);b.rotate(0,0,-s3*0.30);
+      b.scale(1.0,1.5,0.7);
+      b.sphere(0,0,0,0.038,10,8,MID);b.pop();
+    }
+    /* the skull, small and centred, in white */
+    b.push();b.translate(0,0.078,0.098);
+    b.sphere(0,0,0,0.028,12,9,'#F4F0EA',{squash:0.88});
+    b.sphere(-0.010,0.004,0.020,0.008,7,6,'#1A1418');
+    b.sphere( 0.010,0.004,0.020,0.008,7,6,'#1A1418');
+    b.pop();
+  },
+  viking:function(b){
+    b.mat('panel');
+    b.loft([
+      {y:0.014,pts:Geo.roundRect(0.212,0.220,0.094,16)},
+      {y:0.100,pts:Geo.roundRect(0.204,0.212,0.092,16)},
+      {y:0.166,pts:Geo.roundRect(0.148,0.156,0.066,16)}
+    ],LIT,{openBottom:true});
+    b.push();b.translate(0,0.164,0);b.scale(1.0,0.44,1.0);
+    b.sphere(0,0,0,0.082,14,10,LIT);b.pop();
+    /* the nasal, and the brow band */
+    b.push();b.translate(0,0.020,0.104);
+    b.chamfer(0,0,0,0.024,0.062,0.014,MID,0.006);b.pop();
+    b.loft([{y:0.020,pts:Geo.roundRect(0.216,0.224,0.096,16)},
+            {y:0.048,pts:Geo.roundRect(0.216,0.224,0.096,16)}],MID,
+           {openTop:true,openBottom:true});
+    /* horns, curved out and forward */
+    for(var s4=-1;s4<=1;s4+=2){
+      for(var h=0;h<6;h++){
+        var t=h/5;
+        b.push();
+        b.translate(s4*(0.098+t*0.098),0.108+Math.sin(t*2.1)*0.070,
+                    -0.010+t*t*0.052);
+        b.sphere(0,0,0,0.030-t*0.020,9,7,'#EFE6D4');
+        b.pop();
+      }
+    }
+  },
+  knight:function(b){
+    b.mat('panel');
+    b.loft([
+      {y:0.006,pts:Geo.roundRect(0.216,0.230,0.070,18)},
+      {y:0.090,pts:Geo.roundRect(0.212,0.226,0.080,18)},
+      {y:0.170,pts:Geo.roundRect(0.150,0.168,0.062,18)}
+    ],LIT,{openBottom:true});
+    b.push();b.translate(0,0.168,0);b.scale(1.0,0.42,1.06);
+    b.sphere(0,0,0,0.082,14,10,LIT);b.pop();
+    /* the visor slot, and the rivets either side of it */
+    b.push();b.translate(0,0.046,0.116);
+    b.chamfer(0,0,0,0.152,0.020,0.010,'#14181F',0.004,{noBand:true});b.pop();
+    for(var r2=-1;r2<=1;r2+=2){
+      b.push();b.translate(r2*0.100,0.062,0.084);
+      b.sphere(0,0,0,0.013,8,6,MID);b.pop();
+    }
+    b.mat('gold');
+    b.push();b.translate(0,0.192,0);
+    b.chamfer(0,0,0,0.020,0.036,0.150,LIT,0.006);b.pop();
+  },
+  santa:function(b){
+    b.loft([
+      {y:0.010,pts:Geo.roundRect(0.216,0.224,0.096,16)},
+      {y:0.096,pts:Geo.roundRect(0.196,0.204,0.088,16)},
+      {y:0.170,pts:Geo.roundRect(0.140,0.150,0.062,16)}
+    ],LIT,{openBottom:true});
+    /* the tip flops back and to one side */
+    var tp=[[0,0.176,0],[-0.030,0.246,-0.052],[-0.078,0.268,-0.132],
+            [-0.120,0.246,-0.208]];
+    for(var i2=0;i2<tp.length;i2++){
+      b.push();b.translate(tp[i2][0],tp[i2][1],tp[i2][2]);
+      b.sphere(0,0,0,0.058-i2*0.010,12,9,LIT);b.pop();
+    }
+    b.push();b.translate(-0.120,0.246,-0.208);
+    b.sphere(0,0,0,0.052,12,10,'#F6F4F0');b.pop();
+    /* the fur band */
+    b.loft([{y:0.004,pts:Geo.roundRect(0.230,0.238,0.100,16)},
+            {y:0.052,pts:Geo.roundRect(0.234,0.242,0.102,16)},
+            {y:0.070,pts:Geo.roundRect(0.222,0.230,0.096,16)}],'#F6F4F0',
+           {openTop:true,openBottom:true});
+  },
+  elf:function(b){
+    b.loft([
+      {y:0.010,pts:Geo.roundRect(0.212,0.220,0.094,16)},
+      {y:0.106,pts:Geo.roundRect(0.180,0.188,0.080,16)},
+      {y:0.180,pts:Geo.roundRect(0.104,0.112,0.046,16)},
+      {y:0.230,pts:Geo.roundRect(0.030,0.034,0.014,16)}
+    ],LIT,{openBottom:true});
+    b.push();b.translate(0,0.244,0);
+    b.sphere(0,0,0,0.030,10,8,MID,{squash:0.9});b.pop();
+    b.loft([{y:0.004,pts:Geo.roundRect(0.222,0.230,0.098,16)},
+            {y:0.044,pts:Geo.roundRect(0.226,0.234,0.100,16)}],MID,
+           {openTop:true,openBottom:true});
+  },
+  chef:function(b){
+    b.loft([{y:0.010,pts:Geo.circle(0.108,18,1.0,1.04)},
+            {y:0.084,pts:Geo.circle(0.106,18,1.0,1.04)}],MID,{openBottom:true});
+    /* the puff: three overlapping squashed spheres so the top is a
+       cloud rather than a drum */
+    for(var q2=0;q2<3;q2++){
+      var aa2=q2/3*M.TAU;
+      b.push();
+      b.translate(Math.sin(aa2)*0.044,0.148,Math.cos(aa2)*0.046);
+      b.sphere(0,0,0,0.094,14,10,LIT,{squash:0.86});b.pop();
+    }
+    b.push();b.translate(0,0.176,0);
+    b.sphere(0,0,0,0.086,14,10,LIT,{squash:0.82});b.pop();
+  },
+  straw:function(b){
+    b.push();b.translate(0,0.018,0);
+    b.loft([{y:0,pts:Geo.circle(0.196,22,1.0,1.02)},
+            {y:0.010,pts:Geo.circle(0.190,22,1.0,1.02)},
+            {y:0.024,pts:Geo.circle(0.150,22,1.0,1.02)}],LIT,{});
+    b.pop();
+    b.loft([{y:0.030,pts:Geo.circle(0.106,18,1.0,1.03)},
+            {y:0.108,pts:Geo.circle(0.096,18,1.0,1.03)},
+            {y:0.132,pts:Geo.circle(0.062,18,1.0,1.03)}],LIT,{openBottom:true});
+    b.push();b.translate(0,0.134,0);b.scale(1.0,0.4,1.0);
+    b.sphere(0,0,0,0.062,12,9,LIT);b.pop();
+    b.loft([{y:0.038,pts:Geo.circle(0.110,18,1.0,1.03)},
+            {y:0.062,pts:Geo.circle(0.110,18,1.0,1.03)}],DEEP,
+           {openTop:true,openBottom:true});
+  },
+  sombrero:function(b){
+    b.push();b.translate(0,0.020,0);
+    b.loft([{y:0,pts:Geo.circle(0.290,26)},
+            {y:0.018,pts:Geo.circle(0.282,26)},
+            {y:0.046,pts:Geo.circle(0.190,26)}],LIT,{});
+    b.pop();
+    b.loft([{y:0.052,pts:Geo.circle(0.112,20)},
+            {y:0.150,pts:Geo.circle(0.098,20)},
+            {y:0.192,pts:Geo.circle(0.052,20)}],LIT,{openBottom:true});
+    b.push();b.translate(0,0.194,0);b.scale(1.0,0.4,1.0);
+    b.sphere(0,0,0,0.052,12,9,LIT);b.pop();
+    /* embroidery: a ring of beads round the brim */
+    for(var e2=0;e2<16;e2++){
+      var ae=e2/16*M.TAU;
+      b.push();b.translate(Math.sin(ae)*0.238,0.032,Math.cos(ae)*0.238);
+      b.sphere(0,0,0,0.016,7,6,MID);b.pop();
+    }
+  },
+  pith:function(b){
+    b.push();b.translate(0,0.020,0.004);
+    b.loft([{y:0,pts:Geo.circle(0.192,22,1.0,1.06)},
+            {y:0.016,pts:Geo.circle(0.184,22,1.0,1.06)}],LIT,{});
+    b.pop();
+    b.loft([{y:0.030,pts:Geo.circle(0.116,20,1.0,1.04)},
+            {y:0.118,pts:Geo.circle(0.106,20,1.0,1.04)}],LIT,{openBottom:true});
+    b.push();b.translate(0,0.120,0);b.scale(1.0,0.62,1.04);
+    b.sphere(0,0,0,0.106,16,12,LIT);b.pop();
+    b.loft([{y:0.036,pts:Geo.circle(0.120,20,1.0,1.04)},
+            {y:0.062,pts:Geo.circle(0.120,20,1.0,1.04)}],MID,
+           {openTop:true,openBottom:true});
+    /* the crown vent */
+    b.push();b.translate(0,0.184,0);
+    b.sphere(0,0,0,0.018,8,6,MID,{squash:0.7});b.pop();
+  },
+  football:function(b){
+    b.mat('panel');
+    b.push();b.translate(0,0.062,-0.006);b.scale(1.06,1.0,1.10);
+    b.sphere(0,0,0,0.132,18,14,LIT,{squash:0.94});b.pop();
+    /* ear holes, so it is a helmet and not a bowling ball */
+    for(var s5=-1;s5<=1;s5+=2){
+      b.push();b.translate(s5*0.128,0.040,-0.008);b.scale(0.3,1.0,1.0);
+      b.sphere(0,0,0,0.042,10,8,DEEP);b.pop();
+    }
+    /* the facemask: three bars across the front */
+    b.mat('blank');
+    /* Bars run across the face, and a cylinder runs along Y, so each
+       one is turned a quarter before it is drawn. */
+    for(var g2=0;g2<3;g2++){
+      b.push();b.translate(0,-0.010-g2*0.036,0.126+g2*0.006);
+      b.rotate(0,0,Math.PI/2);
+      b.cylinder(0,0,0,0.009,0.009,0.190,8,MID);b.pop();
+    }
+    b.push();b.translate(0,-0.046,0.128);b.rotate(0,0,Math.PI/2);
+    b.cylinder(0,0,0,0.008,0.008,0.120,8,MID);b.pop();
+  },
+  spacehelmet:function(b){
+    b.mat('panelw');
+    b.push();b.translate(0,0.052,0);
+    b.sphere(0,0,0,0.152,20,16,LIT,{squash:1.0});b.pop();
+    b.mat('glass',0.10);
+    b.push();b.translate(0,0.040,0.056);b.scale(1.0,0.92,0.72);
+    b.sphere(0,0,0,0.130,18,14,LIT);b.pop();
+    b.mat('panel');
+    /* the neck ring, and the light on the temple */
+    b.loft([{y:-0.070,pts:Geo.circle(0.126,18)},
+            {y:-0.030,pts:Geo.circle(0.132,18)}],MID,
+           {openTop:true,openBottom:true});
+    b.mat('neon',0.9);
+    b.push();b.translate(0.128,0.098,0.030);
+    b.sphere(0,0,0,0.020,9,7,LIT);b.pop();
+  },
+  partyhat:function(b){
+    b.push();b.translate(0.030,0,0);b.rotate(0,0,-0.18);
+    b.cylinder(0,0.130,0,0.088,0.008,0.240,16,LIT);
+    b.pop();
+    b.push();b.translate(0.074,0.256,0);
+    b.sphere(0,0,0,0.036,12,10,MID,{squash:0.94});b.pop();
+    /* spots */
+    for(var d2=0;d2<9;d2++){
+      var td=d2/8, ad=d2*2.4;
+      b.push();
+      b.translate(0.030+Math.sin(ad)*0.070*(1-td)+td*0.044,
+                  0.020+td*0.200,Math.cos(ad)*0.072*(1-td));
+      b.sphere(0,0,0,0.014,7,6,MID,{squash:0.8});b.pop();
+    }
+  },
+  headphones:function(b){
+    b.mat('panel');
+    /* the band, as an arc of beads over the crown */
+    for(var i3=0;i3<11;i3++){
+      var a3=(-0.95+i3/10*1.90);
+      b.push();
+      b.translate(Math.sin(a3)*0.126,0.108+Math.cos(a3)*0.108,-0.006);
+      b.sphere(0,0,0,0.020,8,7,MID);b.pop();
+    }
+    for(var s6=-1;s6<=1;s6+=2){
+      b.push();b.translate(s6*0.124,0.016,-0.006);b.rotate(0,0,s6*0.06);
+      b.scale(0.44,1.0,1.0);
+      b.sphere(0,0,0,0.070,14,11,LIT,{squash:1.10});
+      b.push();b.translate(s6*0.052,0,0);b.scale(0.36,1.0,1.0);
+      b.sphere(0,0,0,0.058,12,9,DEEP,{squash:1.06});b.pop();
+      b.pop();
+    }
+    b.mat('neon',0.7);
+    for(var s7=-1;s7<=1;s7+=2){
+      b.push();b.translate(s7*0.156,0.016,-0.006);b.scale(0.2,1.0,1.0);
+      b.sphere(0,0,0,0.046,10,8,LIT,{squash:1.06});b.pop();
+    }
+  },
+  antlers:function(b){
+    b.mat('bark');
+    for(var s8=-1;s8<=1;s8+=2){
+      /* a main beam with three tines off it */
+      var beam=[[s8*0.056,0.110,-0.010],[s8*0.086,0.196,-0.030],
+                [s8*0.132,0.262,-0.058],[s8*0.196,0.300,-0.086]];
+      for(var k2=0;k2<beam.length;k2++){
+        b.push();b.translate(beam[k2][0],beam[k2][1],beam[k2][2]);
+        b.sphere(0,0,0,0.026-k2*0.005,9,7,LIT);b.pop();
+      }
+      var tines=[[1,0.30,0.10],[2,0.42,0.16],[3,0.36,0.12]];
+      for(var t2=0;t2<tines.length;t2++){
+        var base=beam[tines[t2][0]];
+        for(var u=0;u<3;u++){
+          b.push();
+          b.translate(base[0]+s8*u*0.012,base[1]+u*tines[t2][1]*0.10,
+                      base[2]-u*tines[t2][2]*0.10);
+          b.sphere(0,0,0,0.017-u*0.004,7,6,MID);b.pop();
+        }
+      }
+    }
+  },
+  bunnyears:function(b){
+    for(var s9=-1;s9<=1;s9+=2){
+      b.push();b.translate(s9*0.056,0.098,-0.012);b.rotate(-0.12,0,s9*0.20);
+      b.scale(0.52,1.0,0.42);
+      b.sphere(0,0.098,0,0.108,14,12,LIT,{squash:1.0});
+      b.push();b.translate(0,0.098,0.052);b.scale(0.72,0.86,0.4);
+      b.sphere(0,0,0,0.092,12,10,'#F2C6CC');b.pop();
+      b.pop();
+    }
+    b.push();b.translate(0,0.056,0);b.scale(1.0,0.42,1.0);
+    b.sphere(0,0,0,0.106,14,10,LIT);b.pop();
+  },
+  catears:function(b){
+    for(var sa=-1;sa<=1;sa+=2){
+      b.push();b.translate(sa*0.070,0.104,-0.004);b.rotate(0,0,sa*0.24);
+      b.extrude([[-0.052,-0.010],[0.052,-0.010],[0,0.104]],0.030,LIT);
+      b.push();b.translate(0,0.006,0.018);
+      b.extrude([[-0.032,-0.006],[0.032,-0.006],[0,0.068]],0.010,'#F2C6CC');
+      b.pop();
+      b.pop();
+    }
+    b.push();b.translate(0,0.052,0);b.scale(1.0,0.36,1.0);
+    b.sphere(0,0,0,0.104,14,10,LIT);b.pop();
+  },
+  ringmaster:function(b){
+    b.push();b.translate(0,0.018,0);
+    b.loft([{y:0,pts:Geo.circle(0.158,20,1.0,1.05)},
+            {y:0.014,pts:Geo.circle(0.162,20,1.0,1.05)}],MID,{});
+    b.pop();
+    b.loft([
+      {y:0.026,pts:Geo.circle(0.108,20,1.0,1.04)},
+      {y:0.196,pts:Geo.circle(0.104,20,1.0,1.04)},
+      {y:0.210,pts:Geo.circle(0.102,20,1.0,1.04)}
+    ],LIT,{openBottom:true});
+    b.mat('gold');
+    b.loft([{y:0.034,pts:Geo.circle(0.112,20,1.0,1.04)},
+            {y:0.076,pts:Geo.circle(0.112,20,1.0,1.04)}],LIT,
+           {openTop:true,openBottom:true});
+    b.push();b.translate(0,0.056,0.114);
+    b.chamfer(0,0,0,0.040,0.040,0.010,LIT,0.010);b.pop();
+  },
   none:function(b){}
 };
 Body.HATS=Object.keys(HAT_BUILD);
@@ -8783,6 +9216,63 @@ var FACE_BUILD={
         if(Math.abs(az)<0.44&&y>-0.074&&y<-0.038)return false;
         if(y>-0.050&&Math.abs(az)<1.05)return false;
         return true;}});
+  },
+  handlebar:function(b){
+    /* A moustache with curled ends, which is the only kind anyone
+       recognises from a silhouette. */
+    for(var s=-1;s<=1;s+=2){
+      for(var i=0;i<7;i++){
+        var t=i/6;
+        b.push();
+        b.translate(s*(0.008+t*0.042),-0.040-Math.sin(t*1.6)*0.010,
+                    0.088-t*0.014);
+        b.sphere(0,0,0,0.011-t*0.003,8,6,i%2?LIT:MID,{squash:0.9});
+        b.pop();
+      }
+      /* the curl */
+      for(var c=0;c<4;c++){
+        var a=c/3*2.4;
+        b.push();
+        b.translate(s*(0.052+Math.sin(a)*0.013),-0.030-Math.cos(a)*0.013,
+                    0.072);
+        b.sphere(0,0,0,0.008,7,6,MID);b.pop();
+      }
+    }
+  },
+  pencil:function(b){
+    b.push();b.translate(0,-0.042,0.088);
+    b.chamfer(0,0,0,0.050,0.005,0.008,MID,0.002,{noBand:true});b.pop();
+  },
+  bushy:function(b){
+    /* A full beard as one mass with a jaw-shaped lower edge. */
+    b.push();b.translate(0,-0.062,0.006);
+    b.loft([{y:-0.076,pts:headSect(0.046,0.058,0.040,18,2.6)},
+            {y:-0.036,pts:headSect(0.070,0.086,0.062,18,2.6)},
+            {y: 0.004,pts:headSect(0.086,0.098,0.080,18,2.5)},
+            {y: 0.030,pts:headSect(0.090,0.100,0.086,18,2.4)}],LIT,
+           {openTop:true,openBottom:true});
+    b.pop();
+    /* the wool: beads over the mass so it is not a smooth shell */
+    var rng=M.rng(41);
+    for(var i=0;i<28;i++){
+      var a=(rng()-0.5)*2.3, yy=-0.110+rng()*0.090;
+      b.push();
+      b.translate(Math.sin(a)*0.082,yy,0.030+Math.cos(a)*0.070);
+      b.sphere(0,0,0,0.014+rng()*0.008,8,6,rng()<0.5?LIT:MID);b.pop();
+    }
+    b.push();b.translate(0,-0.040,0.086);
+    b.chamfer(0,0,0,0.048,0.008,0.010,MID,0.003,{noBand:true});b.pop();
+  },
+  sideburns:function(b){
+    for(var s=-1;s<=1;s+=2){
+      for(var i=0;i<5;i++){
+        var t=i/4;
+        b.push();
+        b.translate(s*(0.080-t*0.006),0.010-t*0.060,-0.004+t*0.010);
+        b.scale(0.5,1.0,1.0);
+        b.sphere(0,0,0,0.022-t*0.006,8,7,i%2?LIT:MID);b.pop();
+      }
+    }
   },
   none:function(b){}
 };
@@ -8897,6 +9387,125 @@ var ACC_BUILD={
     b.push();b.translate(0,-0.092,0.060);
     b.chamfer(0,0,0,0.110,0.020,0.028,MID,0.008,{noBand:true});b.pop();
     b.mat('blank');
+  },
+  monocle:function(b){
+    b.mat('gold');
+    b.push();b.translate(0.037,0.006,0.086);
+    b.loft([{y:0,pts:Geo.circle(0.030,16)},
+            {y:0.006,pts:Geo.circle(0.030,16)}],LIT,
+           {openTop:true,openBottom:true});
+    b.mat('glass',0.10);
+    b.push();b.translate(0,0,-0.002);b.scale(1.0,1.0,0.16);
+    b.sphere(0,0,0,0.029,14,10,LIT);b.pop();
+    b.pop();
+    /* the chain, falling away to the ear */
+    b.mat('gold');
+    for(var i=0;i<7;i++){
+      var t=i/6;
+      b.push();
+      b.translate(0.062+t*0.020,-0.006-t*t*0.070,0.082-t*0.030);
+      b.sphere(0,0,0,0.005,6,5,MID);b.pop();
+    }
+  },
+  bigglasses:function(b){
+    b.mat('blank');
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.037,0.006,0.084);
+      b.loft([{y:0,pts:Geo.circle(0.040,18,1.0,0.86)},
+              {y:0.008,pts:Geo.circle(0.040,18,1.0,0.86)}],DEEP,
+             {openTop:true,openBottom:true});
+      b.mat('glass',0.08);
+      b.push();b.scale(1.0,0.86,0.14);
+      b.sphere(0,0,0,0.038,14,10,LIT);b.pop();
+      b.mat('blank');
+      b.pop();
+    }
+    b.push();b.translate(0,0.006,0.090);
+    b.chamfer(0,0,0,0.024,0.006,0.006,DEEP,0.002,{noBand:true});b.pop();
+    for(var s2=-1;s2<=1;s2+=2){
+      b.push();b.translate(s2*0.070,0.006,0.040);
+      b.chamfer(0,0,0,0.006,0.006,0.080,DEEP,0.002,{noBand:true});b.pop();
+    }
+  },
+  threed:function(b){
+    /* One red lens, one cyan, and a white frame. Nothing else needed. */
+    b.mat('blank');
+    b.push();b.translate(0,0.006,0.086);
+    b.chamfer(0,0,0,0.156,0.036,0.008,'#F6F4F0',0.004);b.pop();
+    b.push();b.translate(-0.037,0.006,0.091);
+    b.chamfer(0,0,0,0.052,0.028,0.004,'#E8483C',0.002,{noBand:true});b.pop();
+    b.push();b.translate(0.037,0.006,0.091);
+    b.chamfer(0,0,0,0.052,0.028,0.004,'#3CC8E8',0.002,{noBand:true});b.pop();
+  },
+  visor2:function(b){
+    b.mat('glass',0.30);
+    b.push();b.translate(0,0.014,0.070);b.scale(1.0,0.44,0.62);
+    b.sphere(0,0,0,0.098,18,12,LIT);b.pop();
+    b.mat('panel');
+    b.push();b.translate(0,0.052,0.062);
+    b.chamfer(0,0,0,0.176,0.018,0.070,MID,0.006);b.pop();
+  },
+  clownnose:function(b){
+    b.mat('blank');
+    b.push();b.translate(0,-0.030,0.104);
+    b.sphere(0,0,0,0.034,14,11,'#E8483C');b.pop();
+  },
+  fangs:function(b){
+    b.mat('blank');
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.016,-0.066,0.086);b.rotate(0.1,0,s*0.06);
+      b.cylinder(0,0,0,0.007,0.001,0.024,7,'#F6F4F0');b.pop();
+    }
+  },
+  ninjamask:function(b){
+    b.mat('fabric');
+    /* A band round the lower face and a hood over the crown, with the
+       eye slot cut by simply leaving a gap between them. */
+    b.push();b.translate(0,-0.052,0.006);b.scale(1.02,1.0,1.02);
+    b.loft([{y:-0.052,pts:headSect(0.058,0.070,0.062,18,2.6)},
+            {y:0.000,pts:headSect(0.082,0.094,0.092,18,2.5)},
+            {y:0.030,pts:headSect(0.090,0.100,0.100,18,2.4)}],LIT,
+           {openTop:true,openBottom:true});
+    b.pop();
+    b.push();b.translate(0,0.062,0);b.scale(1.03,1.0,1.03);
+    b.loft([{y:0.000,pts:headSect(0.090,0.102,0.104,18,2.3)},
+            {y:0.052,pts:headSect(0.088,0.098,0.106,18,2.2)},
+            {y:0.086,pts:headSect(0.070,0.072,0.086,18,2.1)}],LIT,
+           {openBottom:true});
+    b.pop();
+    /* the tie, hanging behind */
+    b.push();b.translate(-0.020,0.070,-0.104);b.rotate(0.3,0,0.2);
+    b.chamfer(0,0,0,0.020,0.130,0.010,MID,0.004,{noBand:true});b.pop();
+  },
+  burglar:function(b){
+    b.mat('fabric');
+    b.push();b.translate(0,0.012,0.058);b.scale(1.0,1.0,1.0);
+    b.loft([{y:-0.016,pts:headSect(0.086,0.042,0.088,18,2.4)},
+            {y: 0.034,pts:headSect(0.090,0.044,0.092,18,2.3)}],DEEP,
+           {openTop:true,openBottom:true});
+    b.pop();
+  },
+  warpaint:function(b){
+    b.mat('blank');
+    for(var s=-1;s<=1;s+=2){
+      for(var i=0;i<3;i++){
+        b.push();
+        b.translate(s*(0.052+i*0.013),-0.012,0.080);
+        b.rotate(0,-s*0.5,0);
+        b.chamfer(0,0,0,0.007,0.044,0.004,'#C4382E',0.001,{noBand:true});
+        b.pop();
+      }
+    }
+  },
+  snorkel:function(b){
+    b.mat('blank');
+    b.push();b.translate(0,0.010,0.078);b.scale(1.0,0.60,0.44);
+    b.sphere(0,0,0,0.086,16,12,'#3CC8E8');b.pop();
+    b.push();b.translate(0,0.010,0.070);
+    b.chamfer(0,0,0,0.168,0.088,0.030,MID,0.010,{noBand:true});b.pop();
+    /* the tube, up the side of the head */
+    b.push();b.translate(0.086,0.070,0.020);b.rotate(-0.16,0,0.10);
+    b.cylinder(0,0,0,0.014,0.014,0.190,10,LIT);b.pop();
   },
   none:function(b){}
 };
@@ -9039,6 +9648,100 @@ var WING_BUILD={
       b.sphere(0,0,0,0.020+rng()*0.030,7,6,LIT,{squash:1.4});
       b.pop();
     }
+  },
+  rainbow:function(b){
+    /* Six panes in a fan, each its own hue, each one thin enough that
+       the one behind shows through the gap rather than being hidden. */
+    var HUE=['#FF5A6E','#FFA23C','#FFE04D','#5BD98A','#4FB8FF','#B269FF'];
+    b.mat('blank',0.30);
+    for(var i=0;i<6;i++){
+      var t=i/5;
+      b.push();
+      b.translate(0.10+t*0.16,-0.06+t*0.30,-0.006-t*0.008);
+      b.rotate(0,0,-0.20-t*0.62);
+      b.extrude([[0,-0.046],[M.lerp(0.26,0.60,t),-0.020],
+                 [M.lerp(0.26,0.60,t),0.020],[0,0.046]],0.014,HUE[i]);
+      b.pop();
+    }
+  },
+  phoenix:function(b){
+    b.mat('blank',0.85);
+    /* Feathers that get longer and hotter toward the tip. The colour
+       ramp is the item — a phoenix wing that is one orange is a leaf. */
+    var RAMP=['#FFF0B8','#FFC44D','#FF8A2B','#F2521E','#C42A16'];
+    for(var i=0;i<9;i++){
+      var t=i/8;
+      b.push();
+      b.translate(0.08+t*0.22,-0.10+t*0.40,-0.004-t*0.012);
+      b.rotate(0,0,-0.14-t*0.80);
+      b.extrude([[0,-0.040],[M.lerp(0.24,0.72,t),-0.014],
+                 [M.lerp(0.28,0.80,t),0],
+                 [M.lerp(0.24,0.72,t),0.014],[0,0.040]],0.016,
+                RAMP[Math.min(4,(t*5)|0)]);
+      b.pop();
+    }
+  },
+  devil:function(b){
+    b.mat('blank');
+    /* Bat frame with a barbed trailing edge: three spurs off the
+       membrane are what separate a devil wing from a bat one. */
+    var fing=[[-0.08,0.36,0.72],[0.12,0.16,0.80],[0.30,-0.10,0.62]];
+    b.push();b.rotate(0,0,-0.24);
+    b.limb(0.24,0.032,0.018,DEEP,{seg:6,steps:3,joint:false});
+    b.pop();
+    for(var i=0;i<3;i++){
+      var f=fing[i];
+      b.push();b.translate(0.14,0.02,0);b.rotate(0,0,f[0]);
+      b.cylinder(f[2]/2,f[1]/2,0,0.015,0.006,f[2],7,DEEP,{open:true});
+      b.pop();
+    }
+    b.push();b.translate(0.42,0.10,-0.004);
+    b.extrude([[-0.30,-0.32],[0.36,-0.12],[0.30,0.28],[-0.24,0.32]],0.008,MID);
+    b.pop();
+    for(var q=0;q<3;q++){
+      b.push();b.translate(0.62-q*0.16,-0.16+q*0.20,0);b.rotate(0,0,0.5-q*0.4);
+      b.extrude([[0,-0.026],[0.10,0],[0,0.026]],0.010,DEEP);
+      b.pop();
+    }
+  },
+  bubble:function(b){
+    b.mat('glass',0.22);
+    for(var i=0;i<7;i++){
+      var t=i/6;
+      b.push();
+      b.translate(0.14+t*0.26,-0.06+t*0.34,-0.004);
+      b.scale(1.0,1.0,0.34);
+      b.sphere(0,0,0,0.13-t*0.055,12,10,LIT);
+      b.pop();
+    }
+  },
+  parrot:function(b){
+    b.mat('blank');
+    var HUE=['#3BC96B','#FFD24D','#FF7A3C','#E8442E'];
+    for(var i=0;i<8;i++){
+      var t=i/7;
+      b.push();
+      b.translate(0.10+t*0.18,-0.08+t*0.34,-0.005-t*0.010);
+      b.rotate(0,0,-0.18-t*0.70);
+      b.extrude([[0,-0.042],[M.lerp(0.26,0.62,t),-0.016],
+                 [M.lerp(0.26,0.62,t),0.016],[0,0.042]],0.015,
+                HUE[i%4]);
+      b.pop();
+    }
+  },
+  jet:function(b){
+    b.mat('panel');
+    /* A swept delta with an engine under it, which is a jetpack read
+       as a wing rather than as a backpack. */
+    b.push();b.translate(0.34,0.10,-0.010);b.rotate(0,0,-0.30);
+    b.extrude([[-0.28,-0.10],[0.34,-0.04],[0.28,0.14],[-0.24,0.16]],0.024,LIT);
+    b.pop();
+    b.push();b.translate(0.20,-0.06,-0.030);b.rotate(0,0,-0.18);
+    b.cylinder(0,0,0,0.056,0.048,0.240,12,MID);
+    b.pop();
+    b.mat('neon',1.0);
+    b.push();b.translate(0.14,-0.16,-0.030);
+    b.sphere(0,0,0,0.042,10,8,LIT,{squash:1.5});b.pop();
   },
   none:function(b){}
 };
@@ -9348,27 +10051,61 @@ Cos.overlay=function(style,build){
    Skinned to the shoulders at the clasp and to the pelvis at the hem,
    so it hangs from the collarbone and swings with the hips rather than
    rotating rigidly about the sternum. */
+/* ---------------- capes ----------------
+   There was one cape with a different clasp on it. A cape is defined
+   by three things — where it stops, how much cloth is in it, and what
+   the hem does — so those are the table, and each style is a row.
+
+   `hem` is what happens to the bottom edge: 0 straight, 1 cut into
+   points, 2 torn into ragged strips. `trim` is a band of a second
+   material at the edge, which is most of what separates a royal cape
+   from a length of red cloth. */
+var CAPE_BUILD={
+  plain:   {lo:0.640,w:0.290,mat:'fabric',clasp:'panel',hem:0,fold:0.050},
+  royal:   {lo:0.360,w:0.360,mat:'fabric',clasp:'gold', hem:0,fold:0.060,
+            trim:'gold',collar:1},
+  hero:    {lo:0.520,w:0.320,mat:'fabric',clasp:'gold', hem:0,fold:0.030},
+  vampire: {lo:0.400,w:0.340,mat:'fabric',clasp:'gold', hem:1,fold:0.045,
+            collar:2,inner:'#7A1424'},
+  shadow:  {lo:0.480,w:0.300,mat:'fabric',clasp:'panel',hem:2,fold:0.070},
+  tattered:{lo:0.560,w:0.270,mat:'fabric',clasp:'panel',hem:2,fold:0.090},
+  crystal: {lo:0.620,w:0.280,mat:'crystal',clasp:'crystal',hem:1,fold:0.020,
+            emis:0.35},
+  blanket: {lo:0.700,w:0.330,mat:'fabric',clasp:'fabric',hem:0,fold:0.080}
+};
+Cos.CAPES=Object.keys(CAPE_BUILD);
 Cos.cape=function(style,build){
-  style=style||'plain';
+  style=CAPE_BUILD[style]?style:'plain';
   build=build||'base';
+  var C=CAPE_BUILD[style];
   return Body.skinPart('cape:'+style+':'+build,function(b){
-    b.mat('fabric');
+    b.mat(C.mat,C.emis||0);
     /* The cape's own numbers were fixed, so on a broad body its
        shoulders sat inside the shoulders it was hanging from. */
     var cg=Body.girth(build)*Body.overFit(build);
-    var n=16,steps=9,secs=[];
+    var n=20,steps=11,secs=[];
     for(var i=0;i<=steps;i++){
       var t=i/steps;
-      var y=M.lerp(1.470,0.640,t);
-      var w=M.lerp(0.150*cg,0.290*cg,Math.pow(t,0.85));
-      var d=M.lerp(0.100*cg,0.190*cg,t);
+      var y=M.lerp(1.470,C.lo,t);
+      var w=M.lerp(0.150*cg,C.w*cg,Math.pow(t,0.85));
+      var d=M.lerp(0.100*cg,C.w*0.66*cg,t);
       var pts=Body.sect(w,d,d,n,2.3);
       for(var j=0;j<pts.length;j++){
         /* keep the back: a cape does not wrap the chest */
         if(pts[j][1]>0)pts[j][1]*=0.14;
         else pts[j][1]-=0.030*t;
-        pts[j][0]*=1+Math.sin(j*2.4)*0.050*t;
-        pts[j][1]*=1+Math.cos(j*2.4)*0.060*t;
+        /* the fold. More of it makes heavier cloth: a blanket cape has
+           deep slow folds, a crystal one has almost none. */
+        pts[j][0]*=1+Math.sin(j*2.4)*C.fold*t;
+        pts[j][1]*=1+Math.cos(j*2.4)*C.fold*1.2*t;
+      }
+      /* the hem, on the last ring only */
+      if(i===steps&&C.hem){
+        for(var h=0;h<pts.length;h++){
+          var cut=C.hem===1?(h%2?0.90:1.0)
+                           :(0.72+((h*7)%5)*0.07);
+          pts[h][0]*=cut;pts[h][1]*=cut;
+        }
       }
       var sk=t<0.18?[Bn.chest,0.6,Bn.neck,0.4]
             :(t<0.55?[Bn.chest,0.5,Bn.spine2,0.5]
@@ -9377,20 +10114,49 @@ Cos.cape=function(style,build){
         col:i<2?MID:(i>steps-2?LOW:LIT)});
     }
     b.loft(secs,LIT,{openTop:true,openBottom:true,uvScale:1.6});
+    /* the trim, a band of a second material round the hem */
+    if(C.trim){
+      b.mat(C.trim);
+      var last=secs[secs.length-1];
+      b.skin(Bn.spine,0.4,Bn.hips,0.6);
+      b.loft([{y:last.y+0.030,pts:last.pts},
+              {y:last.y,pts:last.pts}],LIT,
+             {openTop:true,openBottom:true,uvScale:2});
+    }
+    /* a standing collar, for the styles that have one */
+    if(C.collar){
+      b.mat(C.mat);
+      b.skin(Bn.neck,0.6,Bn.chest,0.4);
+      var cw=0.108*cg, ch=C.collar===2?0.150:0.086;
+      var clo=Body.sect(cw,cw*0.72,cw*0.80,16,2.2);
+      var chi=Body.sect(cw*1.42,cw*1.05,cw*1.18,16,2.2);
+      for(var k=0;k<chi.length;k++)if(chi[k][1]>0)chi[k][1]*=0.30;
+      b.loft([{y:1.428,pts:clo},{y:1.428+ch,pts:chi}],
+             C.inner||MID,{openTop:true,openBottom:true});
+    }
     /* clasp across the collarbone */
-    b.mat(style==='royal'?'gold':'panel');
+    b.mat(C.clasp);
     b.skin(Bn.chest,0.6,Bn.neck,0.4);
     b.push();b.translate(0,1.462,0.086);
     b.chamfer(0,0,0,0.120,0.022,0.026,LIT,0.008,{noBand:true});
-    b.sphere(0,0,0.018,0.020,10,8,MID);
+    b.sphere(0,0,0.018,0.022,12,9,MID);
     b.pop();
   });
 };
 
-Cos.backpack=function(style,build){
-  style=style||'satchel';
-  build=build||'base';
-  return Body.skinPart('back:'+style+':'+build,function(b){
+/* ---------------- worn on the back ----------------
+   Everything here shares two straps over the shoulders and differs
+   in what hangs off them, which is also how a real one is designed. */
+function backStraps(b,w,z){
+  for(var s=-1;s<=1;s+=2){
+    b.skin(s>0?Bn.shoulderL:Bn.shoulderR,0.5,Bn.chest,0.5);
+    b.push();b.translate(s*0.082,1.370,z===undefined?-0.020:z);
+    b.rotate(0.16,0,0);
+    b.chamfer(0,0,0,w||0.040,0.210,0.140,MID,0.012);b.pop();
+  }
+}
+var BACK_BUILD={
+  satchel:function(b){
     b.mat('fabric');
     b.skin(Bn.spine2,0.6,Bn.chest,0.4);
     b.push();b.translate(0,1.250,-0.212);
@@ -9402,12 +10168,154 @@ Cos.backpack=function(style,build){
     b.push();b.translate(0,0,0.066);
     b.chamfer(0,0,0,0.196,0.078,0.018,DARK,0.007,{noBand:true});b.pop();
     b.pop();
-    /* shoulder straps */
+    backStraps(b);
+  },
+  rucksack:function(b){
+    b.mat('fabric');
+    b.skin(Bn.spine2,0.6,Bn.chest,0.4);
+    b.push();b.translate(0,1.270,-0.226);
+    b.chamfer(0,0,0,0.250,0.330,0.150,LIT,0.040);
+    /* a bedroll strapped across the top, and side pockets */
+    b.push();b.translate(0,0.190,0.010);b.rotate(0,0,Math.PI/2);
+    b.cylinder(0,0,0,0.052,0.052,0.240,12,MID);b.pop();
     for(var s=-1;s<=1;s+=2){
-      b.skin(s>0?Bn.shoulderL:Bn.shoulderR,0.5,Bn.chest,0.5);
-      b.push();b.translate(s*0.082,1.370,-0.020);b.rotate(0.16,0,0);
-      b.chamfer(0,0,0,0.040,0.210,0.140,MID,0.012);b.pop();
+      b.push();b.translate(s*0.140,-0.040,0.010);
+      b.chamfer(0,0,0,0.060,0.150,0.110,MID,0.016);b.pop();
     }
+    b.pop();
+    backStraps(b,0.048);
+  },
+  jetpack:function(b){
+    b.mat('panel');
+    b.skin(Bn.spine2,0.6,Bn.chest,0.4);
+    b.push();b.translate(0,1.280,-0.208);
+    b.chamfer(0,0,0,0.190,0.240,0.100,LIT,0.026);
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.120,-0.020,-0.010);
+      b.cylinder(0,0,0,0.062,0.058,0.320,14,LIT);
+      b.push();b.translate(0,-0.176,0);
+      b.cylinder(0,0,0,0.050,0.070,0.060,14,MID);b.pop();
+      b.pop();
+    }
+    b.pop();
+    b.mat('neon',1.0);
+    for(var s2=-1;s2<=1;s2+=2){
+      b.push();b.translate(s2*0.120,1.060,-0.218);
+      b.sphere(0,0,0,0.046,10,8,LIT,{squash:1.7});b.pop();
+    }
+    b.mat('panel');
+    backStraps(b,0.044);
+  },
+  astronaut:function(b){
+    b.mat('panelw');
+    b.skin(Bn.spine2,0.6,Bn.chest,0.4);
+    b.push();b.translate(0,1.280,-0.222);
+    b.chamfer(0,0,0,0.270,0.320,0.140,LIT,0.044);
+    b.mat('panel');
+    b.push();b.translate(0,0.060,0.020);
+    b.chamfer(0,0,0,0.220,0.070,0.150,MID,0.018);b.pop();
+    b.mat('neon',0.8);
+    b.push();b.translate(0.076,-0.090,0.076);
+    b.sphere(0,0,0,0.024,9,7,'#4FD8FF');b.pop();
+    b.push();b.translate(-0.076,-0.090,0.076);
+    b.sphere(0,0,0,0.024,9,7,'#FFC44D');b.pop();
+    b.pop();
+    b.mat('fabric');
+    backStraps(b,0.050);
+  },
+  quiver:function(b){
+    b.mat('fabric');
+    b.skin(Bn.spine2,0.6,Bn.chest,0.4);
+    b.push();b.translate(0.090,1.270,-0.190);b.rotate(0.10,0,-0.34);
+    b.cylinder(0,0,0,0.070,0.060,0.360,14,LIT);
+    /* arrows: shafts with fletching, poking out of the top */
+    b.mat('bark');
+    for(var i=0;i<6;i++){
+      var a=i/6*M.TAU;
+      b.push();b.translate(Math.cos(a)*0.030,0.150,Math.sin(a)*0.030);
+      b.cylinder(0,0,0,0.006,0.006,0.180,6,LIT);
+      b.push();b.translate(0,0.100,0);
+      b.extrude([[-0.004,-0.030],[0.004,-0.030],[0.004,0.030],[-0.004,0.030]],
+                0.024,'#D8DDE4');b.pop();
+      b.pop();
+    }
+    b.pop();
+    b.mat('fabric');
+    backStraps(b,0.036,-0.010);
+  },
+  guitar:function(b){
+    b.mat('planks');
+    b.skin(Bn.spine2,0.6,Bn.chest,0.4);
+    b.push();b.translate(-0.020,1.180,-0.206);b.rotate(0,0,0.30);
+    /* body: two lobes, which is what makes it a guitar and not a plank */
+    b.push();b.translate(0,-0.070,0);b.scale(1.0,1.0,0.34);
+    b.sphere(0,0,0,0.185,16,12,LIT);b.pop();
+    b.push();b.translate(0,0.090,0);b.scale(1.0,1.0,0.32);
+    b.sphere(0,0,0,0.150,16,12,LIT);b.pop();
+    b.push();b.translate(0,-0.020,0.058);
+    b.sphere(0,0,0,0.050,12,9,'#241C18',{squash:0.30});b.pop();
+    b.mat('bark');
+    b.push();b.translate(0,0.330,0);
+    b.chamfer(0,0,0,0.060,0.420,0.040,MID,0.010);b.pop();
+    b.push();b.translate(0,0.560,0.010);
+    b.chamfer(0,0,0,0.080,0.100,0.036,LIT,0.012);b.pop();
+    b.pop();
+    b.mat('fabric');
+    backStraps(b,0.034,-0.006);
+  },
+  basket:function(b){
+    b.mat('bark');
+    b.skin(Bn.spine2,0.6,Bn.chest,0.4);
+    b.push();b.translate(0,1.240,-0.216);
+    b.loft([{y:-0.150,pts:Geo.circle(0.130,16)},
+            {y: 0.150,pts:Geo.circle(0.170,16)}],LIT,{openTop:true});
+    /* the weave, as three bands round it */
+    for(var w=0;w<3;w++){
+      var yy=-0.100+w*0.100;
+      b.loft([{y:yy,pts:Geo.circle(0.140+w*0.013,16)},
+              {y:yy+0.028,pts:Geo.circle(0.140+w*0.013,16)}],MID,
+             {openTop:true,openBottom:true});
+    }
+    /* the handle */
+    for(var h=0;h<9;h++){
+      var ah=(-1.0+h/8*2.0);
+      b.push();
+      b.translate(Math.sin(ah)*0.150,0.150+Math.cos(ah)*0.150,0);
+      b.sphere(0,0,0,0.018,7,6,MID);b.pop();
+    }
+    b.pop();
+    b.mat('fabric');
+    backStraps(b,0.034);
+  },
+  ecto:function(b){
+    b.mat('panel');
+    b.skin(Bn.spine2,0.6,Bn.chest,0.4);
+    b.push();b.translate(0,1.270,-0.216);
+    b.chamfer(0,0,0,0.230,0.300,0.130,LIT,0.030);
+    /* a tank, a coil and a dial: the pack that catches ghosts */
+    b.push();b.translate(-0.076,0.020,0.086);
+    b.cylinder(0,0,0,0.052,0.052,0.220,12,MID);b.pop();
+    b.mat('neon',0.9);
+    b.push();b.translate(0.078,0.040,0.086);
+    b.sphere(0,0,0,0.052,12,10,'#7FE86A',{squash:0.9});b.pop();
+    b.mat('gold');
+    for(var c=0;c<5;c++){
+      b.push();b.translate(0.078,-0.070+c*0.026,0.086);
+      b.loft([{y:0,pts:Geo.circle(0.056,12)},
+              {y:0.010,pts:Geo.circle(0.056,12)}],LIT,
+             {openTop:true,openBottom:true});b.pop();
+    }
+    b.pop();
+    b.mat('fabric');
+    backStraps(b,0.046);
+  }
+};
+Cos.BACKS=Object.keys(BACK_BUILD);
+Cos.backpack=function(style,build){
+  style=BACK_BUILD[style]?style:'satchel';
+  build=build||'base';
+  return Body.skinPart('back:'+style+':'+build,function(b){
+    BACK_BUILD[style](b);
   });
 };
 
@@ -9662,6 +10570,108 @@ var TOOL_BUILD={
     b.push();b.translate(0.366,0,0);b.rotate(0,0,Math.PI/2);
     b.cylinder(0,0,0,0.020,0.020,0.006,10,LIT);b.pop();
   },
+  staff:function(b){
+    b.mat('bark');
+    b.cylinder(0,0.28,0,0.020,0.017,0.86,10,LIT);
+    b.mat('crystal',0.55);
+    b.push();b.translate(0,0.74,0);
+    b.sphere(0,0,0,0.062,14,11,LIT,{squash:0.94});b.pop();
+    b.mat('bark');
+    for(var i=0;i<5;i++){
+      var a=i/5*M.TAU;
+      b.push();b.translate(Math.cos(a)*0.048,0.700,Math.sin(a)*0.048);
+      b.rotate(0,0,Math.cos(a)*0.4);
+      b.sphere(0,0,0,0.017,8,6,MID);b.pop();
+    }
+  },
+  bow:function(b){
+    b.mat('bark');
+    /* the limbs, as an arc of beads, and one straight string */
+    for(var i=0;i<15;i++){
+      var t=i/14, a=(-1.15+t*2.30);
+      b.push();
+      b.translate(Math.sin(a)*0.150-0.150,0.30+Math.cos(a)*0.480,0);
+      b.sphere(0,0,0,0.020-Math.abs(t-0.5)*0.016,8,6,t<0.5?LIT:MID);
+      b.pop();
+    }
+    b.mat('fabric');
+    b.push();b.translate(-0.150,0.300,0);
+    b.cylinder(0,0,0,0.005,0.005,0.870,6,'#E8E2D6');b.pop();
+    b.mat('gold');
+    b.push();b.translate(-0.150,0.300,0);
+    b.chamfer(0,0,0,0.036,0.090,0.032,LIT,0.008);b.pop();
+  },
+  hammer:function(b){
+    b.mat('bark');
+    b.cylinder(0,0.22,0,0.021,0.018,0.62,10,LIT);
+    b.mat('panel');
+    b.push();b.translate(0,0.58,0);b.rotate(0,0,Math.PI/2);
+    b.cylinder(0,0,0,0.070,0.062,0.190,12,LIT);b.pop();
+    b.push();b.translate(0,0.58,0);
+    b.chamfer(0,0,0,0.210,0.104,0.108,MID,0.014);b.pop();
+  },
+  shovel:function(b){
+    b.mat('bark');
+    b.cylinder(0,0.30,0,0.019,0.016,0.66,10,LIT);
+    b.push();b.translate(0,0.660,0);
+    b.chamfer(0,0,0,0.090,0.060,0.024,MID,0.010);b.pop();
+    b.mat('panel');
+    b.push();b.translate(0,-0.060,0.010);b.rotate(0.10,0,0);
+    b.extrude([[-0.078,-0.110],[0.078,-0.110],[0.086,0.070],[-0.086,0.070]],
+              0.016,LIT);
+    b.pop();
+  },
+  umbrella:function(b){
+    b.mat('bark');
+    b.cylinder(0,0.26,0,0.014,0.012,0.72,8,MID);
+    b.push();b.translate(0,-0.120,0.028);b.rotate(0.9,0,0);
+    b.cylinder(0,0,0,0.014,0.012,0.090,8,MID);b.pop();
+    b.mat('fabric');
+    /* eight panels rather than a cone, so the edge is scalloped */
+    for(var i=0;i<8;i++){
+      var a=i/8*M.TAU;
+      b.push();b.translate(0,0.560,0);b.rotate(0,a,0);
+      b.extrude([[0,0],[0.150,-0.170],[0.190,-0.150],[0.040,0.030]],
+                0.010,i%2?LIT:MID);
+      b.pop();
+    }
+    b.push();b.translate(0,0.620,0);
+    b.sphere(0,0,0,0.024,10,8,MID);b.pop();
+  },
+  wand:function(b){
+    b.mat('bark');
+    b.cylinder(0,0.16,0,0.012,0.008,0.34,8,LIT);
+    b.mat('neon',1.0);
+    b.push();b.translate(0,0.350,0);
+    /* a five-pointed star, as five wedges from a hub */
+    for(var i=0;i<5;i++){
+      b.push();b.rotate(0,0,i/5*M.TAU);
+      b.extrude([[-0.020,0],[0.020,0],[0,0.086]],0.014,LIT);
+      b.pop();
+    }
+    b.pop();
+  },
+  shield:function(b){
+    b.mat('panel');
+    b.push();b.translate(0,0.28,0);
+    b.loft([{y:-0.230,pts:Geo.roundRect(0.070,0.050,0.030,10)},
+            {y:-0.090,pts:Geo.roundRect(0.290,0.070,0.050,12)},
+            {y: 0.130,pts:Geo.roundRect(0.330,0.076,0.060,12)},
+            {y: 0.230,pts:Geo.roundRect(0.280,0.070,0.055,12)}],LIT,{});
+    b.mat('gold');
+    b.push();b.translate(0,0.020,0.044);
+    b.sphere(0,0,0,0.060,14,10,LIT,{squash:0.42});b.pop();
+    b.pop();
+  },
+  flashlight:function(b){
+    b.mat('panel');
+    b.cylinder(0,0.10,0,0.028,0.026,0.220,10,LIT);
+    b.push();b.translate(0,0.230,0);
+    b.cylinder(0,0,0,0.030,0.048,0.070,12,MID);b.pop();
+    b.mat('neon',1.0);
+    b.push();b.translate(0,0.264,0);b.scale(1.0,0.3,1.0);
+    b.sphere(0,0,0,0.046,12,9,'#FFF0C0');b.pop();
+  },
   none:function(b){}
 };
 Cos.TOOLS=Object.keys(TOOL_BUILD);
@@ -9727,6 +10737,148 @@ var PET_BUILD={
       b.sphere(0,0,0,0.026,6,5,LIT);b.pop();
     }
     b.pop();
+  },
+  bunny:function(b){
+    b.mat('blank');
+    b.push();b.translate(0,0.13,0);b.scale(1.0,1.0,1.25);
+    b.sphere(0,0,0,0.115,14,11,LIT);b.pop();
+    b.push();b.translate(0,0.235,0.105);
+    b.sphere(0,0,0,0.088,14,11,LIT,{squash:0.94});
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.035,0.090,-0.014);b.rotate(-0.16,0,s*0.16);
+      b.scale(0.46,1.0,0.40);
+      b.sphere(0,0.075,0,0.070,10,9,LIT);
+      b.push();b.translate(0,0.075,0.038);b.scale(0.7,0.86,0.4);
+      b.sphere(0,0,0,0.058,9,7,'#F2C6CC');b.pop();
+      b.pop();
+    }
+    b.sphere(0,-0.014,0.074,0.017,8,6,'#F2C6CC');
+    b.sphere(-0.030,0.014,0.070,0.013,7,6,'#241C22');
+    b.sphere( 0.030,0.014,0.070,0.013,7,6,'#241C22');
+    b.pop();
+    for(var i=0;i<4;i++){
+      b.push();b.translate((i<2?0.052:-0.052),0.036,(i%2?0.062:-0.070));
+      b.sphere(0,0,0,0.038,8,7,MID,{squash:1.1});b.pop();
+    }
+    b.push();b.translate(0,0.150,-0.128);
+    b.sphere(0,0,0,0.048,10,9,'#F6F4F0');b.pop();
+  },
+  slime:function(b){
+    b.mat('crystal',0.32);
+    /* Three stacked domes with a wobble, so it reads as something that
+       would move if you poked it. */
+    b.push();b.translate(0,0.090,0);b.scale(1.16,1.0,1.10);
+    b.sphere(0,0,0,0.145,16,12,LIT,{squash:0.78});b.pop();
+    b.push();b.translate(0.020,0.180,-0.010);b.scale(1.0,1.0,0.94);
+    b.sphere(0,0,0,0.090,14,11,LIT,{squash:0.86});b.pop();
+    b.mat('blank');
+    b.push();b.translate(-0.042,0.120,0.108);
+    b.sphere(0,0,0,0.026,9,8,'#141018',{squash:0.9});b.pop();
+    b.push();b.translate(0.042,0.120,0.108);
+    b.sphere(0,0,0,0.026,9,8,'#141018',{squash:0.9});b.pop();
+  },
+  puppy:function(b){
+    b.mat('blank');
+    b.loft([
+      {y:0.075,pts:Geo.roundRect(0.150,0.250,0.065,12)},
+      {y:0.165,pts:Geo.roundRect(0.180,0.300,0.075,12)},
+      {y:0.225,pts:Geo.roundRect(0.140,0.230,0.060,12)}
+    ],LIT,{});
+    b.push();b.translate(0,0.250,0.150);
+    b.sphere(0,0,0,0.098,14,11,LIT,{squash:0.96});
+    b.push();b.translate(0,-0.026,0.082);b.scale(1.0,0.8,1.2);
+    b.sphere(0,0,0,0.048,10,8,MID);b.pop();
+    b.sphere(0,-0.020,0.128,0.020,8,6,'#241C22');
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.072,0.020,-0.020);b.rotate(0,0,s*0.30);
+      b.scale(0.36,1.0,0.72);
+      b.sphere(0,-0.048,0,0.070,10,8,MID);b.pop();
+    }
+    b.sphere(-0.036,0.022,0.078,0.015,7,6,'#241C22');
+    b.sphere( 0.036,0.022,0.078,0.015,7,6,'#241C22');
+    b.pop();
+    for(var i=0;i<4;i++){
+      b.push();b.translate((i<2?0.062:-0.062),0.036,(i%2?0.100:-0.098));
+      b.cylinder(0,0,0,0.032,0.030,0.110,8,MID);b.pop();
+    }
+    b.push();b.translate(0,0.220,-0.190);b.rotate(-0.9,0,0);
+    b.cylinder(0,0.080,0,0.026,0.016,0.170,8,MID);b.pop();
+  },
+  dragon:function(b){
+    b.mat('blank');
+    b.push();b.translate(0,0.170,0);b.scale(1.0,1.0,1.30);
+    b.sphere(0,0,0,0.120,14,11,LIT);b.pop();
+    b.push();b.translate(0,0.240,0.135);
+    b.scale(1.0,0.86,1.30);
+    b.sphere(0,0,0,0.086,14,11,LIT);b.pop();
+    /* the snout, the horns and the wings */
+    b.push();b.translate(0,0.212,0.230);b.scale(1.0,0.72,1.0);
+    b.sphere(0,0,0,0.052,10,8,MID);b.pop();
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.042,0.310,0.100);b.rotate(-0.4,0,s*0.26);
+      b.cylinder(0,0.040,0,0.018,0.003,0.090,7,MID);b.pop();
+      b.push();b.translate(s*0.090,0.230,-0.040);b.rotate(0,s*0.5,-s*0.4);
+      b.extrude([[0,-0.020],[0.180,-0.090],[0.200,0.060],[0,0.070]],
+                0.012,MID);
+      b.pop();
+    }
+    b.sphere(-0.034,0.256,0.198,0.016,7,6,'#F5C93C');
+    b.sphere( 0.034,0.256,0.198,0.016,7,6,'#F5C93C');
+    for(var i=0;i<4;i++){
+      b.push();b.translate((i<2?0.058:-0.058),0.042,(i%2?0.078:-0.084));
+      b.cylinder(0,0,0,0.030,0.028,0.110,8,MID);b.pop();
+    }
+    /* the tail, tapering back with a spade on the end */
+    for(var t=0;t<6;t++){
+      b.push();b.translate(0,0.150-t*0.012,-0.150-t*0.052);
+      b.sphere(0,0,0,0.052-t*0.007,9,7,LIT);b.pop();
+    }
+    b.push();b.translate(0,0.082,-0.470);b.rotate(0,0,Math.PI/2);
+    b.extrude([[0,-0.040],[0.070,0],[0,0.040]],0.012,MID);b.pop();
+  },
+  penguin:function(b){
+    b.mat('blank');
+    b.push();b.translate(0,0.155,0);b.scale(1.0,1.0,0.90);
+    b.sphere(0,0,0,0.135,16,12,LIT,{squash:0.78});b.pop();
+    b.push();b.translate(0,0.150,0.088);b.scale(0.80,0.94,0.42);
+    b.sphere(0,0,0,0.125,14,11,'#F6F2EA');b.pop();
+    b.push();b.translate(0,0.300,0.014);
+    b.sphere(0,0,0,0.098,14,11,LIT,{squash:0.94});
+    b.push();b.translate(0,-0.014,0.076);b.scale(0.66,0.66,1.0);
+    b.sphere(0,0,0,0.046,10,8,'#F5A03C');b.pop();
+    b.sphere(-0.034,0.024,0.076,0.015,7,6,'#F6F2EA');
+    b.sphere( 0.034,0.024,0.076,0.015,7,6,'#F6F2EA');
+    b.sphere(-0.034,0.024,0.086,0.008,6,5,'#141018');
+    b.sphere( 0.034,0.024,0.086,0.008,6,5,'#141018');
+    b.pop();
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.128,0.150,0);b.rotate(0,0,s*0.20);
+      b.scale(0.26,1.0,0.70);
+      b.sphere(0,0,0,0.098,10,9,LIT);b.pop();
+      b.push();b.translate(s*0.052,0.022,0.030);b.scale(1.0,0.4,1.6);
+      b.sphere(0,0,0,0.040,9,7,'#F5A03C');b.pop();
+    }
+  },
+  seagull:function(b){
+    b.mat('blank');
+    b.push();b.translate(0,0.170,0);b.scale(1.0,0.86,1.40);
+    b.sphere(0,0,0,0.110,14,11,'#F6F4F0');b.pop();
+    b.push();b.translate(0,0.250,0.110);
+    b.sphere(0,0,0,0.072,12,10,'#F6F4F0',{squash:0.96});
+    b.push();b.translate(0,-0.010,0.068);b.scale(0.5,0.5,1.6);
+    b.sphere(0,0,0,0.030,9,7,'#F5A03C');b.pop();
+    b.sphere(-0.028,0.018,0.056,0.012,7,6,'#141018');
+    b.sphere( 0.028,0.018,0.056,0.012,7,6,'#141018');
+    b.pop();
+    for(var s=-1;s<=1;s+=2){
+      b.push();b.translate(s*0.070,0.196,-0.010);b.rotate(0,0,s*0.34);
+      b.extrude([[0,-0.050],[0.230,-0.030],[0.250,0.020],[0,0.060]],
+                0.010,'#D8DDE4');
+      b.pop();
+    }
+    b.push();b.translate(0,0.150,-0.150);b.rotate(-0.5,0,0);
+    b.extrude([[-0.050,0],[0.050,0],[0.030,0.110],[-0.030,0.110]],
+              0.010,'#D8DDE4');b.pop();
   },
   none:function(b){}
 };
@@ -13736,8 +14888,11 @@ var M=LH.M,D={};
 var ITEMS=[], ID={}, BY_CAT={};
 
 /* Categories are the inventory's tabs and the shop's aisles. */
+/* `seed` used to be here. Nothing in this game plants, so it was a
+   tab with no items and no behaviour behind it — a category is a
+   promise about what the game does, and that one was not kept. */
 var CAT=['block','material','tool','weapon','fishing','furniture',
-         'cosmetic','collectible','seed','consumable','quest'];
+         'cosmetic','collectible','consumable','quest'];
 D.CAT=CAT;
 D.RARITY=['','Common','Uncommon','Rare','Epic','Legendary','Mythic'];
 D.RARITY_COL=['','#9AA8BE','#57D07A','#489BFF','#B269FF','#F5A03C','#FF4F7A'];
@@ -13986,9 +15141,25 @@ Fn('trophy',    'Trophy',       5,'gold','#FFFFFF',{shape:'pillar',value:2600});
 
 /* ---------------- cosmetics ----------------
    `slot` and `style` map straight onto the character kit. */
+var DYEABLE_ICON={
+  hair:'#6A4A2E', hat:'#5A6478', shirt:'#C8D0DC', pants:'#454E60',
+  shoes:'#3A3B42', cape:'#8E4A54', back:'#7A5A3C', wings:'#DCE4EE',
+  acc:'#3A4150', facial:'#4A3628', over:'#59616F', pet:'#B49A78',
+  aura:'#7FE4FF', tool:'#C8A47E'
+};
 function Cs(key,name,r,slot,style,o){
   o=o||{};o.cat='cosmetic';o.r=r;o.placeable=false;
   o.props={slot:slot,style:style,col:o.col2||'#FFFFFF',emis:o.cemis||0};
+  /* The icon painter reads `col`, the wardrobe reads `props.col`, and
+     until now only the second was set — so a hundred and seventy
+     cosmetics drew as white silhouettes in a shop that was selling
+     them on their colour.
+
+     A dyeable item keeps white in props.col, because that is what
+     tells the wardrobe to leave your own colour alone; its *icon*
+     gets a typical colour for the slot instead, so a shelf of them is
+     a shelf of things rather than a shelf of blank cards. */
+  o.col=o.col2||o.col||DYEABLE_ICON[slot]||'#FFFFFF';
   return It(key,name,o);
 }
 Cs('h_crop',   'Cropped Hair',   1,'hair','crop');
@@ -14022,6 +15193,341 @@ Cs('p_sprite', 'Lumen Sprite',   6,'pet','sprite',{cemis:1,value:9600});
 Cs('a_ring',   'Ground Ring',    4,'aura','ring',{cemis:1});
 Cs('a_motes',  'Drifting Motes', 5,'aura','motes',{cemis:1,value:5400});
 Cs('a_pillar', 'Pillar of Light',6,'aura','pillar',{cemis:1,value:14000});
+
+/* ============================================================
+   THE CATALOGUE.
+
+   Everything above this line is the game's original hundred-odd
+   items: enough to prove the systems, nowhere near enough to make a
+   shop worth walking into. What follows takes it to a catalogue.
+
+   The model is Growtopia's, and so is the lesson from it. Most of its
+   thousands of items are *families* — twelve solid colours, then the
+   same twelve dark, then the same seven pastel, then the same seven
+   pastel again with a flower on. Nobody hand-wrote those and nobody
+   should: they are one row with a loop round it, and writing them out
+   longhand would be four hundred lines that can drift out of step.
+   What is hand-written is everything where the art actually differs.
+
+   Two rules hold the whole thing together.
+
+   Nothing here is a name with no object behind it. Every clothing row
+   points at a style that exists in a *_BUILD table and has been built
+   and measured; every block points at a material that exists in the
+   texture array. A catalogue of items that do not render is a lie
+   told at scale.
+
+   And prices come from `value` alone, as they always have. The shop
+   marks up, the vendor marks down, the trade window totals — so a new
+   family cannot quietly break the economy, because it cannot set a
+   price in more than one place.
+   ============================================================ */
+
+/* ---------------- the colour families ----------------
+   One ramp, used for blocks, for the dark variants, and for
+   wallpapers, so a red block and a red wallpaper are the same red. */
+var HUES=[
+  ['grey',  'Grey',  '#9AA3AD'],
+  ['black', 'Black', '#2B2F36'],
+  ['white', 'White', '#F2F4F7'],
+  ['red',   'Red',   '#E04B45'],
+  ['orange','Orange','#F08A3C'],
+  ['yellow','Yellow','#F5C93C'],
+  ['green', 'Green', '#5BC45E'],
+  ['aqua',  'Aqua',  '#48C9D8'],
+  ['blue',  'Blue',  '#4A86E8'],
+  ['purple','Purple','#9A5BD8'],
+  ['brown', 'Brown', '#9A7048'],
+  ['steel', 'Steel', '#8792A0']
+];
+/* Darken toward black without going to it: a "dark red" that is
+   nearly black is indistinguishable from a "dark purple" that is. */
+function darker(hex,k){
+  var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),
+      b=parseInt(hex.slice(5,7),16);
+  function c(v){var o=Math.round(v*k);return (o<16?'0':'')+o.toString(16);}
+  return '#'+c(r)+c(g)+c(b);
+}
+function lighter(hex,k){
+  var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),
+      b=parseInt(hex.slice(5,7),16);
+  function c(v){var o=Math.min(255,Math.round(v+(255-v)*k));
+    return (o<16?'0':'')+o.toString(16);}
+  return '#'+c(r)+c(g)+c(b);
+}
+for(var hi=0;hi<HUES.length;hi++){
+  var H=HUES[hi];
+  B(H[0]+'block',      H[1]+' Block',        'concrete',H[2],1);
+  B('dark'+H[0]+'block','Dark '+H[1]+' Block','concrete',darker(H[2],0.52),2);
+  /* Wallpaper is the same colour as a pane rather than a cube. In a
+     side-on world it was a background; here it is a thin wall panel,
+     which is the same job done in three dimensions. */
+  It(H[0]+'paper',H[1]+' Wallpaper',{cat:'block',r:1,shape:'pane',
+    mat:'panelw',col:lighter(H[2],0.30),value:5});
+}
+/* The pastel set, and the same set with a flower on it. Growtopia has
+   both and the second one outsells the first, which is a fact about
+   people rather than about blocks. */
+var PASTEL=[['pink','Pink','#F6B8C8'],['orange','Orange','#F8CFA8'],
+            ['yellow','Yellow','#F6E9A8'],['green','Green','#C2E8B4'],
+            ['aqua','Aqua','#B4E4E8'],['blue','Blue','#B8CCF0'],
+            ['purple','Purple','#D4BCEC']];
+for(var pi=0;pi<PASTEL.length;pi++){
+  var Pp=PASTEL[pi];
+  B('pastel'+Pp[0],       'Pastel '+Pp[1]+' Block','concrete',Pp[2],1);
+  B('pastelflower'+Pp[0], 'Pastel '+Pp[1]+' Flower Block','foliage',Pp[2],2);
+  It('pastel'+Pp[0]+'paper','Pastel '+Pp[1]+' Wallpaper',{cat:'block',r:1,
+    shape:'pane',mat:'panelw',col:Pp[2],value:6});
+}
+
+/* ---------------- themed blocks ----------------
+   Hand-written, because each one is a different material or a
+   different silhouette rather than a different tint. */
+B('candycane',  'Candy Cane Block',  'tilepale','#F2A0A8',2);
+B('chocolate',  'Chocolate Block',   'dirt',    '#7A4A2E',2);
+B('darkchoc',   'Dark Chocolate Block','dirt',  '#4A2C1C',3);
+B('pumpkin',    'Pumpkin Block',     'foliage', '#F08A2C',2);
+B('jackblock',  "Jack O' Block",     'foliage', '#F0A030',3,{emis:0.30});
+B('iceblock',   'Ice',               'glass',   '#C4E8F4',2);
+B('snowflake',  'Snowflake Block',   'snow',    '#EAF4FF',3);
+B('adobe',      'Adobe Block',       'brickpale','#D9A272',1);
+B('sandstone',  'Sandstone',         'sand',    '#E8D4A4',1);
+B('granite',    'Granite Block',     'stone',   '#8E8288',2);
+B('jade',       'Jade Block',        'crystal', '#4FC49A',4);
+B('amber',      'Amber Glass',       'glass',   '#F0A83C',3,{emis:0.18});
+B('redglass',   'Red Glass Block',   'glass',   '#E06058',2,{emis:0.10});
+B('blueglass',  'Blue Glass Block',  'glass',   '#5896E8',2,{emis:0.10});
+B('artdeco',    'Art Deco Block',    'tilepale','#E0C88C',3);
+B('hightech',   'High Tech Block',   'panel',   '#7FA8C8',3,{emis:0.22});
+B('evilbrick',  'Evil Bricks',       'brick',   '#5A2830',3);
+B('boney',      'Boney Block',       'tilepale','#E4DCC8',3);
+B('viney',      'Viney Block',       'foliage', '#4E8A3C',2);
+B('leafblock',  'Leaf Block',        'foliage', '#6FC04E',1);
+B('autumnleaf', 'Autumn Leaf Block', 'foliage', '#E08A34',2);
+B('tigerblock', 'Tiger Block',       'dirt',    '#E8A03C',3);
+B('cloudstone', 'Cloudstone Block',  'panelw',  '#DCE8F4',3);
+B('dreamstone', 'Dreamstone Block',  'crystal', '#B08CE8',4,{emis:0.24});
+B('heartstone', 'Heartstone Block',  'crystal', '#F0567C',4,{emis:0.28});
+B('moonblock',  'Moon Block',        'stone',   '#D8DCE4',3);
+B('sunblock',   'Sun Block',         'gold',    '#FFD24D',4,{emis:0.55});
+B('alienblock', 'Alien Block',       'crystal', '#7FE07A',4,{emis:0.30});
+B('martian',    'Martian Soil',      'dirt',    '#C46A44',2);
+B('marsrock',   'Mars Rock',         'cliff',   '#B4553C',2);
+B('lavarock',   'Lava Rock',         'cliff',   '#5A3030',2,{emis:0.16});
+B('deeprock',   'Deep Rock',         'cliff',   '#6E7480',3);
+B('deepsand',   'Deep Sand',         'sand',    '#C8B488',2);
+B('fossilrock', 'Fossil Rock',       'stone',   '#B0A490',2);
+B('igneous',    'Igneous Rock',      'cliff',   '#4E4A50',3);
+B('ammonite',   'Ammonite Block',    'stone',   '#C0A878',3);
+B('pineappleblk','Pineapple Block',  'foliage', '#F0C43C',3);
+B('churro',     'Churro Block',      'planks',  '#D89A50',2);
+B('pinatablock','Pinata Block',      'fabric',  '#F06AA0',3);
+B('celtic',     'Celtic Block',      'stone',   '#5A9A62',3);
+B('rainbowblk', 'Rainbow Block',     'crystal', '#F07CC0',4,{emis:0.34});
+B('glowyblock', 'Glowy Block',       'neon',    '#9FF0C4',4,{emis:0.85});
+B('checker',    'Checker Block',     'tile',    '#DCDCDC',2);
+B('polkadot',   'Polka Dot Block',   'tile',    '#F0A8C4',2);
+B('swisscheese','Swiss Cheese Block','tilepale','#F0D060',2);
+B('bubblewrap', 'Bubble Wrap',       'glass',   '#DCE8EC',2);
+B('cardboard',  'Cardboard Box',     'planks',  '#C8A070',1);
+B('crystalblk', 'Crystal Block',     'crystal', '#9FE8F0',4,{emis:0.30});
+B('emeraldblk', 'Emerald Block',     'crystal', '#3CD08A',5,{emis:0.22});
+B('rubyblk',    'Ruby Block',        'crystal', '#E8446A',5,{emis:0.22});
+B('sapphireblk','Sapphire Block',    'crystal', '#4A7CE8',5,{emis:0.22});
+B('topazblk',   'Topaz Block',       'crystal', '#F0B03C',5,{emis:0.22});
+
+/* Number blocks 0-9. Nine rows and a loop, and the reason they exist
+   is that players label their worlds with them. */
+for(var ni=0;ni<10;ni++)
+  B('num'+ni,'Number Block '+ni,'tilepale','#D8DCE4',1,{value:8});
+
+/* ---------------- clothing ----------------
+   One row per style that exists in the geometry, named the way the
+   thing would be named in a shop rather than the way it is named in
+   the code. `col` is the item's own colour, and an item that leaves it
+   white stays dyeable from the wardrobe. */
+function Cw(key,name,r,slot,style,col,o){
+  o=o||{};o.col2=col||'#FFFFFF';
+  return Cs(key,name,r,slot,style,o);
+}
+/* --- headwear --- */
+Cw('hat_top',    'Top Hat',            3,'hat','tophat','#20222A');
+Cw('hat_fedora', 'Fedora',             2,'hat','fedora','#3A3038');
+Cw('hat_cowboy', 'Cowboy Hat',         3,'hat','cowboy','#A4763E');
+Cw('hat_wizard', "Wizard's Hat",       4,'hat','wizard','#4A3C9A');
+Cw('hat_witch',  'Witch Hat',          4,'hat','witch','#2A2038');
+Cw('hat_pirate', 'Pirate Hat',         4,'hat','pirate','#241E28');
+Cw('hat_viking', 'Viking Helmet',      4,'hat','viking','#98A0A8');
+Cw('hat_knight', 'Knight Helmet',      5,'hat','knight','#AEB6C0',{value:3800});
+Cw('hat_santa',  'Santa Hat',          3,'hat','santa','#D8383C');
+Cw('hat_elf',    'Elf Hat',            3,'hat','elf','#3C9A54');
+Cw('hat_chef',   'Chef Hat',           2,'hat','chef','#F4F2EE');
+Cw('hat_straw',  'Straw Hat',          1,'hat','straw','#DCBE78');
+Cw('hat_somb',   'Sombrero',           3,'hat','sombrero','#E8B44C');
+Cw('hat_pith',   'Pith Helmet',        3,'hat','pith','#D8CBA4');
+Cw('hat_ball',   'Football Helmet',    3,'hat','football','#C4483C');
+Cw('hat_space',  'Astronaut Helmet',   5,'hat','spacehelmet','#EAEEF4',
+   {value:4400});
+Cw('hat_party',  'Party Hat',          2,'hat','partyhat','#F05A8C');
+Cw('hat_phones', 'GrowBeats Headphones',4,'hat','headphones','#2E3440',
+   {cemis:0.5});
+Cw('hat_antler', 'Antler Hat',         3,'hat','antlers','#8A6A48');
+Cw('hat_bunny',  'Bunny Ears',         2,'hat','bunnyears','#F4F0EC');
+Cw('hat_cat',    'Meow Ears',          2,'hat','catears','#3A3238');
+Cw('hat_ring',   'Ringmaster Hat',     5,'hat','ringmaster','#8A2434',
+   {value:4200});
+/* --- hair. Item-only, as it has been since the roster was built --- */
+Cw('h_bowl',     'Bowl Cut',           1,'hair','bowl');
+Cw('h_pixie',    'Pixie Cut',          1,'hair','pixie');
+Cw('h_mop',      'Messy Brown Hair',   2,'hair','mop','#6A4A2E');
+Cw('h_undercut', 'Undercut',           2,'hair','undercut');
+Cw('h_bolt',     'Spikey Hair',        3,'hair','bolt');
+Cw('h_flame',    'Shocking Hair',      4,'hair','flame','#F0703C');
+Cw('h_mohawk',   'Purple Mohawk',      3,'hair','mohawk','#9A4BD8');
+Cw('h_veil',     'Malevolent Hair',    4,'hair','veil','#1E1A24');
+Cw('h_wave',     'Long Brown Hair',    2,'hair','wave','#6A4630');
+Cw('h_afro',     'Afro',               2,'hair','afro');
+Cw('h_curls',    'Kansas Curls',       2,'hair','curls');
+Cw('h_locs',     'Long Black Hair',    3,'hair','locs','#241C22');
+Cw('h_topknot',  'Top Knot',           2,'hair','topknot');
+Cw('h_ponytail', 'Ponytail',           2,'hair','ponytail');
+Cw('h_twin',     'Pigtails',           2,'hair','twin');
+Cw('h_braids2',  'Black Braids',       3,'hair','braids','#241C22');
+Cw('h_rainbow',  'Rainbow Wig',        5,'hair','afro','#F05AA0',{value:3600});
+Cw('h_frost',    'Frosty Hair',        4,'hair','flame','#BFE8F4');
+Cw('h_platinum', 'Platinum Blonde Hair',3,'hair','wave','#EFE6CC');
+Cw('h_slick',    'Slick Black Hair',   2,'hair','swept','#1C1820');
+/* --- facial hair --- */
+Cw('f_stubble',  'Five O’Clock Shadow',1,'facial','stubble');
+Cw('f_moust',    'Shallot Mustache',   1,'facial','moustache');
+Cw('f_handle',   'Biker Stache',       2,'facial','handlebar');
+Cw('f_pencil',   'Pencil Mustache',    2,'facial','pencil');
+Cw('f_goatee',   'Goatee',             1,'facial','goatee');
+Cw('f_beard',    'Bushy Beard',        2,'facial','bushy');
+Cw('f_white',    'White Beard',        3,'facial','bushy','#EFEAE2');
+Cw('f_orange',   'Orange Beard',       3,'facial','bushy','#D87A2E');
+Cw('f_burns',    'Sideburns',          1,'facial','sideburns');
+/* --- worn on the face --- */
+Cw('a_specs',    'Gold-Rimmed Glasses',2,'acc','specs','#E8C45C');
+Cw('a_black',    'Black-Rimmed Glasses',1,'acc','specs','#242028');
+Cw('a_big',      'Big Glasses',        2,'acc','bigglasses','#2A2630');
+Cw('a_mono',     'Monocle',            3,'acc','monocle','#E8C45C');
+Cw('a_3d',       '3D Glasses',         2,'acc','threed');
+Cw('a_goggles',  'Ze Goggles',         2,'acc','goggles','#8A6A3C');
+Cw('a_visor',    'Cyclopean Visor',    4,'acc','visor2','#E04B45',{cemis:0.5});
+Cw('a_patch',    'Eyepatch',           2,'acc','eyepatch','#1E1A20');
+Cw('a_nose',     'Clown Nose',         2,'acc','clownnose');
+Cw('a_fangs',    'Vampire Fangs',      3,'acc','fangs');
+Cw('a_ninja',    'Ninja Mask',         3,'acc','ninjamask','#1E1E26');
+Cw('a_burglar',  'Burglar Mask',       2,'acc','burglar','#1E1E26');
+Cw('a_paint',    'War Paint',          2,'acc','warpaint');
+Cw('a_snorkel',  'Snorkel',            2,'acc','snorkel','#3CC8E8');
+Cw('a_hoops',    'Hoop Earrings',      2,'acc','earrings','#E8C45C');
+Cw('a_bandana',  'Face Bandana',       1,'acc','bandana','#C4483C');
+/* --- tops --- */
+Cw('t_green',    'Green Shirt',        1,'shirt','tee','#4E9A54');
+Cw('t_orange',   'Orange Shirt',       1,'shirt','tee','#E88A3C');
+Cw('t_white',    'Plain White Tee',    1,'shirt','tee','#F2F4F7');
+Cw('t_tan',      'Tan Shirt',          1,'shirt','tee','#D8BE96');
+Cw('t_tiedye',   'Tie Dyed Shirt',     2,'shirt','tee','#B45BD8');
+Cw('t_hawaii',   'Hawaiian Shirt',     2,'shirt','tee','#3CC0A0');
+Cw('t_ref',      'Referee Shirt',      2,'shirt','tee','#E8E8EC');
+Cw('t_jersey',   'Red Sportsball Jersey',2,'shirt','tee','#D8383C');
+Cw('t_lab',      'Lab Coat',           3,'shirt','jacket','#F0F2F6');
+Cw('t_leather',  'Leather Jacket',     3,'shirt','jacket','#3A2E2C');
+Cw('t_puffy',    'Puffy Orange Jacket',3,'shirt','hoodie','#E8802C');
+Cw('t_muscle',   'Muscle Suit',        4,'shirt','tee','#E4B48C');
+Cw('t_crop2',    'Cropped Top',        2,'shirt','crop','#F0A8C4');
+Cw('t_tux',      'Tuxedo',             4,'shirt','jacket','#1E1C22',{value:1700});
+Cw('t_pinstripe','Pinstripe Suit',     4,'shirt','jacket','#3A3E52');
+Cw('t_vamp',     'Vamp Vest',          4,'shirt','jacket','#2A1A24');
+Cw('t_ninjav',   'Ninja Vest',         3,'shirt','jacket','#22222A');
+Cw('t_santa',    'Santa Vest',         3,'shirt','jacket','#D8383C');
+/* --- outer layers --- */
+Cw('o_oilskin',  "Harbourmaster's Oilskin",4,'over','oilskin','#3E4C5A');
+Cw('o_longcoat', "Warden's Longcoat",  4,'over','longcoat','#2E3648');
+Cw('o_harness',  'Quarry Harness',     2,'over','harness','#7A5A3C');
+Cw('o_stole',    'Registry Stole',     3,'over','stole','#8A2E44');
+Cw('o_apron',    'Market Apron',       1,'over','apron','#D8C8A8');
+Cw('o_meaty',    'Meaty Apron',        3,'over','apron','#B4483C');
+Cw('o_belt',     'Tool Belt',          2,'over','toolbelt','#6A4A30');
+Cw('o_pauldron', 'Plate Mail',         4,'over','pauldron','#AEB6C0');
+/* --- legs and feet --- */
+Cw('p_jeans',    'Jeans',              1,'pants','long','#3E5A8A');
+Cw('p_black',    'Black Pants',        1,'pants','long','#22242A');
+Cw('p_green',    'Green Pants',        1,'pants','long','#3C7A48');
+Cw('p_camo',     'Camo Pants',         2,'pants','long','#6A7A4A');
+Cw('p_cargo',    'Cargo Shorts',       1,'pants','shorts','#8A7A54');
+Cw('p_sweat',    'Red Sweatpants',     1,'pants','long','#C4483C');
+Cw('p_fancy',    'Fancy Pants',        3,'pants','long','#3A3448');
+Cw('p_bell',     'White Bellbottoms',  3,'pants','long','#F0F0F4');
+Cw('p_pinstripe','Pinstripe Pants',    3,'pants','long','#3A3E52');
+Cw('p_hammer',   'Hammer Pants',       2,'pants','shorts','#8A5BD8');
+Cw('s_brown',    'Brown Shoes',        1,'shoes','shoe','#6A4A32');
+Cw('s_patent',   'Patent Leather Shoes',2,'shoes','shoe','#1C1A20');
+Cw('s_ruby',     'Ruby Slippers',      4,'shoes','shoe','#D8384C');
+Cw('s_boots',    'Boots',              1,'shoes','boot','#4A3A2C');
+Cw('s_cowboy',   'Cowboy Boots',       3,'shoes','boot','#A4763E');
+Cw('s_asbestos', 'Asbestos Boots',     3,'shoes','boot','#8E9298');
+Cw('s_zombie',   "Zombie-Stompin' Boots",3,'shoes','boot','#3C4A38');
+Cw('s_moon',     'Moon Boots',         4,'shoes','boot','#E4E8F0');
+Cw('s_air',      'Air Robinsons',      3,'shoes','shoe','#F0F2F6');
+Cw('s_climb',    'Climbing Boots',     3,'shoes','boot','#5A4A3C');
+/* --- capes --- */
+Cw('c_hero',     'Heroman Cape',       3,'cape','hero','#C4383C');
+Cw('c_vamp',     'Vampire Cape',       4,'cape','vampire','#241820');
+Cw('c_shadow',   'Cape of Shadows',    4,'cape','shadow','#1E1E28');
+Cw('c_tatter',   'Cape Tatters',       3,'cape','tattered','#5A5048');
+Cw('c_crystal',  'Crystal Cape',       5,'cape','crystal','#9FE8F0',
+   {cemis:0.35,value:5200});
+Cw('c_blanket',  'Blanket Cape',       2,'cape','blanket','#C4A87C');
+/* --- worn on the back --- */
+Cw('b_ruck',     'Backpack',           2,'back','rucksack','#5A6A4A');
+Cw('b_jet',      'Jetpack',            4,'back','jetpack','#8E96A4',
+   {cemis:0.4});
+Cw('b_astro',    'Astronaut Pack',     5,'back','astronaut','#EAEEF4',
+   {value:4600});
+Cw('b_quiver',   'Quiver',             2,'back','quiver','#6A4A30');
+Cw('b_guitar',   'Bass Guitar',        3,'back','guitar','#8A3A2E');
+Cw('b_basket',   'Wicker Basket',      1,'back','basket','#C8A070');
+Cw('b_ecto',     'Ecto Pack',          5,'back','ecto','#5A6470',
+   {cemis:0.5,value:5400});
+/* --- wings --- */
+Cw('w_rainbow',  'Rainbow Wings',      5,'wings','rainbow','#FFFFFF',
+   {cemis:0.4,value:5600});
+Cw('w_phoenix',  'Phoenix Wings',      6,'wings','phoenix','#FFFFFF',
+   {cemis:0.9,value:12000});
+Cw('w_devil',    'Devil Wings',        4,'wings','devil','#2A1A22');
+Cw('w_bubble',   'Bubble Wings',       3,'wings','bubble','#BEE0F0',
+   {cemis:0.2});
+Cw('w_parrot',   'Parrot Wings',       4,'wings','parrot','#FFFFFF');
+Cw('w_jetw',     'Rocket Thruster',    4,'wings','jet','#8E96A4',{cemis:0.5});
+/* --- pets --- */
+Cw('p_bunny',    'Cuddly Bunny',       3,'pet','bunny','#F4F0EC');
+Cw('p_slime',    'Pet Slime',          3,'pet','slime','#6FD86A',{cemis:0.3});
+Cw('p_puppy',    'Puppy Leash',        3,'pet','puppy','#C09858');
+Cw('p_dragon',   'Tiny Dragon',        5,'pet','dragon','#4E9A5C',{value:6400});
+Cw('p_penguin',  'Penguin Leash',      4,'pet','penguin','#2E3440');
+Cw('p_gull',     'Seagull',            2,'pet','seagull','#F0F0F4');
+/* --- auras --- */
+Cw('au_gold',    'Golden Aura',        6,'aura','motes','#F5C93C',
+   {cemis:1,value:10500});
+Cw('au_black',   'Black Aura',         6,'aura','pillar','#7A4BD8',
+   {cemis:1,value:11500});
+
+/* ---------------- held ---------------- */
+Tl('pick_gold',  'Golden Pickaxe',     5,3.4,3,{value:4200});
+Tl('spade',      "Digger's Spade",     2,1.5,1,{style:'shovel'});
+Tl('hammer_big', 'Rock Hammer',        3,2.1,2,{style:'hammer'});
+Tl('flash',      'Flashlight',         2,1.0,1,{style:'flashlight'});
+Wp('sword_gold', 'Golden Sword',       5,26,{value:4600});
+Wp('bat',        'Baseball Bat',       2,11,{style:'hammer'});
+Wp('bow_elvish', 'Elvish Longbow',     4,19,{style:'bow'});
+Wp('staff_em',   'Emerald Staff',      4,20,{style:'staff'});
+Wp('wand_fire',  'Fire Wand',          4,18,{style:'wand'});
+Wp('wand_freeze','Freeze Wand',        4,16,{style:'wand'});
+Wp('shield_w',   "Warrior's Shield",   3,8,{style:'shield'});
+Wp('umbrella',   'Parasol',            2,6,{style:'umbrella'});
 
 /* ---------------- consumables ---------------- */
 It('food_bread',  'Harbour Loaf', {cat:'consumable',r:1,consumable:true,value:12,
@@ -14564,7 +16070,9 @@ function grantStarter(){
      kit was refreshed. Equipment still wins when there is any — this
      just stops it winning by default. */
   state.equipped={hair:null,shirt:null,hat:null,wings:null,
-                  cape:null,back:null,pet:null,aura:null,tool:'pick_stone'};
+                  cape:null,back:null,pet:null,aura:null,
+                  over:null,acc:null,facial:null,pants:null,shoes:null,
+                  tool:'pick_stone'};
 }
 grantStarter();
 
@@ -15089,14 +16597,31 @@ function matPattern(ctx,matName,tint,size){
   return tmp;
 }
 
-/* An isometric cube: three faces from the same material at three
-   brightnesses. Cheap, and it reads as a block instantly. */
+/* An isometric block: three faces from the same material at three
+   brightnesses. Cheap, and it reads as a block instantly.
+
+   It now reads as the *right* block. Every placeable shape used to
+   come out of here as a full cube, so a wallpaper, a fence, a lamp
+   post and a sapling were four identical squares with different
+   tints — which on a catalogue this size is a wall of the same
+   picture. The footprint and the height come from the shape, so a
+   pane is thin, a slab is low, a pillar is tall and narrow, and a
+   plant and a lamp get the one extra mark that names them. */
+var SHAPE_BOX={
+  cube:  {w:1.00,t:1.00,h:1.00},
+  slab:  {w:1.00,t:1.00,h:0.42},
+  pillar:{w:0.46,t:0.46,h:1.34},
+  pane:  {w:1.00,t:0.16,h:1.10},
+  fence: {w:0.94,t:0.22,h:0.92},
+  lamp:  {w:0.42,t:0.42,h:1.10},
+  plant: {w:0.60,t:0.60,h:0.30}
+};
 function cube(ctx,mat,col,shapeName){
-  var w=S*0.62,h=w*0.5;
-  var cx=S/2, cy=S*0.56;
+  var box=SHAPE_BOX[shapeName]||SHAPE_BOX.cube;
+  var w=S*0.62*box.w, h=S*0.31*box.t;
+  var cx=S/2, cy=S*0.56+S*0.06*(1-box.h);
   var tex=matPattern(ctx,mat,col,64);
-  var low=shapeName==='slab'?0.5:1;
-  var lift=h*low;
+  var lift=S*0.31*box.h;
 
   function face(pts,bright){
     ctx.save();
@@ -15128,6 +16653,31 @@ function cube(ctx,mat,col,shapeName){
   ctx.beginPath();
   ctx.moveTo(cx-w/2,topY);ctx.lineTo(cx,topY-h/2);ctx.lineTo(cx+w/2,topY);
   ctx.stroke();
+
+  /* One mark to name the shape, drawn over the block rather than
+     modelled into it — an icon has about forty pixels to work with. */
+  if(shapeName==='plant'){
+    stroke(ctx,[[cx,topY],[cx,topY-S*0.20]],'#5A8A3C',3);
+    ctx.fillStyle='#6FC04E';
+    ctx.beginPath();ctx.ellipse(cx-S*0.07,topY-S*0.17,S*0.075,S*0.045,-0.5,0,6.3);
+    ctx.fill();
+    ctx.beginPath();ctx.ellipse(cx+S*0.07,topY-S*0.21,S*0.075,S*0.045,0.5,0,6.3);
+    ctx.fill();
+  }else if(shapeName==='lamp'){
+    ctx.fillStyle='rgba(255,232,160,.92)';
+    ctx.beginPath();ctx.arc(cx,topY-S*0.06,S*0.11,0,6.3);ctx.fill();
+    ctx.globalAlpha=0.35;
+    ctx.beginPath();ctx.arc(cx,topY-S*0.06,S*0.19,0,6.3);ctx.fill();
+    ctx.globalAlpha=1;
+  }else if(shapeName==='fence'){
+    ctx.strokeStyle='rgba(0,0,0,.30)';ctx.lineWidth=2;
+    for(var fx=-1;fx<=1;fx++){
+      ctx.beginPath();
+      ctx.moveTo(cx+fx*w*0.30,topY+h*0.10);
+      ctx.lineTo(cx+fx*w*0.30,cy+h*0.30);
+      ctx.stroke();
+    }
+  }
 }
 
 function stroke(ctx,pts,col,width,cap){
@@ -15275,6 +16825,80 @@ DRAW.cape=function(ctx,c){
   poly(ctx,[[26,18],[36,18],[36,58],[28,52]],shade(c,12));
   poly(ctx,[[26,18],[46,18],[44,24],[28,24]],shade(c,-22));
 };
+/* A rounded rectangle path. Canvas has roundRect now, and it is not
+   in every browser this game has to open in. */
+function round(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+DRAW.pants=function(ctx,c){
+  ctx.fillStyle=c;
+  ctx.beginPath();
+  ctx.moveTo(S*0.32,S*0.22);ctx.lineTo(S*0.68,S*0.22);
+  ctx.lineTo(S*0.64,S*0.80);ctx.lineTo(S*0.54,S*0.80);
+  ctx.lineTo(S*0.50,S*0.48);ctx.lineTo(S*0.46,S*0.80);
+  ctx.lineTo(S*0.36,S*0.80);
+  ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(0,0,0,.22)';
+  ctx.fillRect(S*0.32,S*0.22,S*0.36,S*0.06);
+};
+DRAW.shoes=function(ctx,c){
+  ctx.fillStyle=c;
+  ctx.beginPath();
+  ctx.moveTo(S*0.24,S*0.68);ctx.lineTo(S*0.40,S*0.68);
+  ctx.lineTo(S*0.44,S*0.48);ctx.lineTo(S*0.56,S*0.48);
+  ctx.quadraticCurveTo(S*0.80,S*0.56,S*0.78,S*0.68);
+  ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(0,0,0,.34)';
+  ctx.fillRect(S*0.22,S*0.68,S*0.58,S*0.07);
+};
+DRAW.pack=function(ctx,c){
+  ctx.fillStyle=c;
+  round(ctx,S*0.30,S*0.30,S*0.40,S*0.46,S*0.09);ctx.fill();
+  ctx.fillStyle='rgba(0,0,0,.26)';
+  round(ctx,S*0.34,S*0.52,S*0.32,S*0.14,S*0.05);ctx.fill();
+  ctx.strokeStyle=c;ctx.lineWidth=S*0.05;ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.moveTo(S*0.38,S*0.30);ctx.quadraticCurveTo(S*0.50,S*0.16,S*0.62,S*0.30);
+  ctx.stroke();
+};
+DRAW.face=function(ctx,c){
+  ctx.strokeStyle=c;ctx.lineWidth=S*0.055;
+  ctx.beginPath();ctx.arc(S*0.34,S*0.50,S*0.15,0,6.3);ctx.stroke();
+  ctx.beginPath();ctx.arc(S*0.66,S*0.50,S*0.15,0,6.3);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(S*0.49,S*0.50);ctx.lineTo(S*0.51,S*0.50);
+  ctx.moveTo(S*0.19,S*0.44);ctx.lineTo(S*0.10,S*0.40);
+  ctx.moveTo(S*0.81,S*0.44);ctx.lineTo(S*0.90,S*0.40);
+  ctx.stroke();
+};
+DRAW.tache=function(ctx,c){
+  ctx.fillStyle=c;
+  ctx.beginPath();
+  ctx.moveTo(S*0.50,S*0.44);
+  ctx.bezierCurveTo(S*0.30,S*0.36,S*0.14,S*0.50,S*0.20,S*0.62);
+  ctx.bezierCurveTo(S*0.30,S*0.70,S*0.42,S*0.58,S*0.50,S*0.54);
+  ctx.bezierCurveTo(S*0.58,S*0.58,S*0.70,S*0.70,S*0.80,S*0.62);
+  ctx.bezierCurveTo(S*0.86,S*0.50,S*0.70,S*0.36,S*0.50,S*0.44);
+  ctx.fill();
+};
+DRAW.coat=function(ctx,c){
+  ctx.fillStyle=c;
+  ctx.beginPath();
+  ctx.moveTo(S*0.30,S*0.24);ctx.lineTo(S*0.70,S*0.24);
+  ctx.lineTo(S*0.76,S*0.84);ctx.lineTo(S*0.24,S*0.84);
+  ctx.closePath();ctx.fill();
+  /* the lapels, which is what makes it a coat and not a sack */
+  ctx.fillStyle='rgba(0,0,0,.30)';
+  ctx.beginPath();
+  ctx.moveTo(S*0.44,S*0.24);ctx.lineTo(S*0.50,S*0.54);
+  ctx.lineTo(S*0.56,S*0.24);ctx.closePath();ctx.fill();
+  ctx.fillRect(S*0.47,S*0.24,S*0.06,S*0.60);
+};
 DRAW.material=function(ctx,c,it){
   /* a small heap of nuggets — reads as "raw stuff" at any size */
   var pts=[[28,48,10],[44,46,9],[36,38,8],[46,54,6],[26,56,6]];
@@ -15331,6 +16955,15 @@ function drawerFor(it){
     if(slot==='cape')return DRAW.cape;
     if(slot==='pet')return DRAW.pet;
     if(slot==='aura')return DRAW.aura;
+    /* Six slots used to fall through to the shirt glyph, so trousers,
+       shoes, a rucksack, a pair of glasses, a moustache and a coat
+       were all drawn as the same t-shirt. */
+    if(slot==='pants')return DRAW.pants;
+    if(slot==='shoes')return DRAW.shoes;
+    if(slot==='back')return DRAW.pack;
+    if(slot==='acc')return DRAW.face;
+    if(slot==='facial')return DRAW.tache;
+    if(slot==='over')return DRAW.coat;
     return DRAW.shirt;
   }
   if(st&&DRAW[st])return DRAW[st];
@@ -15907,7 +17540,7 @@ U.init=function(){
   panels.wardrobe.root.classList.add('dress');
   makePanel('profile','Profile',['Overview','Skills','Collections','Achievements']);
   makePanel('missions','Missions',['Daily','Story','Weekly']);
-  makePanel('shop','Store',['Seeds','Blocks','Gear','Style','Bundles']);
+  makePanel('shop','Store',['Style','Blocks','Walls','Held','Food','Bundles']);
   makePanel('worlds','Worlds',['My Worlds','New World']);
   makePanel('trade','Trade',null);
   makePanel('menu','Menu',null);
@@ -16392,10 +18025,18 @@ function renderProfile(bd,tab){
   bd.appendChild(o);
 }
 
+/* Aisles, as categories plus an optional shape filter. The Store used
+   to open on Seeds, which sold nothing, because nothing in this game
+   plants — an empty first aisle is the worst possible first
+   impression of a shop. These are the aisles the catalogue actually
+   has stock for, biggest first. */
 var SHOP_TAB={
-  'Seeds':['seed'],'Blocks':['block','furniture'],
-  'Gear':['tool','weapon','fishing'],'Style':['cosmetic'],
-  'Bundles':['consumable']
+  'Style':  {cats:['cosmetic']},
+  'Blocks': {cats:['block','furniture'],not:'pane'},
+  'Walls':  {cats:['block'],only:'pane'},
+  'Held':   {cats:['tool','weapon','fishing']},
+  'Food':   {cats:['consumable']},
+  'Bundles':{cats:['cosmetic'],setsOnly:true}
 };
 /* An outfit card: the three pieces, what you already own of it, and
    one price for the rest. Prices come from D.setPrice against the
@@ -16464,14 +18105,17 @@ function setCard(bd,set){
 }
 
 function renderShop(bd,tab){
-  var cats=SHOP_TAB[tab]||['block'];
-  var list=D.ITEMS.filter(function(it){
-    return cats.indexOf(it.cat)>=0&&it.value>0;
+  var A=SHOP_TAB[tab]||SHOP_TAB.Blocks;
+  var list=A.setsOnly?[]:D.ITEMS.filter(function(it){
+    if(A.cats.indexOf(it.cat)<0||it.value<=0)return false;
+    if(A.only&&it.shape!==A.only)return false;
+    if(A.not&&it.shape===A.not)return false;
+    return true;
   }).sort(function(a,b){return a.value-b.value;});
-  if(tab==='Style'){
+  if(A.setsOnly){
     bd.appendChild(el('div','aisle','Outfits'));
     D.SETS.forEach(function(st){setCard(bd,st);});
-    bd.appendChild(el('div','aisle','Everything else'));
+    return;
   }
   if(!list.length){
     bd.appendChild(el('div','empty-note','This aisle is empty for now.'));
@@ -19728,14 +21372,17 @@ G.loadSave=function(){
    it now falls back to this rather than to the engine's default. It
    used to fall back to 'crop' and 'none', which meant the first thing
    you ever equipped quietly shaved your head and took your coat off. */
-var LOOK={};
-var LOOK_SLOTS=['hair','shirt','hat','wings','cape','back','pet','aura'];
+var LOOK={},LOOKC={};
+var LOOK_SLOTS=['hair','shirt','hat','wings','cape','back','pet','aura',
+                'over','acc','facial','pants','shoes'];
 G.rememberLook=function(){
   if(!G.player)return;
   var k=G.player.kit;
   for(var i=0;i<LOOK_SLOTS.length;i++){
     var n=LOOK_SLOTS[i];
-    if(k[n])LOOK[n]=k[n].style;
+    if(!k[n])continue;
+    LOOK[n]=k[n].style;
+    if(k[n].color)LOOKC[n]=k[n].color;
   }
 };
 
@@ -19743,20 +21390,45 @@ G.refreshKit=function(){
   if(!G.player)return;
   var eq=Net.snapshot().equipped;
   var k=G.player.kit;
+  /* An equipped item wins over the wardrobe for both the shape and
+     the colour. It used to win only on the shape, so buying a Red
+     Coat got you the coat in whatever colour your wardrobe was set
+     to — which is a strange thing for a shop to sell. An item with no
+     colour of its own (props.col '#FFFFFF') keeps the wardrobe's,
+     which is how a plain tee stays dyeable. */
   function slot(name,dflt){
     var key=eq[name];
     var it=key?D.byKey(key):null;
     if(it&&it.props&&it.props.style){
       k[name].style=it.props.style;
       if(it.props.emis!==undefined)k[name].emis=it.props.emis;
+      if(k[name].color!==undefined)
+        k[name].color=(it.props.col&&it.props.col!=='#FFFFFF')
+          ? it.props.col
+          : (LOOKC[name]||k[name].color);
     }else{
       var fb=LOOK[name]!==undefined?LOOK[name]:dflt;
       if(fb!==undefined)k[name].style=fb;
+      if(k[name]&&k[name].color!==undefined&&LOOKC[name])
+        k[name].color=LOOKC[name];
     }
   }
-  slot('hair','crop');slot('shirt','tee');slot('hat','none');
+  slot('hair','bald');slot('shirt','tee');slot('hat','none');
   slot('wings','none');slot('cape','none');slot('back','none');
   slot('pet','none');slot('aura','none');
+  /* The five slots that had geometry and items but no way to put one
+     on: a coat, glasses, a beard, trousers and shoes were all
+     wardrobe-only, so every such item in the shop was unwearable. */
+  slot('over','none');slot('acc','none');slot('facial','none');
+  slot('shoes','shoe');
+  /* Trousers carry a leg length rather than a style name, so they are
+     read by hand rather than through slot(). */
+  var pit=eq.pants?D.byKey(eq.pants):null;
+  if(pit&&pit.props){
+    k.pants.leg=pit.props.style==='shorts'?'shorts':'long';
+    if(pit.props.col&&pit.props.col!=='#FFFFFF')k.pants.color=pit.props.col;
+  }else if(LOOKC.pants)k.pants.color=LOOKC.pants;
+
   /* the held object follows the equipped tool */
   var tool=eq.tool?D.byKey(eq.tool):null;
   k.tool.style=(tool&&tool.props&&tool.props.style)||'none';

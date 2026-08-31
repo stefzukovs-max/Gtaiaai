@@ -75,6 +75,8 @@ weather states riding on top as multipliers.
 | Hair | Cards over a solid cap pushed out to the style's own length, so the cap carries the silhouette and the strands ride on it; the hairline sits low enough to give every style a fringe |
 | Proportion | One per-bone map turns the anatomical body into a three-and-a-fifth-head toy at draw time — legs to 56 per cent, arms shortened and thickened, head at 1.90 — without changing a single number in any garment |
 | Mobile | A pixel-measured HUD inside the safe area, a stick that draws itself under the thumb, verb-labelled action buttons, three graphics tiers, and an install path that takes the browser away |
+| Cosmetics | 139 built styles across 13 slots — hats, hair, faces, beards, tops, coats, legs, feet, capes, backs, wings, pets, held |
+| Catalogue | 426 items: colour families by loop, themed blocks and clothing by hand, every row pointing at art that exists |
 | Build | A per-region profile over the size scalar, so slim, base and bulk differ in taper rather than in scale — and every garment inherits it, because a garment is the body's own rings grown outward |
 | Outfits | Six named sets priced and granted by the server, charging only for the pieces you are missing |
 | Progression | XP from every activity, six skills on their own curves, so a dedicated angler out-ranks a generalist at fishing without out-levelling them |
@@ -1027,6 +1029,94 @@ screen permanently, offering Place and Rotate to somebody who was
 fishing; it is tied to build mode now. And the rotate gate was a gate:
 on a tablet held in portrait the game simply did not start. Portrait
 reflows instead.
+
+### The face was a collection
+
+The head was correct and it was a grimace. It had a nose with alae, a
+septum and two nostrils; lips as two spheres with a vermilion border,
+a groove and corner beads; a philtrum as two ridges; four spheres per
+eyelid with a fold and a caruncle; and an ear built from eight beads
+around a hollow. Every one of those is a real thing on a real face,
+and every one was right at the size it was authored for.
+
+Then the head doubled and the lighting went flat. Two dozen small
+spheres stuck on a smooth skull read as lumps, and a face made of
+lumps is a grimace whatever the lumps are of. So the features are
+three now, and each is one continuous thing: a nose that is a ridge
+rather than an assembly, a mouth that is a single swept curve of
+overlapping beads (a chamfer gives a straight slot, a sphere gives a
+blob, and a face needs a line that bends), and an ear that is one
+shape with one hollow in it. The eye is a small warm-white almond
+under a dark iris that covers most of it, because what separates a
+friendly eye from a staring one is how little white shows. Brows went
+from eleven dark cylinders to seven at two thirds the thickness —
+they were the single biggest contributor to the scowl.
+
+One bug underneath all of it: `TOYFACE`, the switch that picks the
+three-mark face map over the full portrait one, was declared *below*
+the texture layer table that calls `R.face()`. It read as `undefined`,
+the portrait branch shipped, and every character in the game wore a
+painted jaw shadow and cheek hollows under flat toy lighting.
+
+Segment counts went up everywhere the toy warp had made something
+fatter without making it rounder — the head from 22 to 32, the torso
+from 26 to 34, arms 16 to 24, legs 18 to 26, and the same for every
+garment cut from those rings. A cylinder that gets two thirds thicker
+at a fixed segment count gets visibly flatter, and the shoulders and
+calves had started reading as cut gems.
+
+### A shop worth walking into
+
+The reason to walk into the store is that somebody else is wearing
+something you have not got, and that needs stock. Cosmetics went from
+sixty-odd styles to a hundred and thirty-nine, all built and all
+measured: twenty-one more hats (a top hat with a grosgrain band, a
+fedora with a real pinch, a cowboy brim that rolls at the sides, a
+wizard's cone with a bent tip, a bicorne, a knight's visor, a space
+helmet, headphones, antlers, cat ears), six more wings, capes rebuilt
+as a table of length-cloth-and-hem so there are eight rather than one
+with a different clasp, eight things worn on the back, six more pets,
+ten more worn on the face, four more kinds of facial hair, and eight
+more held.
+
+The item table went from 112 rows to 426. The model is Growtopia's and
+so is the lesson from it: most of its thousands of items are
+*families* — twelve solid colours, the same twelve dark, seven pastel,
+the same seven with a flower on — and nobody hand-wrote those. Those
+are one row with a loop around it. What is hand-written is everything
+where the art actually differs: fifty themed blocks, a hundred and
+seventy clothing rows, more tools and weapons.
+
+Two rules hold it together. Nothing is a name with no object behind
+it — every clothing row points at a style that exists in a `*_BUILD`
+table and has been built and measured, and a verification pass checks
+exactly that, because a catalogue of items that do not render is a lie
+told at scale. And prices still come from `value` alone, so a new
+family cannot quietly break the economy.
+
+Five bugs surfaced while wiring it up, all of the same shape — things
+the game had art for and no way to use:
+
+- **Five dead slots.** Coats, glasses, beards, trousers and shoes all
+  had geometry, and `refreshKit` did not read them, so every such item
+  in the shop was unwearable.
+- **Equipment ignored its own colour.** An equipped item set the shape
+  and left the colour to your wardrobe, so buying a Red Coat got you
+  the coat in whatever colour you happened to be wearing.
+- **Cosmetic icons were white.** The icon painter reads `col` and the
+  wardrobe reads `props.col`, and only the second was ever set — so a
+  shop selling a hundred and seventy items on their colour drew all of
+  them as blank silhouettes.
+- **Six slots shared one glyph.** Trousers, shoes, a rucksack,
+  glasses, a moustache and a coat were all drawn as the same t-shirt.
+- **Every placeable shape drew as a cube.** A wallpaper, a fence, a
+  lamp post and a sapling were four identical squares with different
+  tints.
+
+And the Store opened on an aisle called Seeds that sold nothing,
+because nothing in this game plants. The `seed` category is gone —
+a category is a promise about what the game does — and the aisles are
+now the ones the catalogue has stock for.
 
 ---
 
