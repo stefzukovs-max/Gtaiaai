@@ -1581,15 +1581,57 @@ R.face=function(){
      a mouth, the hint of a nose, and enough of a socket that the eye
      balls do not look glued on. */
   if(TOYFACE)return function(u,v){
+    /* The face map does more work now, because the geometry does less.
+       The eye is four flat discs and the lid is one cap; everything
+       that used to be a small sphere stuck on the face — the crease
+       above the eye, the shadow the brow casts into the socket, the
+       soft dark under the lower lash, the corner of the mouth — is a
+       mark here instead. Paint costs nothing at silhouette and never
+       reads as a lump. */
     var h=1-v, c=BASE.slice(), i, e;
     for(i=0;i<2;i++){
-      e=blobW(u,h,EYE_U[i],EYE_V-0.008,0.070,0.082);
-      c=mixv(c,rgb('#EBD4C9'),e*0.42);
+      var ex=EYE_U[i];
+      /* the socket: a soft cool pool the lens sits in */
+      e=blobW(u,h,ex,EYE_V-0.004,0.086,0.092);
+      c=mixv(c,rgb('#E2C6BC'),e*0.50);
+      /* the crease above it, tighter and darker at the outer end */
+      e=blobW(u,h,ex+(i?0.010:-0.010),EYE_V+0.060,0.070,0.026);
+      c=mixv(c,rgb('#C8A294'),e*0.62);
+      /* the shadow the upper lash drops onto the white */
+      e=blobW(u,h,ex,EYE_V+0.026,0.062,0.020);
+      c=mixv(c,rgb('#A8867C'),e*0.52);
+      /* and a little warmth under the eye, which is what stops the
+         socket reading as a bruise */
+      e=blobW(u,h,ex,EYE_V-0.058,0.060,0.024);
+      c=mixv(c,rgb('#F2C8B6'),e*0.44);
+      /* the outer corner, where the lids meet */
+      e=blobW(u,h,ex+(i?0.052:-0.052),EYE_V-0.006,0.024,0.020);
+      c=mixv(c,rgb('#B08C80'),e*0.46);
     }
-    e=blob(u,h,0.25,0.306,0.040,0.036);
-    c=mixv(c,rgb('#F0CDBE'),e*0.42);
-    e=blob(u,h,0.25,0.214,0.064,0.017);
-    c=mixv(c,rgb('#C87668'),e*0.85);
+    /* the bridge, lifted, so the two sockets are not one band */
+    e=blob(u,h,0.25,EYE_V+0.010,0.030,0.070);
+    c=mixv(c,rgb('#FBEDE4'),e*0.40);
+    /* the nose: a soft shadow under the tip rather than a modelled one */
+    e=blob(u,h,0.25,0.300,0.044,0.040);
+    c=mixv(c,rgb('#F0CDBE'),e*0.40);
+    e=blob(u,h,0.25,0.268,0.038,0.016);
+    c=mixv(c,rgb('#C9A091'),e*0.44);
+    /* the mouth: a line with corners, not a lozenge */
+    e=blob(u,h,0.25,0.212,0.058,0.013);
+    c=mixv(c,rgb('#B4655A'),e*0.88);
+    for(i=0;i<2;i++){
+      e=blob(u,h,0.25+(i?0.052:-0.052),0.216,0.016,0.012);
+      c=mixv(c,rgb('#9C544C'),e*0.70);
+    }
+    /* the lower lip catching light under it */
+    e=blob(u,h,0.25,0.196,0.048,0.014);
+    c=mixv(c,rgb('#F6D0C0'),e*0.44);
+    /* a touch of colour on the cheeks. One mark, and it is the
+       difference between a face and a mask. */
+    for(i=0;i<2;i++){
+      e=blobW(u,h,EYE_U[i]+(i?0.026:-0.026),0.318,0.078,0.056);
+      c=mixv(c,rgb('#F0A898'),e*0.34);
+    }
     return c;
   };
   return function(u,v){
@@ -2127,24 +2169,38 @@ Tex.SIZE=SZ;
    zeroed so the material still has *some* relative relief if `bump`
    is ever dialled back up; the scene's global `bump` is what actually
    turns it off. */
+/* Roughness, and why it moved twice.
+
+   The realism pass gave every material a measured value. The toy pass
+   pushed them all to matte, because the reference had no specular at
+   all. Both were right for what they were aimed at, and the result of
+   the second is a world where a brass fitting, a slate roof and a
+   cotton shirt reflect exactly the same amount of nothing — so the
+   only thing telling them apart is their colour, which is the
+   definition of an untextured look.
+
+   These are back to a spread, at a stylised amplitude rather than a
+   photographic one: cloth and skin stay matte, stone and wood take a
+   little, and metal, glass and crystal are allowed to be shiny,
+   because a gem that does not catch the light is a coloured pebble. */
 var SURF={
-  blank:{bump:0,rough:0.94},
+  blank:{bump:0,rough:0.88},
   grass:{bump:0.55,rough:0.97}, dirt:{bump:0.85,rough:0.97},
   sand:{bump:0.60,rough:0.96},  stone:{bump:1.00,rough:0.95},
   cliff:{bump:1.20,rough:0.95}, gravel:{bump:1.10,rough:0.95},
-  snow:{bump:0.35,rough:0.92},  planks:{bump:0.75,rough:0.94},
+  snow:{bump:0.35,rough:0.86},  planks:{bump:0.75,rough:0.88},
   deck:{bump:0.80,rough:0.94},  bark:{bump:1.30,rough:0.96},
   brick:{bump:-0.95,rough:0.90},brickpale:{bump:-0.95,rough:0.90},
-  panel:{bump:0.45,rough:0.90}, panelw:{bump:0.40,rough:0.90},
+  panel:{bump:0.45,rough:0.52}, panelw:{bump:0.40,rough:0.58},
   concrete:{bump:0.55,rough:0.92},
-  tile:{bump:-0.35,rough:0.93}, tilepale:{bump:-0.35,rough:0.93},
-  tiledark:{bump:-0.35,rough:0.93},
+  tile:{bump:-0.35,rough:0.74}, tilepale:{bump:-0.35,rough:0.74},
+  tiledark:{bump:-0.35,rough:0.74},
   roof:{bump:0.85,rough:0.94},  road:{bump:0.65,rough:0.95},
-  foliage:{bump:0.45,rough:0.86},foliagep:{bump:0.45,rough:0.86},
+  foliage:{bump:0.45,rough:0.90},foliagep:{bump:0.45,rough:0.90},
   skin:{bump:0.30,rough:0.92},  face:{bump:0.26,rough:0.90},
   fabric:{bump:0.60,rough:0.93},fabricw:{bump:0.60,rough:0.93},
-  glass:{bump:0.05,rough:0.08}, crystal:{bump:0.30,rough:0.26},
-  gold:{bump:0.20,rough:0.42},  water:{bump:0,rough:0.16},
+  glass:{bump:0.05,rough:0.06}, crystal:{bump:0.30,rough:0.14},
+  gold:{bump:0.20,rough:0.22},  water:{bump:0,rough:0.12},
   neon:{bump:0,rough:0.55},     neonw:{bump:0,rough:0.55},
   /* Hair is rough on purpose, and the reason is worth writing down.
 
@@ -2212,7 +2268,10 @@ var TOY={
   glass:'#BEE0F0', crystal:'#7FE4FF', gold:'#F2C455',
   water:null, neon:null, neonw:null, blank:null
 };
-var TOY_MIX=0.16;
+/* How much of the painted texture survives the pull toward a flat
+   colour. At 0.16 almost none of it did, which is why a plank, a
+   brick and a sheet of steel were three flat rectangles. */
+var TOY_MIX=0.46;
 function toyify(cv,name){
   var target=TOY[name];
   if(!target)return cv;
@@ -2592,6 +2651,9 @@ uniform float uBump;
    make it change colour as it walked. */
 uniform float uMacro;
 uniform float uSpec;
+uniform float uRim;
+uniform float uRimPow;
+uniform vec3  uRimCol;
 // Which texture-array layer means skin. One comparison per fragment
 // buys a second lighting model without a second shader or a second
 // draw call.
@@ -2753,7 +2815,7 @@ void main(){
   vec3 refl = reflect(-v,n);
   float amb_f = 0.04+0.96*pow(1.0-saturate(dot(n,v)),5.0);
   vec3 skyRefl = mix(uGndCol,uSkyCol,refl.y*0.5+0.5)*2.4;
-  col += skyRefl*amb_f*(1.0-rough)*(1.0-rough)*0.22;
+  col += skyRefl*amb_f*(1.0-rough)*(1.0-rough)*0.24;
 
   // Subsurface: a narrow warm band either side of the terminator, where
   // light entered the skin and came back out somewhere else. It is a
@@ -2773,10 +2835,16 @@ void main(){
     col += albedo*uSunCol*vec3(0.17,0.044,0.029)*trans*sh;
   }
 
-  // Rim light picked out of the sky colour: separates a character from
-  // the background without a outline pass.
-  float rim = pow(1.0-saturate(dot(n,v)),mix(3.0,2.0,uToon));
-  col += uSkyCol*rim*(0.16+uToon*0.20);
+  // Rim light. Not a subtle separation any more: it is the single
+  // thing that stops a matte character reading as an untextured
+  // primitive, because it draws the silhouette in light rather than
+  // leaving it to a change of albedo. Two terms — a broad one from the
+  // sky that lifts the whole edge, and a tight one from behind that
+  // only fires where the sun is actually back there.
+  float rim = pow(1.0-saturate(dot(n,v)), uRimPow);
+  col += uRimCol*rim*uRim;
+  float back = saturate(dot(-l,v))*saturate(-dot(n,l)+0.35);
+  col += uSunCol*pow(1.0-saturate(dot(n,v)),3.0)*back*uRim*0.85*sh;
 
   col += albedo*vEmis*3.0*uEmisScale;
 
@@ -3346,21 +3414,36 @@ R.scene={
      rather than a key, and the darkest part of a green hill is still
      obviously green. Sun down, ambient up by a factor of three, and
      the ground bounce warmed so undersides do not go to slate. */
-  sunCol:M.v3(0.62,0.58,0.50),
-  skyCol:M.v3(0.56,0.64,0.74),
-  gndCol:M.v3(0.34,0.34,0.30),
-  zenith:M.v3(0.36,0.62,0.88),
-  horizon:M.v3(0.80,0.90,0.98),
+  /* Storybook key, not a lightbox.
+
+     The previous pass took the sun down and the ambient up threefold
+     to match a flat mobile reference, and it worked: everything came
+     out evenly lit matte plastic. That is also exactly what makes a
+     character read as an untextured primitive — with no terminator
+     there is no form, and with no form a body is a stack of tubes
+     whatever shape the tubes are.
+
+     So: a warm key strong enough to cast a real terminator, a cool
+     fill that is clearly a *fill* rather than a second key, and a
+     ground bounce warm enough that an underside is in shade rather
+     than in slate. The key and fill are complementary on purpose —
+     warm light, cool shadow is the oldest trick in illustration and
+     the reason a stylised character looks lit rather than printed. */
+  sunCol:M.v3(0.94,0.85,0.70),
+  skyCol:M.v3(0.38,0.45,0.60),
+  gndCol:M.v3(0.32,0.27,0.23),
+  zenith:M.v3(0.26,0.55,0.90),
+  horizon:M.v3(0.84,0.92,1.00),
   ground:M.v3(0.30,0.36,0.42),
-  fogCol:M.v3(0.78,0.87,0.95),
+  fogCol:M.v3(0.76,0.86,0.96),
   /* Tuned by eye against a 120m view: enough haze to give the far
      shore depth, not so much that the middle distance goes flat. */
   fogDensity:0.0009,
   fogHeight:52,
   exposure:1.0,
   stars:0,
-  bloom:0.85,
-  bloomThresh:1.05,
+  bloom:0.62,
+  bloomThresh:1.02,
   vignette:0.55,
   emisScale:1.0,
   rays:0.34,
@@ -3379,7 +3462,16 @@ R.scene={
   /* A touch of banding, not a cel shader. The reference is soft — it
      has a gradient across a shirt, not two flat steps — so this sits
      low enough to firm the terminator up and no further. */
-  toon:0.14,
+  /* A firmer terminator. Low enough that a shirt still has a gradient
+     across it, high enough that the gradient has a shape. */
+  toon:0.24,
+  /* The rim, as three numbers rather than a hard-coded constant.
+     `rimCol` is deliberately not the sky colour: a violet edge on a
+     warm-lit character is what makes the light read as magical rather
+     than as overcast. */
+  rim:0.22,
+  rimPow:3.4,
+  rimCol:M.v3(0.62,0.66,1.00),
   /* Occlusion strength, the sample radius in metres, and a depth bias
      that stops a surface shadowing itself. */
   /* Weather the world can feel. `wind` is a direction times a
@@ -3412,13 +3504,17 @@ R.scene={
      normals were most of what made this world read as photographed.
      A trace is kept rather than zero so a wall is not perfectly
      lifeless under a raking sun. */
-  bump:0.10,
+  /* Some relief back. Zero is moulded plastic; this is enough that a
+     brick course and a plank seam exist without the world going
+     photographic again. */
+  bump:0.34,
   shadowSoft:2.0,
   outline:0.0,
   inkWidth:1.35,
   inkNear:24,
   inkFar:150,
-  saturation:0.26
+  /* Colour, rather than the memory of it. */
+  saturation:0.46
 };
 
 /* ---------------- quality tiers ----------------
@@ -3571,6 +3667,9 @@ function bindSceneUniforms(p){
   GL.u3v(p,'uEye',R.eye);
   GL.u1f(p,'uExposure',s.exposure);
   GL.u1f(p,'uToon',s.toon);
+  GL.u1f(p,'uRim',s.rim);
+  GL.u1f(p,'uRimPow',s.rimPow);
+  GL.u3v(p,'uRimCol',s.rimCol);
   GL.u1f(p,'uSkinLayer',LH.Tex.layer('skin'));
   GL.u1f(p,'uBump',s.bump);
   GL.u1f(p,'uMacro',0);
@@ -3660,7 +3759,7 @@ R.beginOpaque=function(){
   GL.bindTex(3,R.shadowN.tex,gl.TEXTURE_2D);
   GL.u1i(p,'uShadowN',3);
   /* Matte. A moulded surface has a wide, weak sheen or none. */
-  GL.u1f(p,'uSpec',0.03);
+  GL.u1f(p,'uSpec',0.10);
   GL.u1f(p,'uAlpha',1);
   GL.u1f(p,'uEmisScale',R.scene.emisScale);
   GL.u4f(p,'uTint',1,1,1,0);
@@ -4552,7 +4651,7 @@ var TOY={
   legOut:1.40,     /* and the hip joint, so thick thighs still clear  */
   wHip:1.15, wSpine:1.08, wSpine2:1.02, wChest:0.98, wNeck:1.15,
   wArm:1.50, wDelt:1.04, wLeg:1.30, wFoot:1.25,
-  wHandXZ:1.70, wHandY:1.30,
+  wHandXZ:1.42, wHandY:1.18,
   neckUp:1.63,     /* the neck bone, up under the jaw where a toy's is */
   neckY:0.62,      /* and the neck itself, most of the way gone        */
   headY:0.30,      /* what is left of it, tucked inside the skull      */
@@ -4854,11 +4953,18 @@ C.idle=function(p,ph,pr){
      so the palms face the thighs. Perfectly straight arms with the
      palms forward is the anatomical position, and nobody has ever
      stood in it voluntarily. */
+  /* Out at eleven degrees rather than four. Four is what a real arm
+     does against a real ribcage; against a toy torso two thirds
+     thicker than a real one it means the arms touch the body down
+     their whole length, and a figure whose arms are fused to its
+     sides is the silhouette everyone reads as an untextured
+     primitive. Eleven leaves daylight between elbow and hip, which is
+     what makes the shape legible from behind. */
   var lag=sin((ph-0.10)*TAU*0.37);
-  p.set('armL', 0.045+lag*0.012,0, 0.075+lag*0.014);
-  p.set('armR', 0.045+lag*0.012,0,-0.075-lag*0.014);
-  p.set('forearmL',-0.24-br*0.020, 0.34, 0.030);
-  p.set('forearmR',-0.24-br*0.020,-0.34,-0.030);
+  p.set('armL', 0.060+lag*0.014,0, 0.200+lag*0.018);
+  p.set('armR', 0.060+lag*0.014,0,-0.200-lag*0.018);
+  p.set('forearmL',-0.34-br*0.024, 0.38, 0.044);
+  p.set('forearmR',-0.34-br*0.024,-0.38,-0.044);
   p.set('handL',0.04, 0.10, 0.06);
   p.set('handR',0.04,-0.10,-0.06);
 
@@ -4971,8 +5077,8 @@ C.locomote=function(p,ph,pr){
      forward half of the swing than the back half. */
   var aL=hipCurve(uR,sp),aR=hipCurve(uL,sp);
   var amp=0.62+sp*0.42, bend=0.30+sp*0.85;
-  p.set('armL', aL*amp,0, 0.085-sp*0.030);
-  p.set('armR', aR*amp,0,-0.085+sp*0.030);
+  p.set('armL', aL*amp,0, 0.185-sp*0.030);
+  p.set('armR', aR*amp,0,-0.185+sp*0.030);
   p.add('shoulderL',-Math.max(0,aL)*0.10,0,0);
   p.add('shoulderR',-Math.max(0,aR)*0.10,0,0);
   p.set('forearmL',-bend-Math.max(0,aL)*(0.28+sp*0.50), 0.22, 0.04);
@@ -5916,27 +6022,17 @@ Body.head=function(){
        face; the face map paints the same curve underneath it so the
        two reinforce rather than fight. A mouth built from two spheres
        and a slot read as a wound at this scale. */
-    sweep(0,-0.0585,0.0905,0.0245,0.0042,0.0052,LIPLINE,13,0.62);
-    /* the lower lip, as a soft swell under it rather than as an object */
-    b.push();b.translate(0,-0.0665,0.0838);
-    b.scale(1.34,0.40,0.30);
-    b.sphere(0,0,0,0.0170,14,10,LIPL);b.pop();
+    /* One shallow crease, and the rest is paint. The swell that used
+       to sit under it read as a duck bill on a face this flat. */
+    sweep(0,-0.0588,0.0888,0.0216,0.0036,0.0034,LIPLINE,13,0.58);
 
     /* ---- eyelids ----
-       One cap over the top of each eye. The lower lid, the fold and
-       the caruncle are gone: three spheres each to describe the age of
-       an eye on a head where the eye is a coloured disc. */
-    for(var k=-1;k<=1;k+=2){
-      b.push();b.translate(k*0.0370,0.0292,0.0790);b.rotate(-0.20,k*-0.22,0);
-      b.scale(1.16,0.90,0.58);
-      b.sphere(0,0,0,0.0192,14,10,LIDU);b.pop();
-      /* The lower lid is a rim, not a pad. Set back into the face and
-         flattened, it closes the socket without putting a bag under
-         the eye. */
-      b.push();b.translate(k*0.0370,-0.0168,0.0760);b.rotate(0.26,k*-0.22,0);
-      b.scale(1.04,0.46,0.40);
-      b.sphere(0,0,0,0.0176,14,10,LIDL);b.pop();
-    }
+       Painted, not modelled. The crease above the eye and the shadow
+       under it are two marks in the face map now; the only lid left as
+       geometry is the one in Body.lids, which exists because it has to
+       move when the character blinks. Four spheres per eye to describe
+       the age of an eye, on a head where the eye is a flat disc, was
+       four spheres of lumps. */
 
     /* ---- ears ----
        One shape with one hollow. The helix was eight beads around a
@@ -5963,7 +6059,31 @@ Body.head=function(){
    they replace, and the single biggest reason the old head read as a
    doll. The socket is already a dent in the skull, so the eye only
    has to fill it. */
-var EYE_X=0.0370, EYE_Y=0.0040, EYE_Z=0.0788, EYE_R=0.0145, EYE_TILT=-0.22;
+/* The eye, and the single biggest reason this character read as a
+   mannequin.
+
+   A real eyeball is 24 mm across on a 150 mm head — a tenth of the
+   face — and that is what was here, faithfully. It is also completely
+   wrong for the genre. Every character in a stylised RPG that anyone
+   describes as *appealing* has eyes at a fifth of the face width or
+   more, because the eyes are where a face is read from, and a tenth
+   of a face gives you two dark specks on a blank oval. Two dark
+   specks on a blank oval is the look people mean when they say a
+   character looks like an untextured primitive.
+
+   So this is a designed eye rather than a measured one: half again as
+   large, set a little wider and a little higher, and with every part
+   of it — socket, sclera, lids, iris, catchlight — derived from EYE_R
+   so the whole assembly stays in proportion if it is ever retuned
+   again. */
+/* EYE_Z is where the lens plane sits, and it is no longer where the
+   centre of a ball would go. The face plane at the eyeline is at
+   0.099, the socket dent takes it to about 0.091, and a lens is four
+   millimetres thick — so the plane goes at 0.089 and the eye lies in
+   the socket with its front a hair proud of the skin. Set at the old
+   ball's centre it was thirteen millimetres inside the head, which is
+   exactly where it went the first time. */
+var EYE_X=0.0402, EYE_Y=0.0098, EYE_Z=0.0888, EYE_R=0.0224, EYE_TILT=-0.20;
 /* The iris, as a fraction of the eyeball. Left at one: enlarging it
    sounded like the toy thing to do and turned out to read as a pair
    of goggles, because the ring around it grows with it. */
@@ -5974,66 +6094,88 @@ Body.eyes=function(){
     b.mat('blank');
     b.push();b.scale(P.headScale,P.headScale,P.headScale);
     for(var s=-1;s<=1;s+=2){
-      /* the socket behind, so nothing shows through the gap */
-      b.push();b.translate(s*EYE_X,EYE_Y,EYE_Z-0.008);b.rotate(0,s*EYE_TILT,0);
-      b.sphere(0,0,0,EYE_R*1.34,12,9,'#241E22',{squash:0.82});
-      b.pop();
-      /* The sclera. Warm off-white rather than paper: photographic
-         white on an eyeball is the fastest way to make a face read as
-         a doll. It is also *small* — the iris covers most of it, which
-         is what separates a friendly eye from a staring one. The old
-         build added a lash line, a lid shadow, an inner-corner
-         caruncle and two specular dots on top of this; at the size a
-         player sees a head, all of that was four grey specks. */
+      /* A lens, not a ball.
+
+         This is the third build of this eye and the first one that is
+         the right *kind* of object. A sphere is what an eye is, and on
+         a head with a real brow and a real socket to sink it into,
+         modelling one works. This head is a stylised near-flat plane:
+         a sphere set into it either disappears or — set far enough
+         forward to read — sits on the face like a bead glued on, which
+         is precisely the look people mean when they say a character
+         looks unfinished. Every stylised game with an appealing face
+         solves it the same way: the eye is a flat disc lying in the
+         face plane, and the roundness is painted rather than modelled.
+
+         So each eye is four coplanar discs — a dark rim, the sclera,
+         the iris, the pupil — squashed almost flat and set into the
+         socket dent, plus two catchlights. Nothing protrudes, and the
+         silhouette of the head stays the silhouette of the head. */
       b.push();b.translate(s*EYE_X,EYE_Y,EYE_Z);b.rotate(0,s*EYE_TILT,0);
-      b.scale(0.94,0.70,1.0);
-      b.sphere(0,0,0,EYE_R,16,12,'#EDE7E1');
+      /* the rim, a shade wider than the white, which is what gives the
+         opening an edge without a modelled eyelid */
+      b.scale(1.0,0.70,0.16);
+      b.sphere(0,0,0,EYE_R*1.10,20,8,'#2A2028');
       b.pop();
-      /* One catchlight, up and out, where a sky would put it. It lives
-         here rather than with the iris because this part is tinted
-         white and the iris part is tinted with the player's eye
+      b.push();b.translate(s*EYE_X,EYE_Y,EYE_Z+EYE_R*0.030);
+      b.rotate(0,s*EYE_TILT,0);
+      b.scale(1.0,0.66,0.15);
+      b.sphere(0,0,0,EYE_R,20,8,'#F4F0EA');
+      b.pop();
+      /* Catchlights. Up and out from a sky, and a small one opposite.
+         They live here rather than with the iris because this part is
+         tinted white and the iris part is tinted with the player's eye
          colour, and a highlight is white whatever the eye is. */
       b.push();b.translate(s*EYE_X,EYE_Y,EYE_Z);b.rotate(0,s*EYE_TILT,0);
-      b.sphere(-0.0042,0.0050,EYE_R*0.94,0.0030,7,6,'#FFFFFF');
+      b.sphere(-EYE_R*0.30,EYE_R*0.28,EYE_R*0.36,EYE_R*0.145,10,8,'#FFFFFF',
+               {squash:0.62});
+      b.sphere( EYE_R*0.26,-EYE_R*0.30,EYE_R*0.36,EYE_R*0.075,7,6,'#DCE8F6',
+               {squash:0.62});
       b.pop();
     }
     b.pop();
   });
 };
-/* The iris carries the player's eye colour. Four concentric discs: a
-   dark limbal ring, the body, a pupil, and a shadow under the upper
-   lid that stops the whole thing reading as a printed sticker. The
-   striations and the collarette that used to be here were five more
-   draws for detail that survives to about forty centimetres. */
+/* The iris carries the player's eye colour. Three coplanar discs on
+   top of the white: a dark limbal ring, the body, and a pupil. It is
+   a separate part from the white because it is tinted, and separate
+   from the head because it moves — this is what darts when a character
+   looks at something. */
 Body.iris=function(){
   return part('iris',function(b){
     b.mat('blank');
     b.push();b.scale(P.headScale,P.headScale,P.headScale);
     for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*EYE_X,EYE_Y,EYE_Z+EYE_R*0.80);
+      /* In front of the white, which it was not: four coplanar discs
+         only read in the order you stack them, and the iris was
+         losing the depth test to the sclera by two tenths of a
+         millimetre — so every character had blank white eyes. */
+      b.push();b.translate(s*EYE_X,EYE_Y-EYE_R*0.05,EYE_Z+EYE_R*0.200);
       b.rotate(0,s*EYE_TILT,0);
-      /* Three discs and no fourth. A grey band under the upper lid was
-         the fourth, and at this scale it read as the eye looking down.
-         The limbal ring is nearly as tall as the opening, so what you
-         see is a dark eye with white only at the corners — which is
-         the whole difference between friendly and staring. */
-      b.sphere(0,0,0,0.0076*IRISK,16,12,'#23242C',{squash:0.62});  /* limbal */
-      b.sphere(0,0,0.0011,0.0062*IRISK,16,12,'#FFFFFF',{squash:0.58});/* body */
-      b.sphere(0,0,0.0022,0.0034*IRISK,12,9,'#07070A',{squash:0.56}); /* pupil */
+      b.scale(1.0,1.0,0.13);
+      b.sphere(0,0,0,EYE_R*0.62,20,8,'#1A1B24');      /* limbal ring */
+      b.sphere(0,0,EYE_R*0.05,EYE_R*0.50,20,8,'#FFFFFF'); /* the colour */
+      /* a darker floor to the iris, so it is a bowl rather than a chip
+         of flat paint */
+      b.sphere(0,-EYE_R*0.13,EYE_R*0.10,EYE_R*0.36,16,7,'#5C5C6E');
+      b.sphere(0,0,EYE_R*0.14,EYE_R*0.26,16,7,'#07070C');  /* pupil */
       b.pop();
     }
     b.pop();
   });
 };
+/* The lid, for blinking. One skin cap that drops over the lens — the
+   fold, the lower lid and the caruncle that used to be modelled here
+   were four more spheres on a face that already had too many. */
 Body.lids=function(){
   return part('lids',function(b){
     b.mat('skin');
     b.push();b.scale(P.headScale,P.headScale,P.headScale);
     for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*EYE_X,EYE_Y+0.008,EYE_Z-0.001);
-      b.rotate(0.12,s*EYE_TILT,0);
-      b.scale(1.06,1.0,0.66);
-      b.sphere(0,0,0,EYE_R*1.28,14,10,LIT);
+      b.push();b.translate(s*EYE_X,EYE_Y+EYE_R*0.84,EYE_Z-EYE_R*0.46);
+      b.rotate(0.10,s*EYE_TILT,s*0.08);
+      b.scale(1.14,0.72,0.34);
+      b.sphere(0,0,0,EYE_R*1.16,16,10,LIT);
       b.pop();
     }
     b.pop();
@@ -6054,12 +6196,12 @@ Body.brows=function(){
          the single biggest contributor to the grimace. */
       for(var i=0;i<7;i++){
         var t=i/6;
-        var arc=Math.sin(t*2.2)*0.010;
-        var x=EYE_X-0.020+t*0.046;
-        var y=0.0330+arc-t*t*0.010;
-        var z=EYE_Z+0.0175-t*0.0130-Math.abs(t-0.35)*0.004;
-        var len=0.0092-t*0.0030;
-        var thick=(0.0034-t*0.0013)*(1-0.35*Math.abs(t-0.25));
+        var arc=Math.sin(t*2.2)*0.011;
+        var x=EYE_X-0.026+t*0.054;
+        var y=0.0560+arc-t*t*0.012;
+        var z=EYE_Z+0.0180-t*0.0140-Math.abs(t-0.35)*0.004;
+        var len=0.0104-t*0.0032;
+        var thick=(0.0046-t*0.0016)*(1-0.32*Math.abs(t-0.25));
         b.push();
         b.translate(s*x,y,z);
         b.rotate(0.30-t*0.55,s*(EYE_TILT-t*0.34),s*(0.34-t*0.92));
@@ -7060,7 +7202,13 @@ function hairCard(b,o){
     var t=i/seg;
     pts.push(p.slice());
     ws.push(o.w*(1-(o.taper===undefined?0.72:o.taper)*t*t));
-    cols.push(hairShade(t));
+    /* The tip used to ramp the whole way up the shade table, which
+       ends at near-white. On dark hair that put a row of pale
+       triangles along every fringe and turned every spike grey — the
+       hard sawtooth edge that made these heads look unfinished. A
+       strand does catch more light at its tip than at its root, but by
+       a third of a stop, not by the whole ramp. */
+    cols.push(hairShade(0.16+t*0.30));
     /* Gravity and flow are applied per step, not per metre. Scaling
        them by the step length meant a three-centimetre crop barely bent
        while a long style folded double on the same droop number, and
@@ -7119,6 +7267,8 @@ function hairCard(b,o){
 
 /* Triangle wave in -1..1, for the teeth along a cut edge. */
 function tri(x){x=x-Math.floor(x);return 4*Math.abs(x-0.5)-1;}
+/* Smoothstep on an already-clamped 0..1. */
+function smooth(t){return t*t*(3-2*t);}
 /* 1 at the face, 0 at the nape — every hairline is written in terms
    of this rather than in raw azimuth, so a style reads as "low at the
    front, lower at the back" instead of as trigonometry. */
@@ -7148,16 +7298,26 @@ function shell(b,cfg){
      through the top of every short style. `pad` is that difference,
      applied where it exists rather than everywhere. */
   function pad(el){
-    var t=(el-0.45)/0.95;
+    /* The head is wider than the ellipsoid over most of its upper
+       half, not just near the crown — at the temples it is about four
+       per cent out, which was enough for a bare patch to show through
+       every short style at exactly eye level. */
+    var t=(el+0.10)/1.40;
     if(t<=0)return 0;
     if(t>1)t=1;
-    return 0.075*t*t*(3-2*t);
+    return 0.088*t*t*(3-2*t);
   }
   function rAt(az,k,el){
     var lim=lo(az)+(jag?jag*tri(k/n*teeth+ph):0);
     var o=1.05+pad(el)+out(az,el);
+    /* The hairline as a roll rather than a cliff. At 0.09 the shell
+       went from inside the skull to its full radius across one ring,
+       which under a directional key is a bright vertical wall running
+       round the head — the hard sawtooth edge every short style had.
+       Spread over three times the elevation it reads as hair meeting
+       skin. */
     if(el<lim)return IN;
-    if(el<lim+0.09)return M.lerp(IN,o,(el-lim)/0.09);
+    if(el<lim+0.26)return M.lerp(IN,o,smooth((el-lim)/0.26));
     return o;
   }
   /* Rings are unshifted rather than pushed. `scalpPt` walks the ring as
@@ -7297,7 +7457,7 @@ var HAIR_BUILD={
   /* --- short, everyday --- */
   crop:function(b){
     shell(b,{lo:line(0.12,-0.50),out:function(){return 0.115;},
-      jag:0.030,teeth:11,rows:12});
+      jag:0.017,teeth:11,rows:12});
   },
   bowl:function(b){
     /* A bowl is a cut, not a shape: one height all the way round, and
@@ -7307,7 +7467,7 @@ var HAIR_BUILD={
   },
   pixie:function(b){
     shell(b,{lo:line(0.03,-0.42),out:function(az){return 0.13+fw(az)*0.05;},
-      jag:0.075,teeth:13,rows:13});
+      jag:0.041,teeth:13,rows:13});
     crest(b,{n:5,az0:-0.7,az1:0.7,el:0.30,len:0.030,w:0.014,out:0.5,
       dir:[0,0.35,0.55],droop:0.5,seed:3,elJit:0.10});
   },
@@ -7327,14 +7487,14 @@ var HAIR_BUILD={
     shell(b,{lo:function(az){return line(0.08,-0.46)(az)-Math.sin(az)*0.16;},
       out:function(az){return 0.15+Math.max(0,Math.cos(az))*0.11+
         Math.max(0,Math.sin(az))*0.05;},
-      jag:0.045,teeth:8,rows:13});
+      jag:0.025,teeth:8,rows:13});
     crest(b,{n:7,az0:-1.15,az1:0.35,el:0.24,len:0.052,w:0.016,out:0.35,
       dir:[-0.55,0.05,0.65],droop:0.9,seed:23,elJit:0.12,lenJit:0.34});
   },
   /* --- messy and spiked --- */
   mop:function(b){
     shell(b,{lo:line(-0.06,-0.54),out:function(){return 0.20;},
-      jag:0.115,teeth:12,rows:13});
+      jag:0.063,teeth:12,rows:13});
     scatter(b,{n:26,el0:0.15,el1:1.40,len:0.040,w:0.014,out:0.9,
       dir:[0,0.25,0],droop:0.7,seed:11,curl:0.5,curlFreq:1.6});
     crest(b,{n:9,az0:-1.05,az1:1.05,el:0.06,len:0.038,w:0.013,out:0.55,
@@ -7381,13 +7541,13 @@ var HAIR_BUILD={
     /* The fringe comes down past the brow and the edge is cut into
        points. It is meant to read as a hood of hair. */
     shell(b,{lo:line(-0.13,-0.66),out:function(az){return 0.20+fw(az)*0.07;},
-      jag:0.135,teeth:7,rows:14,n:42,drop:0.045,dropRows:3,
+      jag:0.074,teeth:7,rows:14,n:42,drop:0.045,dropRows:3,
       hang:function(az){return 1-fw(az)*fw(az);},
       sh0:0.08,sh1:0.58});
   },
   long:function(b){
     shell(b,{lo:line(0.09,-0.78),out:function(){return 0.185;},
-      jag:0.045,teeth:9,rows:14,n:40,
+      jag:0.025,teeth:9,rows:14,n:40,
       drop:0.150,dropRows:7,taperIn:0.14,
       hang:function(az){var f=fw(az);return M.clamp(1.35-f*2.1,0,1);}});
   },
@@ -7396,7 +7556,7 @@ var HAIR_BUILD={
        reads differently from the back in a crowd. */
     shell(b,{lo:function(az){return line(0.05,-0.74)(az)-Math.sin(az)*0.12;},
       out:function(az){return 0.19+Math.max(0,-Math.sin(az))*0.06;},
-      jag:0.030,teeth:14,rows:14,n:40,
+      jag:0.017,teeth:14,rows:14,n:40,
       drop:0.135,dropRows:7,taperIn:0.16,
       hang:function(az){
         var f=fw(az);
@@ -7404,11 +7564,11 @@ var HAIR_BUILD={
   },
   afro:function(b){
     shell(b,{lo:line(0.08,-0.44),out:function(){return 0.470;},
-      jag:0.055,teeth:22,rows:16,n:44,sh0:0.20});
+      jag:0.030,teeth:22,rows:16,n:44,sh0:0.20});
   },
   curls:function(b){
     shell(b,{lo:line(0.02,-0.50),out:function(){return 0.245;},
-      jag:0.070,teeth:15,rows:14,n:40});
+      jag:0.039,teeth:15,rows:14,n:40});
     /* the bumps that turn a smooth mass into a curly one */
     var rng=M.rng(113);
     for(var i=0;i<40;i++){
@@ -7456,7 +7616,7 @@ var HAIR_BUILD={
   },
   twin:function(b){
     shell(b,{lo:line(0.09,-0.42),out:function(){return 0.120;},rows:11,
-      jag:0.030,teeth:10});
+      jag:0.017,teeth:10});
     for(var s=-1;s<=1;s+=2){
       var c=scalpPt(s*1.60,0.30,1.16);
       tie(b,c,0.021);
@@ -7466,7 +7626,7 @@ var HAIR_BUILD={
   },
   braids:function(b){
     shell(b,{lo:line(0.09,-0.46),out:function(){return 0.105;},rows:11,
-      jag:0.025,teeth:16,sh0:0.14});
+      jag:0.014,teeth:16,sh0:0.14});
     for(var s=-1;s<=1;s+=2){
       var st=scalpPt(s*1.42,0.20,1.14);
       rope(b,st,[s*0.34,-0.92,0.10],0.215,0.023,15,0.07,61+s);
@@ -8167,8 +8327,13 @@ Body.hat=function(style){
        hairline, five and a half centimetres up. The 0.88 is the same
        correction in width: a brim authored against the old skull came
        out half a metre across on this one. */
-    b.push();b.translate(0,0.030,0);
-    b.scale(HEAD_FIT[0]*0.94,HEAD_FIT[1]*0.94,HEAD_FIT[2]*0.94);
+    /* 0.94 put a hat band 0.39 metres across on a head 0.28 across,
+       so every hat in the game hovered with a finger of daylight round
+       it — which reads as broken long before it reads as loose. 0.76
+       is snug: the band grips the skull and the brim still oversails
+       it. */
+    b.push();b.translate(0,0.026,0);
+    b.scale(HEAD_FIT[0]*0.76,HEAD_FIT[1]*0.80,HEAD_FIT[2]*0.76);
     HAT_BUILD[style](b);
     b.pop();
   });
@@ -21476,7 +21641,7 @@ App.onDraw(function(dt,time){
   R.beginScene();
   var p=R.beginOpaque();
   GL.uM4(p,'uModel',_id);
-  GL.u1f(p,'uSpec',0.03+LH.Sky.wet*0.14);
+  GL.u1f(p,'uSpec',0.10+LH.Sky.wet*0.26);
   GL.u1f(p,'uMacro',1);
   T.drawChunks(true);
   GL.u1f(p,'uMacro',0);

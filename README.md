@@ -1164,6 +1164,73 @@ asserts its own at run time rather than only declaring it in a head
 that a host may replace. The game now carries its answer wherever it
 is embedded.
 
+### Why it looked broken
+
+"Broken and Roblox-y" was a fair description and the causes were not
+the ones you would guess from the geometry. Four of them, and three
+were lighting or ordering rather than shape.
+
+**There was no light.** The toy pass had taken the sun down and the
+ambient up threefold to match a flat mobile reference, and it worked
+exactly as asked: everything came out evenly lit matte plastic. That
+is also what makes a character read as an untextured primitive — with
+no terminator there is no form, and with no form a body is a stack of
+tubes whatever shape the tubes are. It is a warm key strong enough to
+cast a real terminator now, against a cool fill that is clearly a
+fill, with a violet rim picking out the silhouette. Warm light and
+cool shadow is the oldest trick in illustration and the reason a
+stylised character looks lit rather than printed.
+
+Roughness went back to a spread at the same time. A brass fitting, a
+slate roof and a cotton shirt had all been reflecting exactly the same
+amount of nothing, so the only thing separating them was their hue —
+which is the definition of an untextured look. And `TOY_MIX` was
+pulling every painted texture 84 per cent of the way to a flat colour,
+which is why a plank, a brick and a sheet of steel were three flat
+rectangles.
+
+**The eye was the wrong kind of object.** A real eyeball is a tenth of
+the width of a real face, and that is faithfully what was here. It is
+also completely wrong for the genre: every stylised RPG character
+anyone calls appealing has eyes at a fifth of the face or more,
+because the eyes are where a face is read from, and a tenth gives you
+two dark specks on a blank oval. Enlarging the sphere only made it
+worse — a ball set into a near-flat face either disappears or sits on
+it like a bead glued on.
+
+So the eye is a *lens*: four coplanar discs — dark rim, sclera, iris,
+pupil — squashed almost flat and laid into the socket dent, with two
+catchlights. Nothing protrudes and the head keeps its silhouette. The
+crease, the brow shadow, the lash shadow and the corners moved into
+the face map, where they cost nothing at silhouette and can never read
+as lumps.
+
+Two ordering bugs came with it, and both are worth writing down
+because both produced a *specific* broken look. Seated at the old
+ball's centre the lens was thirteen millimetres inside the head, so
+the eyes vanished. Seated correctly, the iris lost the depth test to
+the sclera by two tenths of a millimetre, so every character had blank
+white eyes.
+
+**The hair tips ramped to near-white.** A strand catches more light at
+its tip than at its root — by about a third of a stop, not by the
+whole shade table, which is what `hairCard` was doing. On dark hair
+that put a row of pale triangles along every fringe and turned every
+spike grey. The hairline transition was also one ring wide, which
+under a directional key is a bright vertical cliff running round the
+head; it is a roll three times as wide now.
+
+**And the arms were fused to the body.** Four degrees out is what a
+real arm does against a real ribcage. Against a toy torso two thirds
+thicker it means the arms touch down their whole length, which is the
+silhouette everyone reads as unfinished. Eleven degrees leaves
+daylight between elbow and hip.
+
+Hats were the same class of error: the fit multiplier put a band 0.39
+metres across on a head 0.28 across, so every hat in the game hovered
+with a finger of daylight round it — loose enough to read as broken
+long before it reads as loose.
+
 ---
 
 ## `site/index.html` — the landing page
