@@ -2741,15 +2741,15 @@ R.face=function(){
     e=blob(u,h,0.25,0.268,0.038,0.016);
     c=mixv(c,rgb('#C9A091'),e*0.44);
     /* the mouth: a line with corners, not a lozenge */
-    e=blob(u,h,0.25,0.212,0.058,0.013);
-    c=mixv(c,rgb('#B4655A'),e*0.88);
+    e=blob(u,h,0.25,0.212,0.062,0.015);
+    c=mixv(c,rgb('#9A4E46'),e*0.95);
     for(i=0;i<2;i++){
-      e=blob(u,h,0.25+(i?0.052:-0.052),0.216,0.016,0.012);
-      c=mixv(c,rgb('#9C544C'),e*0.70);
+      e=blob(u,h,0.25+(i?0.054:-0.054),0.218,0.018,0.014);
+      c=mixv(c,rgb('#8A423C'),e*0.80);
     }
     /* the lower lip catching light under it */
-    e=blob(u,h,0.25,0.196,0.048,0.014);
-    c=mixv(c,rgb('#F6D0C0'),e*0.44);
+    e=blob(u,h,0.25,0.194,0.050,0.016);
+    c=mixv(c,rgb('#F8D4C4'),e*0.52);
     /* a touch of colour on the cheeks. One mark, and it is the
        difference between a face and a mask. */
     for(i=0;i<2;i++){
@@ -7051,11 +7051,17 @@ Body.head=function(){
       return {y:y,pts:headSect(hw,hf,hb,n,ex),col:col||null};
     }
     var secs=[
-      R(-0.118,0.034,0.058,0.038,2.7,MID),   /* chin point            */
-      R(-0.100,0.048,0.070,0.056,2.7),
-      R(-0.078,0.062,0.078,0.072,2.8),       /* jaw                   */
-      R(-0.056,0.072,0.088,0.082,2.7),       /* mouth line            */
-      R(-0.036,0.080,0.094,0.092,2.5),       /* cheek / zygomatic     */
+      /* A chin, and a jaw that tapers to it. The old profile ran
+         nearly straight from the cheekbone to a small rounded point,
+         which on a head this wide is a face with no lower half — the
+         "blank oval" read. Narrower at the jaw, fuller at the chin,
+         and the cheek pulled in a little so the two of them describe a
+         shape rather than a circle. */
+      R(-0.120,0.040,0.062,0.042,2.5,MID),   /* chin point            */
+      R(-0.102,0.052,0.074,0.058,2.5),
+      R(-0.080,0.062,0.080,0.070,2.6),       /* jaw                   */
+      R(-0.056,0.071,0.089,0.080,2.5),       /* mouth line            */
+      R(-0.036,0.079,0.094,0.090,2.4),       /* cheek / zygomatic     */
       R(-0.014,0.085,0.098,0.098,2.4),
       R( 0.005,0.087,0.099,0.101,2.3),       /* eyeline               */
       R( 0.030,0.088,0.100,0.104,2.3),
@@ -7207,7 +7213,7 @@ Body.head=function(){
    the socket with its front a hair proud of the skin. Set at the old
    ball's centre it was thirteen millimetres inside the head, which is
    exactly where it went the first time. */
-var EYE_X=0.0402, EYE_Y=0.0098, EYE_Z=0.0888, EYE_R=0.0224, EYE_TILT=-0.20;
+var EYE_X=0.0378, EYE_Y=0.0128, EYE_Z=0.0888, EYE_R=0.0230, EYE_TILT=-0.20;
 /* The iris, as a fraction of the eyeball. Left at one: enlarging it
    sounded like the toy thing to do and turned out to read as a pair
    of goggles, because the ring around it grows with it. */
@@ -7270,36 +7276,55 @@ Body.iris=function(){
     b.mat('blank');
     b.push();b.scale(P.headScale,P.headScale,P.headScale);
     for(var s=-1;s<=1;s+=2){
-      /* In front of the white, which it was not: four coplanar discs
-         only read in the order you stack them, and the iris was
-         losing the depth test to the sclera by two tenths of a
-         millimetre — so every character had blank white eyes. */
-      b.push();b.translate(s*EYE_X,EYE_Y-EYE_R*0.05,EYE_Z+EYE_R*0.200);
+      /* Each disc gets its own transform.
+
+         The first build nested four spheres inside one `scale(1,1,0.13)`
+         that flattened them into discs — and flattened their z offsets
+         with them, by the same factor. The limbal ring is the widest
+         disc, so once its half-thickness was 0.13 of its radius and the
+         gaps between the discs were 0.13 of a tenth of a millimetre,
+         the ring came out in front of everything inside it and every
+         character in the game had solid black eyes. The stacking has
+         to happen outside the flattening. */
+      function disc(dz,r,squash,col,seg){
+        b.push();
+        b.translate(s*EYE_X,EYE_Y-EYE_R*0.05,EYE_Z+EYE_R*(0.20+dz));
+        b.rotate(0,s*EYE_TILT,0);
+        b.scale(1.0,1.0,squash);
+        b.sphere(0,0,0,r,seg||20,8,col);
+        b.pop();
+      }
+      /* Widest and furthest back, so it reads as a ring round the
+         colour rather than as a lid over it. */
+      disc(0.000,EYE_R*0.62,0.13,'#191A22');
+      /* The colour the player picked. This is the disc that has to be
+         seen, so it is the largest thing that is not the ring. */
+      disc(0.045,EYE_R*0.52,0.11,'#FFFFFF');
+      /* A brighter crescent low in the iris, where light that entered
+         the top of it comes back out. Offset downward, not concentric:
+         a bright disc centred on the pupil is a bullseye, and three
+         concentric rings is a dartboard rather than an eye. */
+      b.push();
+      b.translate(s*EYE_X,EYE_Y-EYE_R*0.19,EYE_Z+EYE_R*0.29);
       b.rotate(0,s*EYE_TILT,0);
-      b.scale(1.0,1.0,0.13);
-      b.sphere(0,0,0,EYE_R*0.62,20,8,'#1A1B24');      /* limbal ring */
-      b.sphere(0,0,EYE_R*0.05,EYE_R*0.50,20,8,'#FFFFFF'); /* the colour */
-      /* a darker floor to the iris, so it is a bowl rather than a chip
-         of flat paint */
-      b.sphere(0,-EYE_R*0.13,EYE_R*0.10,EYE_R*0.36,16,7,'#5C5C6E');
-      b.sphere(0,0,EYE_R*0.14,EYE_R*0.26,16,7,'#07070C');  /* pupil */
+      b.scale(1.0,0.54,0.07);
+      b.sphere(0,0,0,EYE_R*0.36,16,8,'#FFF6E2');
       b.pop();
+      /* and the pupil on top of all of it */
+      disc(0.150,EYE_R*0.235,0.07,'#0A0A10',16);
     }
     b.pop();
   });
 };
-/* The lid, for blinking. One skin cap that drops over the lens — the
-   fold, the lower lid and the caruncle that used to be modelled here
-   were four more spheres on a face that already had too many. */
 Body.lids=function(){
   return part('lids',function(b){
     b.mat('skin');
     b.push();b.scale(P.headScale,P.headScale,P.headScale);
     for(var s=-1;s<=1;s+=2){
-      b.push();b.translate(s*EYE_X,EYE_Y+EYE_R*0.84,EYE_Z-EYE_R*0.46);
-      b.rotate(0.10,s*EYE_TILT,s*0.08);
-      b.scale(1.14,0.72,0.34);
-      b.sphere(0,0,0,EYE_R*1.16,16,10,LIT);
+      b.push();b.translate(s*EYE_X,EYE_Y+EYE_R*0.74,EYE_Z-EYE_R*0.46);
+      b.rotate(0.10,s*EYE_TILT,s*0.10);
+      b.scale(1.16,0.70,0.34);
+      b.sphere(0,0,0,EYE_R*1.18,16,10,LIT);
       b.pop();
     }
     b.pop();
@@ -11310,7 +11335,7 @@ A.defaultKit=function(seed){
   var rng=kitRng(seed);
   var SKIN=['#F2C9A4','#E3AE83','#C98B62','#9C6242','#75462C','#54321F','#FBDCC0'];
   var HAIRC=['#2B2118','#4A3222','#7A5230','#A87740','#D8B978','#8E3B2E','#2A2E3A'];
-  var EYEC=['#4A7FB5','#4E6B3A','#6B4A2C','#3A3F4A','#5C4B8A'];
+  var EYEC=['#5C9EDC','#5FA86A','#A87A46','#4E5A6E','#8A6ED8'];
   /* Everyone arrives in a colour. A plaza of people in slate reads as
      a crowd of extras; a plaza of people in eight bright tees reads as
      a place worth standing in. */
@@ -12023,7 +12048,7 @@ var SKIN=['#FBDCC0','#F2C9A4','#E3AE83','#C98B62','#9C6242','#75462C',
           '#54321F'];
 var HAIRC=['#241C16','#3A2A1C','#5A3A22','#7A5230','#A87740','#D8B978',
            '#8E3B2E','#2A2E3A','#8B8478','#B8D8E8','#7B3220','#3E5A4A'];
-var EYEC=['#4A7FB5','#4E6B3A','#6B4A2C','#3A3F4A','#5C4B8A','#93A7B2'];
+var EYEC=['#5C9EDC','#5FA86A','#A87A46','#4E5A6E','#8A6ED8','#93B7C2'];
 /* One saturated garment colour per person. Neighbouring entries are
    kept far apart in hue so two people picked in a row rarely match. */
 var LOUD=['#FF6B5B','#4FA8FF','#4FD08A','#FFB84D','#C08BFF','#4FE3B0',
@@ -21231,7 +21256,12 @@ F.go=function(s){go(s);};
 var SKIN=['#F7DCC2','#F2C9A4','#E3AE83','#C98B62','#9C6242','#75462C','#54321F'];
 var HAIRC=['#1E1B18','#2B2118','#4A3222','#7A5230','#A87740','#D8B978',
            '#8E3B2E','#2A2E3A','#5C4B8A','#2E6B6B'];
-var EYEC=['#4A7FB5','#4E6B3A','#6B4A2C','#3A3F4A','#5C4B8A','#8A5A3A'];
+/* Eye colours, brightened. These are multiplied over a white iris
+   disc, so what is listed here is what you see — and the old set was
+   picked as plausible iris pigments, which on a stylised face at three
+   metres is six shades of dark. */
+var EYEC=['#5C9EDC','#5FA86A','#A87A46','#4E5A6E','#8A6ED8','#C88A4A',
+          '#3FC4C0','#D06A86'];
 var WEAR=['#8C93A0','#3E5C7A','#7A3A48','#3A6A4A','#6A5A3A','#4A3A6A',
           '#D8D2C4','#26292F'];
 /* The wardrobe offers the same choices as character creation, from the

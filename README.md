@@ -1157,6 +1157,21 @@ skeleton and refuses a page that brings a second one. There is no
 second copy of the game to drift out of step: run the script after a
 change and the preview is that change.
 
+The first version of it did change something else, and the way it
+failed is worth keeping. It kept a hand-picked list from the head —
+the title and the font links — and dropped the `<style>` block, which
+is where all eleven hundred lines of the game's CSS live. The preview
+then *booted perfectly*: `LH` loaded, the world generated, the boot bar
+reached "Ready", the title card appeared in the DOM. It also rendered
+as an unstyled 300x150 canvas at the top of a thirty-thousand-pixel
+page, because `#app{position:fixed}` had gone with everything else.
+
+Every boolean a test could assert was true. So the script self-checks
+on size and substance now — the output has to be within three per cent
+of the source, and it has to contain the layout CSS, the canvas CSS,
+the device layer and the renderer by name — and the sandbox test
+measures the canvas rather than asking whether the page loaded.
+
 The one thing the host cannot get right is the viewport, whose tag is
 written for a document rather than for a game — it will allow
 pinch-zoom and it will not run the canvas under a notch. So `LH.Device`
@@ -1230,6 +1245,32 @@ Hats were the same class of error: the fit multiplier put a band 0.39
 metres across on a head 0.28 across, so every hat in the game hovered
 with a finger of daylight round it — loose enough to read as broken
 long before it reads as loose.
+
+### Eyes that are a colour
+
+Two more instances of the same bug, and the second one is the reason
+every character in the game had solid black eyes.
+
+The eye is four coplanar discs — ring, colour, crescent, pupil — and
+the first build flattened all four inside one `scale(1,1,0.13)`. That
+squashes the discs, which is the point, and it squashes the *gaps
+between them* by the same factor, which is not. The limbal ring is the
+widest disc and therefore the thickest after flattening, so it came out
+in front of everything it was supposed to surround. The stacking has to
+happen outside the flattening; each disc gets its own transform now.
+
+The palette was the other half of it. The eye colours had been picked
+as plausible iris pigments, which on a stylised face at three metres is
+six shades of dark. They are colours now.
+
+While the face was open: the eyes came in from a 54-per-cent-of-half-a-
+head spacing that left a broad flat bridge between them; the jaw was
+given a taper and the chin some width, because the old profile ran
+nearly straight from cheekbone to a small rounded point and a head that
+wide with no lower half is exactly the "blank oval" read; the iris lost
+a concentric white disc that was turning it into a dartboard, in favour
+of an offset crescent; and the mouth went from a smudge to a line with
+corners.
 
 ---
 
