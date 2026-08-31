@@ -1,0 +1,23 @@
+name: build and test
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+
+      # src/ must still reproduce the shipped file exactly
+      - run: python3 tools/build.py --check
+
+      - run: npm init -y && npm i playwright@latest
+      - run: npx playwright install --with-deps chromium
+
+      # SwiftShader, so the game renders slowly but it does render
+      - run: NODE_PATH=$(npm root) node tools/test/all.mjs

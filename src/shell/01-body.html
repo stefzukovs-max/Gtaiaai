@@ -1,0 +1,37 @@
+</style>
+</head>
+<body>
+
+<div id="app">
+  <canvas id="gl"></canvas>
+
+  <div id="hud"></div>
+
+  <div id="boot">
+    <div class="brand">Lumen Harbor<small>A World Of Your Own</small></div>
+    <div class="bootbar"><i id="bootfill"></i></div>
+    <div class="boottip" id="boottip">Waking the harbour…</div>
+  </div>
+
+  <div id="front"><div class="veil"></div><div class="pane" id="frontpane"></div></div>
+
+  <div id="rotate"><div class="ph"></div>
+    <div style="font-family:var(--disp);letter-spacing:.2em;font-size:18px">TURN YOUR DEVICE</div>
+    <div style="color:var(--ink3);font-size:13px;max-width:280px">Lumen Harbor has more
+      room in landscape — but it plays either way.</div>
+    <div class="dismiss" id="rotateok">Play in portrait</div>
+  </div>
+
+  <!-- Offered on a phone once, and never again after it is answered:
+       install for a full screen with no browser in it, or go fullscreen
+       here and now if the platform will not install. -->
+  <div class="getapp" id="getapp">
+    <div class="txt"><b>Play without the browser</b>
+      <span id="getappwhy">Add Lumen Harbor to your home screen and it opens
+      full screen, with no address bar.</span></div>
+    <div class="go" id="getappgo">Install</div>
+    <div class="no" id="getappno">✕</div>
+  </div>
+</div>
+
+<script>

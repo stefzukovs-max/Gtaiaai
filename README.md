@@ -1274,6 +1274,56 @@ corners.
 
 ---
 
+## `src/` — where the game is actually written
+
+`game/lumen-harbor.html` is 908 KB in one file, and for a long time that
+was the whole point: no bundler, no build step, open it and it runs. It
+still ships that way, because that is what lets it run offline from a home
+screen with no install and no round trip for code.
+
+But 908 KB stopped being free. Nobody — person or agent — can hold it in
+their head, two edits to one file collide, and every change had to be made
+by searching a wall of text for a landmark. So the game is now authored as
+one file per module under `src/`, and `tools/build.py` concatenates them
+back.
+
+The build is a concatenation and nothing else. Every file in `src/` is a
+verbatim slice of the shipped file, `src/manifest.json` records the order,
+and `python3 tools/build.py --check` proves the two agree byte for byte —
+which is what makes the split safe to trust. The same build emits
+`site/preview.html`, so the preview can no longer drift from the game.
+
+### The tests are in the repo now
+
+They were not. The probes that verified every one of the passes above lived
+in a scratch directory outside the repository, which means each of them had
+to be written again from memory, and any of them could quietly stop being
+run without anyone noticing. They are committed now, under `tools/test/`:
+
+    NODE_PATH=$(npm root -g) node tools/test/all.mjs
+
+Five probes, 35 checks: the game boots with all 35 modules and a canvas the
+size of the window; the golden path runs end to end; every wearable style
+builds with geometry in it; the item table has no duplicate keys, no missing
+icons and no valueless tradeable; and `site/preview.html` boots inside a
+sandboxed iframe served over http with its stylesheet intact.
+
+The golden path is the one that matters most, because it is the chain that
+must never break between commits:
+
+    buy → make a world → travel → place → break → leave → sell → wear →
+    save → reload
+
+It is driven through `LH.Net`, not through the HUD, so a change to the
+interface cannot make it pass while the game underneath is broken. Planting
+and harvesting belong in that chain and are not in it, because farming does
+not exist yet.
+
+One rule holds all of this together, and it was learned the hard way when a
+preview with no stylesheet at all reached a real user while every test
+passed: **measure, do not assert booleans.** "Did it load" is true of a
+blank screen. The probes assert on sizes, counts, positions and pixels.
+
 ## `site/index.html` — the landing page
 
 The product page for Lumen Harbor: hero, world, pillars, systems, and a

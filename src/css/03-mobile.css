@@ -1,0 +1,262 @@
+/* ============================================================
+   MOBILE FIRST.
+
+   Everything above this line is sized in cqw against the game
+   container, which is the right call on a desktop — the interface
+   scales as one piece with the view. On a phone it is the wrong call
+   twice over. In landscape on a 844x390 screen one cqw is 8.4 pixels,
+   so a label written at 0.86cqw renders at seven pixels; and a layout
+   measured from the corners of a rectangle ignores the fact that a
+   phone is held by two thumbs that reach about a third of the way in
+   from the bottom corners and nowhere near the top ones.
+
+   So the phone gets its own layout rather than a scaled copy of the
+   desktop one. It is expressed in pixels, because a thumb is 44
+   physical pixels wide whatever the screen is; it is anchored to the
+   safe area rather than to the glass; and the things you press most —
+   move, jump, use, interact, the hotbar — are the biggest things on
+   screen and sit inside the thumb arcs. The desktop layout is left
+   exactly as it was.
+
+   `--sa*` are the notch and home-indicator insets, read once and used
+   everywhere so nothing has to remember the env() spelling.
+   ============================================================ */
+#app.mobile{
+  --sat:env(safe-area-inset-top,0px);
+  --sar:env(safe-area-inset-right,0px);
+  --sab:env(safe-area-inset-bottom,0px);
+  --sal:env(safe-area-inset-left,0px);
+  /* the thumb arc: how far up from the bottom edge the action cluster
+     and the hotbar sit, so neither is under the home indicator */
+  --thumb:calc(12px + var(--sab));
+}
+/* A tap that scrolls the page behind the game, or selects a label, or
+   fires a 300ms-delayed synthetic click, is a tap that got away. */
+#app.mobile, #app.mobile *{
+  -webkit-touch-callout:none;
+  -webkit-user-select:none;user-select:none;
+  touch-action:manipulation;
+}
+#app.mobile input, #app.mobile textarea{
+  -webkit-user-select:text;user-select:text;
+  font-size:16px;              /* anything smaller makes iOS zoom on focus */
+}
+
+/* ---- mobile: identity, purse, tools ----
+   One slim bar across the top, clear of the notch, with nothing in it
+   you have to hit accurately. */
+#app.mobile .idchip{left:calc(8px + var(--sal));top:calc(8px + var(--sat));
+  gap:8px;padding:5px 12px 5px 5px;border-radius:16px}
+#app.mobile .idchip .av{width:34px;height:34px;min-width:34px;min-height:34px;
+  border-radius:11px;font-size:15px}
+#app.mobile .idchip .lvbadge{font-size:8px;padding:1px 0}
+#app.mobile .idchip .who{min-width:0;gap:3px}
+#app.mobile .idchip .nm{font-size:13px}
+#app.mobile .xpbar{height:4px;min-height:4px}
+#app.mobile .idchip .xpn{font-size:9px}
+#app.mobile .purse{left:auto;right:calc(8px + var(--sar));top:calc(8px + var(--sat));
+  gap:6px}
+#app.mobile .coin{font-size:12px;padding:5px 10px 5px 6px}
+#app.mobile .coin .dot{width:14px;height:14px;min-width:14px;min-height:14px}
+#app.mobile .coin .plus{width:20px;height:20px;min-width:20px;min-height:20px;
+  font-size:13px}
+/* The desktop tool cluster and the left menu list are both keyboard
+   affordances. On a phone their jobs belong to the nav bar below. */
+#app.mobile .tools, #app.mobile .menu, #app.mobile .keyhint,
+#app.mobile .prompt .k{display:none !important}
+
+/* ---- mobile: the nav bar ----
+   Six destinations along the top edge under the identity, each one a
+   48px target. This replaces the keyboard menu and is the only piece
+   of chrome that is always on screen besides the controls. */
+.mnav{position:absolute;display:none;gap:6px;z-index:26;pointer-events:auto}
+#app.mobile .mnav{display:flex}
+.mnav .nb{width:44px;height:44px;border-radius:14px;display:grid;
+  place-items:center;color:var(--ink2);
+  background:linear-gradient(170deg,rgba(28,37,54,.88),rgba(13,19,30,.88));
+  border:1px solid var(--line);backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  box-shadow:0 4px 14px rgba(0,0,0,.42)}
+.mnav .nb .hicon{width:20px;height:20px;min-width:20px;min-height:20px}
+.mnav .nb:active{transform:scale(.92);background:rgba(79,227,176,.22);
+  color:var(--acc)}
+.mnav .nb.on{color:var(--acc);border-color:var(--acc)}
+/* a dot for anything that wants attention — a mission done, a trade */
+.mnav .nb i{position:absolute;margin:-24px 0 0 24px;width:9px;height:9px;
+  border-radius:50%;background:var(--danger);display:none}
+.mnav .nb.alert i{display:block}
+
+/* ---- mobile: hotbar ----
+   Bottom centre, between the thumbs rather than under one of them, so
+   picking a block never fights with steering. */
+#app.mobile .hotbar{left:50%;transform:translateX(-50%);
+  bottom:var(--thumb);gap:7px;padding:7px;border-radius:18px}
+#app.mobile .slot{width:52px;height:52px;min-width:52px;min-height:52px;
+  border-radius:14px}
+#app.mobile .slot .n{font-size:10px}
+#app.mobile .slot .k{display:none}
+#app.mobile .slot.on{box-shadow:0 0 0 2px var(--acc),0 6px 18px rgba(0,0,0,.5)}
+
+/* ---- mobile: the controls ----
+   The stick is invisible until a thumb lands and then draws itself
+   under it, anywhere in the left half — a fixed stick you have to find
+   is a stick you look down at. */
+#app.mobile .tstick{width:132px;height:132px;border-width:2px}
+#app.mobile .tstick>i{width:46%;height:46%;margin:-23% 0 0 -23%}
+#app.mobile .tbtn{border:1px solid var(--line2);
+  font-family:var(--disp);font-weight:700;letter-spacing:.04em}
+#app.mobile .tbtn.big{width:82px;height:82px;font-size:14px;
+  right:calc(16px + var(--sar));bottom:calc(var(--thumb) + 62px)}
+#app.mobile .tbtn.mid{width:58px;height:58px;font-size:12px}
+#app.mobile .tbtn.jump{right:calc(106px + var(--sar));
+  bottom:calc(var(--thumb) + 74px)}
+#app.mobile .tbtn.act{right:calc(24px + var(--sar));
+  bottom:calc(var(--thumb) + 152px)}
+#app.mobile .tbtn.menu{display:none}
+/* A button that does nothing right now says so by fading, rather than
+   by doing nothing when pressed. */
+#app.mobile .tbtn.off{opacity:.34;pointer-events:none}
+
+/* ---- mobile: the pieces that only make sense with a mouse ----
+   The world card is a dashboard widget: it is read once a session and
+   it sits exactly where a right thumb rests. It moves into the Worlds
+   sheet. The reticle shrinks because on a phone the primary button's
+   label already says what is under it, and a big crosshair over a
+   small screen is just something in the way. */
+#app.mobile .myworld{display:none}
+#app.mobile .clock{right:calc(8px + var(--sar));top:calc(48px + var(--sat));
+  font-size:11px;gap:6px;padding:4px 9px}
+#app.mobile .clock .wx{font-size:9px}
+#app.mobile .retic{width:7px;height:7px}
+#app.mobile .plate .nm{font-size:11px}
+#app.mobile .plate .hb{width:52px;height:5px}
+#app.mobile .actbar{bottom:calc(var(--thumb) + 68px);gap:5px;padding:5px;
+  max-width:calc(100vw - 200px);overflow-x:auto;scrollbar-width:none}
+#app.mobile .actbar::-webkit-scrollbar{display:none}
+#app.mobile .act2{min-height:44px;padding:0 12px;font-size:11px;
+  border-radius:13px;gap:6px}
+#app.mobile .act2 .hicon{width:16px;height:16px}
+
+/* ---- mobile: prompt, arrival, toasts ---- */
+#app.mobile .prompt{font-size:13px;padding:9px 14px;border-radius:14px;
+  bottom:calc(var(--thumb) + 74px);left:50%;transform:translateX(-50%)}
+#app.mobile .arrive .nm{font-size:26px}
+#app.mobile .arrive .sb{font-size:12px}
+#app.mobile .toasts{right:calc(8px + var(--sar));top:calc(60px + var(--sat));
+  width:min(64vw,300px)}
+#app.mobile .toast{font-size:12px;padding:9px 12px}
+
+/* ---- mobile: chat ----
+   Collapsed to a single line you tap to open, because a chat log is
+   the one thing on this HUD that nobody needs while they are moving. */
+#app.mobile .chat{left:calc(8px + var(--sal));bottom:calc(var(--thumb) + 62px);
+  width:min(52vw,300px);height:112px;border-radius:14px}
+#app.mobile .chat.dim{height:34px}
+#app.mobile .chat .tabs2{font-size:11px}
+#app.mobile .chat .ct{padding:5px 9px}
+#app.mobile .chat .log{font-size:11.5px}
+#app.mobile .chat .inp input{font-size:16px;padding:7px 9px}
+
+/* ---- mobile: panels as sheets ----
+   A phone has no room for a floating dialogue. Every panel becomes a
+   sheet that owns the screen, slides up from the bottom edge, and has
+   one 44px close target in the corner your thumb is already near. */
+#app.mobile .panel{
+  width:100%;max-width:none;height:100%;max-height:none;
+  left:0;top:0;right:0;bottom:0;transform:none;border-radius:0;
+  padding:calc(10px + var(--sat)) calc(10px + var(--sar))
+          calc(10px + var(--sab)) calc(10px + var(--sal));
+  animation:sheet .22s cubic-bezier(.2,.8,.3,1)}
+@keyframes sheet{from{transform:translateY(4%);opacity:0}
+                 to{transform:none;opacity:1}}
+#app.mobile .panel h3{font-size:19px}
+#app.mobile .panel .px{width:44px;height:44px;min-width:44px;min-height:44px;
+  font-size:20px;border-radius:14px}
+#app.mobile .panel .tabs{gap:6px;overflow-x:auto;flex-wrap:nowrap;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch}
+#app.mobile .panel .tabs::-webkit-scrollbar{display:none}
+#app.mobile .panel .tab{font-size:12.5px;padding:0 15px;border-radius:12px;
+  white-space:nowrap;flex:0 0 auto;min-height:44px;display:grid;
+  place-items:center}
+#app.mobile .panel .body{-webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;font-size:14px}
+#app.mobile .grid{grid-template-columns:repeat(auto-fill,minmax(84px,1fr));
+  gap:8px}
+#app.mobile .cell{border-radius:14px}
+#app.mobile .cell .qty{font-size:11px}
+#app.mobile .row{padding:12px;border-radius:14px;gap:10px}
+#app.mobile .btn{min-height:44px;font-size:14px;padding:0 16px;border-radius:14px}
+#app.mobile .dressnote,#app.mobile .empty-note{font-size:13px}
+#app.mobile .dsw{width:34px;height:34px;min-width:34px;min-height:34px}
+#app.mobile .dressrow>.lb{font-size:11px}
+#app.mobile .dopt{min-height:40px;font-size:13px;padding:0 14px;
+  display:grid;place-items:center}
+#app.mobile .scrim{backdrop-filter:blur(2px)}
+
+/* ---- mobile: emote wheel ---- */
+#app.mobile .wheel .ring{width:min(86vw,86vh);height:min(86vw,86vh);
+  min-width:0;min-height:0}
+#app.mobile .wheel .em{width:76px;height:76px;min-width:76px;min-height:76px}
+#app.mobile .wheel .em b{font-size:26px}
+#app.mobile .wheel .em span{font-size:9px}
+#app.mobile .wheel .em i{display:none}
+#app.mobile .wheel .hub h4{font-size:17px}
+#app.mobile .wheel .hub p{font-size:11px}
+
+/* ---- mobile: portrait ----
+   Portrait is playable rather than blocked. The view keeps the top of
+   the screen, the controls take the bottom third, and the hotbar moves
+   above them instead of between them. */
+#app.mobile.portrait .tbtn.big{width:74px;height:74px;
+  right:calc(14px + var(--sar));bottom:calc(var(--thumb) + 96px)}
+#app.mobile.portrait .tbtn.jump{right:calc(96px + var(--sar));
+  bottom:calc(var(--thumb) + 108px)}
+#app.mobile.portrait .tbtn.act{right:calc(20px + var(--sar));
+  bottom:calc(var(--thumb) + 184px)}
+#app.mobile.portrait .hotbar{bottom:calc(var(--thumb) + 4px)}
+#app.mobile.portrait .chat{width:min(70vw,320px);
+  bottom:calc(var(--thumb) + 190px)}
+#app.mobile.portrait .prompt{bottom:calc(var(--thumb) + 200px)}
+#app.mobile.portrait .mnav{flex-wrap:wrap;max-width:56vw}
+
+/* ---- the rotate hint ----
+   A suggestion, not a gate. It used to cover the screen and refuse to
+   go away, which on a tablet held in portrait meant the game simply
+   did not start. */
+#rotate{gap:14px}
+#rotate .dismiss{margin-top:6px;padding:12px 22px;border-radius:14px;
+  border:1px solid var(--line2);background:rgba(28,37,54,.9);
+  color:var(--ink);font-family:var(--disp);font-size:14px;letter-spacing:.08em}
+
+/* ---- the install / fullscreen affordance ----
+   Two ways off the browser, offered once and then remembered. */
+.getapp{position:absolute;z-index:110;display:none;
+  left:50%;transform:translateX(-50%);bottom:calc(14px + var(--sab,0px));
+  align-items:center;gap:12px;padding:11px 14px;border-radius:16px;
+  box-sizing:border-box;
+  background:linear-gradient(180deg,rgba(20,27,42,.96),rgba(11,16,26,.96));
+  border:1px solid var(--line2);box-shadow:0 10px 30px rgba(0,0,0,.6);
+  bottom:calc(84px + env(safe-area-inset-bottom,0px));
+  width:min(92vw,460px)}
+.getapp.on{display:flex}
+.getapp .txt{font-size:12.5px;color:var(--ink2);line-height:1.35;flex:1}
+.getapp .txt b{color:var(--ink);display:block;font-family:var(--disp);
+  font-size:14px;letter-spacing:.02em}
+.getapp .go{min-height:40px;padding:0 15px;border-radius:12px;
+  background:linear-gradient(180deg,var(--acc),var(--acc2));color:#04140F;
+  font-weight:800;font-size:13px;display:grid;place-items:center;
+  white-space:nowrap}
+.getapp .no{width:32px;height:32px;border-radius:10px;display:grid;
+  place-items:center;color:var(--ink3);font-size:17px}
+
+/* ---- narrow / touch ---- */
+@container app (max-aspect-ratio: 13/9){
+  .idchip .who{min-width:11cqw}
+  .slot{width:4.4cqw;height:4.4cqw}
+}
+@container app (max-width: 700px){
+  .idchip .nm{font-size:12px}.idchip .lv{font-size:9px}
+  .coin{font-size:11px}.clock{font-size:11px}
+  .prompt{font-size:11px;bottom:15cqw}
+  .panel{width:94cqw}
+}

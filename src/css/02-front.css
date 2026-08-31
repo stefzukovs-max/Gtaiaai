@@ -1,0 +1,363 @@
+/* ============================================================
+   FRONT END — title, character creation, and the first minutes.
+   Full-frame overlays that own the boot flow. The world renders
+   behind them from the first frame, so character creation is a
+   live preview rather than a separate screen.
+   ============================================================ */
+#front{position:absolute;inset:0;z-index:70;display:none;
+  pointer-events:auto}
+#front.on{display:block}
+#front .veil{position:absolute;inset:0;
+  background:linear-gradient(105deg,rgba(4,7,13,.94) 0%,rgba(4,7,13,.86) 38%,
+    rgba(4,7,13,.30) 66%,rgba(4,7,13,.10) 100%)}
+#front .pane{position:absolute;left:0;top:0;bottom:0;width:min(38cqw,560px);
+  padding:3.2cqw 3.0cqw;display:flex;flex-direction:column;
+  justify-content:center;gap:1.1cqw}
+.fbrand{font-family:var(--disp);font-weight:700;letter-spacing:.20em;
+  font-size:clamp(26px,3.4cqw,54px);text-transform:uppercase;line-height:1;
+  background:linear-gradient(180deg,#EAF6FF 0%,#7FE9DA 55%,#1E8C7E 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 6px 26px rgba(59,224,200,.32))}
+.fsub{font-size:.92cqw;letter-spacing:.30em;text-transform:uppercase;
+  color:var(--ink3);margin-top:-.4cqw}
+.fbody{font-size:.95cqw;line-height:1.6;color:var(--ink2);max-width:30cqw}
+.fstep{font-size:.74cqw;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--acc2)}
+.frow{display:flex;gap:.5cqw;flex-wrap:wrap;align-items:center}
+.fbtn{padding:.66cqw 1.5cqw;border-radius:15px;font-size:.98cqw;font-weight:600;
+  letter-spacing:.06em;cursor:pointer;border:1px solid var(--line2);
+  background:rgba(255,255,255,.05);color:var(--ink);transition:all .15s;
+  font-family:var(--ui)}
+.fbtn:hover{background:rgba(59,224,200,.14);border-color:var(--acc);color:var(--acc)}
+.fbtn.pri{background:linear-gradient(180deg,rgba(59,224,200,.26),rgba(21,156,137,.22));
+  border-color:var(--acc);color:#0B1018;font-weight:700}
+.fbtn.pri:hover{filter:brightness(1.12)}
+.fbtn[disabled]{opacity:.4;pointer-events:none}
+.finp{width:100%;background:rgba(6,9,14,.7);border:1px solid var(--line);
+  border-radius:15px;color:var(--ink);font-family:var(--ui);font-size:1.05cqw;
+  padding:.66cqw .9cqw;outline:0}
+.finp:focus{border-color:var(--acc)}
+.swatches{display:flex;gap:.42cqw;flex-wrap:wrap}
+.sw2{width:2.1cqw;height:2.1cqw;min-width:22px;min-height:22px;border-radius:13px;
+  cursor:pointer;border:2px solid transparent;transition:transform .12s}
+.sw2:hover{transform:scale(1.1)}
+.sw2.on{border-color:var(--acc);box-shadow:0 0 0 2px rgba(59,224,200,.3)}
+.optrow{display:flex;gap:.4cqw;flex-wrap:wrap}
+.opt{padding:.4cqw .8cqw;border-radius:13px;font-size:.84cqw;cursor:pointer;
+  border:1px solid var(--line);color:var(--ink2);transition:all .13s;
+  text-transform:capitalize}
+.opt:hover{border-color:var(--line2);color:var(--ink)}
+.opt.on{border-color:var(--acc);color:var(--acc);background:rgba(59,224,200,.10)}
+.flabel{font-size:.76cqw;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink3);margin-bottom:.24cqw}
+/* The wardrobe is taller than the pane once every slot is exposed, so
+   the detail rows scroll inside their own box rather than pushing the
+   Continue button off the bottom of the screen. */
+.fscroll{max-height:40cqh;overflow-y:auto;overflow-x:hidden;
+  display:flex;flex-direction:column;gap:.9cqw;padding-right:.7cqw;
+  /* fade the cut edge, so a half-visible row reads as "more below"
+     rather than as a layout that ran out of room */
+  -webkit-mask-image:linear-gradient(180deg,#000 0,#000 90%,transparent 100%);
+  mask-image:linear-gradient(180deg,#000 0,#000 90%,transparent 100%)}
+.fscroll::-webkit-scrollbar{width:6px}
+.fscroll::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
+.fnote{font-size:.88cqw;line-height:1.5;color:var(--ink3);font-style:italic;
+  border-left:2px solid var(--acc);padding-left:.7cqw;max-width:30cqw}
+
+/* the guided first steps, as a small card in the corner */
+.guide{position:absolute;right:.7cqw;bottom:6.4cqw;width:min(13.2cqw,240px);
+  padding:.9cqw 1.0cqw;border-radius:18px;display:none;
+  background:linear-gradient(180deg,rgba(20,27,42,.94),rgba(10,15,24,.92));
+  border:1px solid var(--line2);backdrop-filter:blur(12px);
+  box-shadow:0 12px 34px rgba(0,0,0,.5)}
+.guide.on{display:block;animation:tin .3s ease both}
+.guide .st{font-size:.7cqw;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--acc2);margin-bottom:.24cqw}
+.guide h4{font-size:1.0cqw;font-weight:700;margin-bottom:.3cqw}
+.guide p{font-size:.86cqw;line-height:1.5;color:var(--ink2)}
+.guide .pg{height:.3cqw;min-height:4px;border-radius:99px;margin-top:.55cqw;
+  background:rgba(255,255,255,.08);overflow:hidden}
+.guide .pg>i{display:block;height:100%;
+  background:linear-gradient(90deg,var(--acc2),var(--acc));transition:width .4s}
+
+@container app (max-width: 700px){
+  #front .pane{width:74cqw;padding:6cqw 5cqw}
+  .fbody{max-width:64cqw;font-size:13px}
+  .guide{width:44cqw;bottom:16cqw;font-size:12px}
+}
+
+/* ---- worlds ---- */
+.wcard{display:flex;gap:1.0cqw;align-items:center;padding:.85cqw 1.0cqw;
+  border-radius:17px;border:1px solid var(--line);margin-bottom:.6cqw;
+  background:rgba(255,255,255,.03);cursor:pointer;transition:all .14s}
+.wcard:hover{border-color:var(--line2);background:rgba(255,255,255,.06)}
+.wcard .badge{width:3.6cqw;height:3.6cqw;min-width:38px;min-height:38px;
+  border-radius:15px;flex:0 0 auto;display:grid;place-items:center;
+  font-family:var(--disp);font-size:1.1cqw;color:#0B1018;font-weight:700}
+.wcard .wi{flex:1;min-width:0}
+.wcard h4{font-size:1.02cqw;font-weight:600}
+.wcard .sub{font-size:.8cqw;color:var(--ink3);letter-spacing:.04em}
+.wcard .perm{font-size:.7cqw;letter-spacing:.14em;text-transform:uppercase;
+  padding:.16cqw .55cqw;border-radius:11px;border:1px solid var(--line);
+  color:var(--ink2)}
+.themes{display:grid;grid-template-columns:repeat(auto-fill,minmax(8cqw,1fr));
+  gap:.5cqw;margin:.6cqw 0}
+.theme{padding:.7cqw;border-radius:15px;border:1px solid var(--line);
+  cursor:pointer;text-align:center;font-size:.86cqw;transition:all .14s}
+.theme:hover{border-color:var(--line2)}
+.theme.on{border-color:var(--acc);background:rgba(59,224,200,.10);color:var(--acc)}
+.theme .sw{height:.7cqw;border-radius:99px;margin-bottom:.34cqw}
+.field{display:flex;gap:.5cqw;align-items:center;margin:.5cqw 0}
+.field input{flex:1;background:rgba(6,9,14,.7);border:1px solid var(--line);
+  border-radius:14px;color:var(--ink);font-family:var(--ui);font-size:.92cqw;
+  padding:.5cqw .8cqw;outline:0}
+.field input:focus{border-color:var(--acc)}
+
+/* travel fade: entering a world regenerates the terrain, and the cut
+   is hidden behind this rather than shown */
+#travel{position:absolute;inset:0;z-index:60;background:#05070C;opacity:0;
+  pointer-events:none;transition:opacity .34s ease;display:grid;
+  place-items:center}
+#travel.on{opacity:1;pointer-events:auto}
+#travel .lbl{font-family:var(--disp);letter-spacing:.24em;font-size:1.2cqw;
+  text-transform:uppercase;color:var(--ink3)}
+
+/* ---- missions ---- */
+.mrow{display:flex;gap:.9cqw;align-items:center;padding:.7cqw .9cqw;
+  border-radius:16px;border:1px solid var(--line);margin-bottom:.5cqw;
+  background:rgba(255,255,255,.028)}
+.mrow.done{border-color:rgba(87,208,122,.42);background:rgba(87,208,122,.07)}
+.mrow .mi{flex:1;min-width:0}
+.mrow h4{font-size:.98cqw;font-weight:600;margin-bottom:.14cqw}
+.mrow p{font-size:.82cqw;color:var(--ink2);margin-bottom:.34cqw}
+.mrow .rw{font-size:.76cqw;color:var(--gold);letter-spacing:.04em}
+.mrow .pg{height:.42cqw;min-height:5px;border-radius:99px;
+  background:rgba(6,9,14,.7);overflow:hidden;border:1px solid var(--line)}
+.mrow .pg>i{display:block;height:100%;
+  background:linear-gradient(90deg,var(--acc2),var(--acc))}
+.mrow .ct{font-size:.76cqw;color:var(--ink3);min-width:4cqw;text-align:right}
+/* ---- outfit sets ----
+   A wide card rather than another square in the grid, because the
+   point of a set is the three things together and a name over them. */
+.setrow{display:flex;gap:.9cqw;align-items:center;padding:.75cqw .9cqw;
+  border-radius:18px;border:1px solid var(--line);margin-bottom:.6cqw;
+  background:linear-gradient(120deg,rgba(255,255,255,.045),rgba(255,255,255,.018))}
+.setrow.owned{border-color:rgba(87,208,122,.42);background:rgba(87,208,122,.06)}
+.setrow .si{flex:1;min-width:0}
+.setrow h4{font-size:1.02cqw;font-weight:600;margin-bottom:.14cqw}
+.setrow p{font-size:.82cqw;color:var(--ink2);margin-bottom:.3cqw}
+.setpc{display:flex;gap:.34cqw;flex-wrap:wrap}
+.setpc>span{font-size:.72cqw;padding:.14cqw .5cqw;border-radius:11px;
+  border:1px solid var(--line);color:var(--ink3);white-space:nowrap}
+.setpc>span.have{border-color:rgba(87,208,122,.5);color:#8FE0A6}
+.setart{display:flex;gap:.3cqw;flex:0 0 auto}
+.setart .cell{width:3.5cqw;min-width:38px;cursor:default}
+.setbuy{flex:0 0 auto;text-align:right;display:flex;flex-direction:column;
+  gap:.34cqw;align-items:flex-end}
+.setbuy .was{font-size:.72cqw;color:var(--ink3);text-decoration:line-through}
+.setbuy .now{font-size:.92cqw;color:var(--gold);font-weight:600}
+.setsave{font-size:.66cqw;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--acc)}
+.aisle{font-size:.7cqw;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--ink3);margin:.9cqw 0 .5cqw}
+.mtype{font-size:.66cqw;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink3);padding:.16cqw .5cqw;border-radius:11px;
+  border:1px solid var(--line);white-space:nowrap}
+
+/* ---- NPC dialogue ---- */
+.dlg{position:absolute;left:50%;bottom:9.4cqw;transform:translateX(-50%);
+  width:min(46cqw,720px);display:none;gap:1.0cqw;padding:1.0cqw 1.2cqw;
+  border-radius:19px;
+  background:linear-gradient(180deg,rgba(20,27,42,.96),rgba(10,15,24,.95));
+  border:1px solid var(--line2);backdrop-filter:blur(12px);
+  box-shadow:0 16px 44px rgba(0,0,0,.55)}
+.dlg.on{display:flex}
+.dlg .face{width:4.4cqw;height:4.4cqw;min-width:46px;min-height:46px;
+  border-radius:16px;flex:0 0 auto;
+  background:linear-gradient(160deg,#2C3A52,#151E2C);
+  border:1px solid var(--line2);display:grid;place-items:center;
+  font-family:var(--disp);font-size:1.6cqw;color:var(--acc)}
+.dlg .txt{flex:1;min-width:0}
+.dlg .who{font-size:.98cqw;font-weight:700}
+.dlg .role{font-size:.72cqw;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink3);margin-bottom:.4cqw}
+.dlg .line{font-size:.95cqw;line-height:1.5;color:var(--ink)}
+.dlg .offer{font-size:.86cqw;color:var(--acc);margin-top:.4cqw}
+.dlg .cls{font-size:.76cqw;color:var(--ink3);margin-top:.5cqw}
+
+/* ---- chat ----
+   Bottom-left, tabbed by channel, with the channel tag colour-coded in
+   the line itself so you can read who is talking to whom at a glance
+   without parsing the tab you happen to be on. */
+.chat{position:absolute;left:.7cqw;bottom:2.7cqw;width:min(19cqw,300px);
+  display:flex;flex-direction:column;overflow:hidden;
+  transition:opacity .2s}
+.chat .tabs2{display:flex;align-items:center;gap:.16cqw;padding:.2cqw .24cqw;
+  border-bottom:1px solid var(--line)}
+.chat .ct{padding:.16cqw .5cqw;border-radius:10px;font-size:.66cqw;cursor:pointer;
+  color:var(--ink3);letter-spacing:.04em}
+.chat .ct:hover{color:var(--ink2);background:rgba(255,255,255,.05)}
+.chat .ct.on{color:var(--acc);background:rgba(59,224,200,.14)}
+.chat .cx{margin-left:auto;padding:0 .34cqw;color:var(--ink3);cursor:pointer;
+  font-size:.72cqw}
+.chat .cx:hover{color:var(--danger)}
+.chat .log{height:7.6cqw;min-height:76px;overflow:auto;padding:.3cqw .5cqw;
+  display:flex;flex-direction:column;gap:.1cqw}
+.chat .log::-webkit-scrollbar{width:4px}
+.chat .log::-webkit-scrollbar-thumb{background:rgba(126,160,216,.22);border-radius:6px}
+.chat .ln{font-size:.7cqw;line-height:1.4;color:var(--ink2);word-break:break-word}
+.chat .ln .tag{font-weight:600;margin-right:.22cqw}
+.chat .ln .tag.world{color:#5BC8FF}
+.chat .ln .tag.global{color:#8FA4C4}
+.chat .ln .tag.trade{color:#F5C451}
+.chat .ln .tag.clan{color:#9BE87F}
+.chat .ln .tag.system{color:#B269FF}
+.chat .ln b{color:var(--ink)}
+.chat .inp{display:flex;border-top:1px solid var(--line)}
+.chat input{flex:1;background:transparent;border:0;outline:0;color:var(--ink);
+  font-family:var(--ui);font-size:.72cqw;padding:.34cqw .5cqw}
+.chat input::placeholder{color:var(--ink3)}
+.chat.dim{opacity:.42}
+.chat.dim:hover{opacity:1}
+
+/* ---- vitals and the fishing rig ---- */
+.vitals{position:absolute;left:.7cqw;top:4.0cqw;width:12.2cqw;display:none}
+.vitals.on{display:block}
+.bar{height:.55cqw;min-height:7px;border-radius:99px;overflow:hidden;
+  background:rgba(4,7,12,.8);border:1px solid rgba(0,0,0,.5);position:relative}
+.bar>i{display:block;height:100%;transition:width .22s ease}
+.bar .lbl{position:absolute;inset:0;display:grid;place-items:center;
+  font-size:.5cqw;font-weight:700;letter-spacing:.08em;color:var(--ink);
+  text-shadow:0 1px 2px rgba(0,0,0,.8)}
+.bar.hp>i{background:linear-gradient(90deg,#B22C42,#FF6478);
+  box-shadow:0 0 8px rgba(255,100,120,.5)}
+
+.fishrig{position:absolute;left:50%;bottom:6.6cqw;transform:translateX(-50%);
+  width:min(30cqw,460px);display:none;flex-direction:column;gap:.5cqw;
+  padding:.8cqw 1.0cqw;border-radius:19px;
+  background:linear-gradient(180deg,rgba(20,27,42,.94),rgba(10,15,24,.92));
+  border:1px solid var(--line2);backdrop-filter:blur(12px);
+  box-shadow:0 14px 40px rgba(0,0,0,.55)}
+.fishrig.on{display:flex}
+.fishrig .cap{font-size:.82cqw;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink3);display:flex;justify-content:space-between}
+.fishrig .cap b{color:var(--acc);letter-spacing:.06em;text-transform:none}
+.prog{height:1.1cqw;min-height:12px;border-radius:99px;overflow:hidden;
+  background:rgba(6,9,14,.8);border:1px solid var(--line);position:relative}
+.prog>i{display:block;height:100%;
+  background:linear-gradient(90deg,var(--acc2),var(--acc));
+  box-shadow:0 0 14px rgba(59,224,200,.55)}
+.strain{height:.62cqw;min-height:7px;border-radius:99px;overflow:hidden;
+  background:rgba(6,9,14,.8);border:1px solid var(--line)}
+.strain>i{display:block;height:100%;
+  background:linear-gradient(90deg,#3FA46A,#F5C451 62%,#FF4F7A)}
+.strain.hot{animation:strainPulse .28s ease-in-out infinite alternate}
+@keyframes strainPulse{to{box-shadow:0 0 14px rgba(255,79,122,.8)}}
+.fishrig .hint{font-size:.80cqw;color:var(--ink2);text-align:center;min-height:1.1em}
+.fishrig .runs{color:#FFB86A;font-weight:700}
+
+/* the catch card */
+.catch{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) scale(.9);
+  display:none;flex-direction:column;align-items:center;gap:.5cqw;
+  padding:1.3cqw 2.0cqw;border-radius:21px;
+  background:linear-gradient(180deg,rgba(22,29,44,.97),rgba(12,17,26,.97));
+  border:1px solid var(--line2);opacity:0;transition:all .3s ease;
+  box-shadow:0 24px 60px rgba(0,0,0,.6)}
+.catch.on{display:flex;opacity:1;transform:translate(-50%,-50%) scale(1)}
+.catch .ic{width:7cqw;height:7cqw;background-size:cover;border-radius:12px}
+.catch h3{font-size:1.4cqw;font-weight:700}
+.catch .w{font-size:1.0cqw;color:var(--ink2)}
+.catch .r{font-size:.78cqw;letter-spacing:.18em;text-transform:uppercase}
+
+/* floating damage numbers */
+.dmg{position:absolute;font-family:var(--disp);font-weight:700;
+  font-size:1.3cqw;color:#FFD9A0;text-shadow:0 2px 6px rgba(0,0,0,.8);
+  pointer-events:none;animation:dfloat .9s ease-out both}
+.dmg.crit{font-size:1.9cqw;color:#FFE9A8}
+.dmg.hurt{color:#FF7A8E}
+@keyframes dfloat{from{opacity:1;transform:translate(-50%,0)}
+  to{opacity:0;transform:translate(-50%,-3.4cqw)}}
+
+/* enemy nameplate */
+.plate{position:absolute;transform:translate(-50%,-100%);pointer-events:none;
+  display:flex;flex-direction:column;align-items:center;gap:.16cqw}
+.plate .nm{font-size:.76cqw;font-weight:600;color:var(--ink);
+  text-shadow:0 2px 5px rgba(0,0,0,.9);white-space:nowrap}
+.plate .hb{width:5.5cqw;height:.34cqw;min-height:4px;border-radius:99px;
+  background:rgba(6,9,14,.8);border:1px solid rgba(0,0,0,.6);overflow:hidden}
+.plate .hb>i{display:block;height:100%;background:linear-gradient(90deg,#C4344A,#FF6478)}
+.plate.boss .hb{width:9cqw}
+.plate.boss .nm{color:#FFC46A}
+
+/* ---- touch ----
+   Only present on a coarse pointer. Left thumb steers, right thumb
+   looks, and the action cluster sits under the right thumb rather
+   than in a corner it cannot reach. */
+.touch{position:absolute;inset:0;pointer-events:none;display:none}
+.touch.on{display:block}
+.tstick{position:absolute;width:26cqh;height:26cqh;border-radius:50%;
+  border:2px solid rgba(232,239,250,.18);pointer-events:none;
+  opacity:0;transition:opacity .18s}
+.tstick.on{opacity:1}
+.tstick>i{position:absolute;left:50%;top:50%;width:38%;height:38%;
+  margin:-19% 0 0 -19%;border-radius:50%;
+  background:rgba(232,239,250,.24);border:1px solid rgba(232,239,250,.42)}
+.tbtn{position:absolute;border-radius:50%;pointer-events:auto;
+  display:grid;place-items:center;font-family:var(--disp);font-weight:700;
+  letter-spacing:.06em;color:var(--ink);
+  background:linear-gradient(165deg,rgba(38,48,66,.86),rgba(18,25,38,.86));
+  border:1px solid var(--line2);backdrop-filter:blur(8px);
+  box-shadow:0 6px 20px rgba(0,0,0,.45);user-select:none;
+  transition:transform .1s,background .1s}
+.tbtn:active{transform:scale(.92);background:rgba(59,224,200,.22)}
+.tbtn.big{width:13cqh;height:13cqh;font-size:1.5cqh;right:4cqh;bottom:13cqh}
+.tbtn.mid{width:9.5cqh;height:9.5cqh;font-size:1.2cqh}
+.tbtn.jump{right:17.5cqh;bottom:16cqh}
+.tbtn.act{right:5.5cqh;bottom:27cqh}
+.tbtn.menu{width:7cqh;height:7cqh;font-size:1cqh;right:2.5cqh;top:2.5cqh}
+
+/* ---- trading ---- */
+.tradewrap{display:flex;gap:1.1cqw}
+.tradeside{flex:1;min-width:0;border:1px solid var(--line);border-radius:17px;
+  padding:.8cqw;background:rgba(255,255,255,.025)}
+.tradeside h4{font-size:.92cqw;font-weight:600;margin-bottom:.5cqw;
+  display:flex;justify-content:space-between;align-items:center}
+.tradeside h4 .v{color:var(--gold);font-size:.86cqw}
+.tradegrid{display:grid;grid-template-columns:repeat(3,1fr);gap:.42cqw}
+.tradegrid .cell{aspect-ratio:1}
+.tradeside.locked{border-color:rgba(87,208,122,.5);
+  background:rgba(87,208,122,.06)}
+.tradebar{display:flex;gap:.6cqw;align-items:center;margin-top:.9cqw}
+.tradebar .note{flex:1;font-size:.84cqw;color:var(--ink2)}
+.tradetimer{height:.34cqw;border-radius:99px;background:rgba(6,9,14,.7);
+  overflow:hidden;margin-top:.6cqw;border:1px solid var(--line)}
+.tradetimer>i{display:block;height:100%;background:var(--acc);transition:width 1s linear}
+
+/* ---- emote wheel ---- */
+.wheel{position:absolute;inset:0;z-index:34;display:none;
+  place-items:center;background:rgba(5,8,14,.44)}
+.wheel.on{display:grid}
+.wheel .ring{position:relative;width:30cqw;height:30cqw;
+  min-width:280px;min-height:280px}
+.wheel .em{position:absolute;transform:translate(-50%,-50%);
+  width:7.4cqw;height:7.4cqw;min-width:74px;min-height:74px;
+  display:grid;place-items:center;gap:.1cqw;border-radius:99px;
+  border:1px solid var(--line2);background:var(--panel2);cursor:pointer;
+  transition:transform .12s ease,border-color .12s ease,background .12s ease}
+.wheel .em:hover{transform:translate(-50%,-50%) scale(1.14);
+  border-color:var(--acc);background:rgba(79,227,176,.16)}
+.wheel .em b{font-size:2.1cqw;line-height:1;min-font-size:20px}
+.wheel .em span{font-size:.62cqw;letter-spacing:.10em;text-transform:uppercase;
+  color:var(--ink2)}
+.wheel .em i{position:absolute;top:.3cqw;right:.7cqw;font-style:normal;
+  font-size:.58cqw;color:var(--ink3)}
+.wheel .hub{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  text-align:center;pointer-events:none;
+  /* The hub sits over whoever is standing in the middle of it, so it
+     carries its own ground rather than trusting the scene behind. */
+  padding:.7cqw 1.4cqw;border-radius:99px;
+  background:radial-gradient(closest-side,rgba(6,9,15,.86),rgba(6,9,15,0))}
+.wheel .hub h4{font-family:var(--disp);font-size:1.3cqw;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--ink)}
+.wheel .hub p{font-size:.68cqw;color:var(--ink3);margin-top:.3cqw}
+
