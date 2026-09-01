@@ -1274,6 +1274,31 @@ corners.
 
 ---
 
+### Then smaller
+
+The first mobile pass sized everything for certainty — an 82px USE
+button, 52px hotbar slots, a 132px stick ring — because the thing it was
+fixing was a HUD you could not hit. Hit it we could; it was then taking
+up more of the screen than the game.
+
+So the whole cluster and the icon set came down by about a fifth, with
+the button positions re-derived from the new sizes rather than left where
+the old ones had put them:
+
+    USE      82 -> 64 landscape, 74 -> 60 portrait
+    JUMP     58 -> 48        TALK     58 -> 48
+    hotbar   52 -> 44        nav      44 -> 40, icons 20 -> 17
+    stick    132 -> 104      avatar   34 -> 30, coin dot 14 -> 12
+
+Controls and icons are 16% of the screen now. The floor is 40 pixels on
+anything you press, and `tools/test/05-phone.mjs` holds that line — it
+failed this pass twice on the way, once for a 38px target and once for a
+label at 8.5px, which is exactly the point of having it.
+
+The nav also stopped wrapping. Six 40px buttons and five 5px gaps is 265
+pixels; the portrait rule allowed 62vw, which is 242, so the settings
+gear had been sitting on a second row by itself.
+
 ### Controls that feel like controls
 
 Playable and good are different passes. The stick read the raw offset

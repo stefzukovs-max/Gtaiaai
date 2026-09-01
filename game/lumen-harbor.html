@@ -1363,6 +1363,78 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 #app.mobile #travel .lbl{font-size:14px;letter-spacing:.16em}
 #app.mobile .stat span, #app.mobile .stat b{font-size:11.5px}
 #app.mobile .cap span, #app.mobile .cap b{font-size:12px}
+
+/* ============================================================
+   Smaller.
+
+   The first mobile pass sized everything for certainty — an 82px USE
+   button, 52px hotbar slots, a 132px stick ring — because the thing it
+   was fixing was a HUD you could not hit. Hit it we can; now it is
+   taking up more of the screen than the game.
+
+   So this walks the whole control cluster and the icon set down by
+   roughly a fifth, and re-derives the button positions from the new
+   sizes rather than leaving them where the old ones put them. The floor
+   is 40px on anything you press, which is where tools/test/05-phone.mjs
+   holds the line: smaller than that and it stops being a thumb target,
+   whatever it looks like.
+   ============================================================ */
+
+/* --- the walk stick --- */
+#app.mobile .tstick{width:104px;height:104px}
+#app.mobile .tsthome{width:104px;height:104px}
+#app.mobile .tsthome{left:calc(18px + var(--sal));bottom:calc(74px + var(--sab))}
+#app.mobile.portrait .tsthome{bottom:calc(132px + var(--sab))}
+
+/* --- the action cluster, landscape --- */
+#app.mobile .tbtn.big{width:64px;height:64px;font-size:12.5px;
+  right:calc(16px + var(--sar));bottom:calc(var(--thumb) + 50px)}
+#app.mobile .tbtn.mid{width:48px;height:48px;font-size:11px}
+#app.mobile .tbtn.jump{right:calc(88px + var(--sar));
+  bottom:calc(var(--thumb) + 58px)}
+#app.mobile .tbtn.act{right:calc(22px + var(--sar));
+  bottom:calc(var(--thumb) + 124px)}
+
+/* --- and portrait, where there is more height to spend --- */
+#app.mobile.portrait .tbtn.big{width:60px;height:60px;
+  right:calc(14px + var(--sar));bottom:calc(var(--thumb) + 80px)}
+#app.mobile.portrait .tbtn.jump{right:calc(80px + var(--sar));
+  bottom:calc(var(--thumb) + 88px)}
+#app.mobile.portrait .tbtn.act{right:calc(18px + var(--sar));
+  bottom:calc(var(--thumb) + 150px)}
+
+/* --- the nav and its icons --- */
+#app.mobile .mnav{gap:5px}
+#app.mobile .mnav .nb{width:40px;height:40px;border-radius:12px}
+#app.mobile .mnav .nb .hicon{width:17px;height:17px;min-width:17px;min-height:17px}
+/* Six 40px buttons and five 5px gaps is 265px; anything narrower drops
+   the settings gear onto a second row on its own. */
+#app.mobile.portrait .mnav{max-width:none;flex-wrap:nowrap}
+
+/* --- the hotbar --- */
+#app.mobile .slot{width:44px;height:44px;min-width:44px;min-height:44px;
+  border-radius:12px}
+#app.mobile .slot .n{font-size:9px}
+#app.mobile .hotbar{gap:5px}
+
+/* --- identity and purse --- */
+#app.mobile .idchip{gap:7px;padding:4px 10px 4px 4px;border-radius:14px}
+#app.mobile .idchip .av{width:30px;height:30px;min-width:30px;min-height:30px;
+  border-radius:10px;font-size:13px}
+#app.mobile .idchip .nm{font-size:12px}
+#app.mobile .xpbar{height:3px;min-height:3px}
+#app.mobile .idchip .xpn{font-size:9.5px}
+#app.mobile .purse{gap:5px}
+#app.mobile .coin{font-size:11px;padding:4px 8px 4px 5px}
+#app.mobile .coin .dot{width:12px;height:12px;min-width:12px;min-height:12px}
+#app.mobile .coin .plus{width:18px;height:18px;min-width:18px;min-height:18px;
+  font-size:12px}
+#app.mobile .clock{font-size:10.5px;padding:3px 9px}
+#app.mobile .act2 .hicon{width:14px;height:14px}
+
+/* The log is for glancing at, not reading a novel in. Four lines. */
+#app.mobile.portrait .chat{height:80px}
+#app.mobile:not(.portrait) .chat{height:74px}
 </style>
 </head>
 <body>
