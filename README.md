@@ -1274,6 +1274,80 @@ corners.
 
 ---
 
+### Controls that feel like controls
+
+Playable and good are different passes. The stick read the raw offset
+from where the thumb landed, divided by a radius, and passed it straight
+through — which walks, but does not feel like anything.
+
+  no dead zone      a thumb resting on the glass drifted the character
+  linear response   lining up a block was as coarse as sprinting
+  a pinned origin   a long turn ran into the edge of the ring and stopped
+  no hysteresis     holding near the run threshold flickered, twice a second
+
+All four are gone. There is a 12% dead zone; the response curve is
+`t*(0.30+0.70*t)`, fine at the bottom where you are placing something and
+full at the top; past the ring the origin follows the thumb, so the stick
+never runs out of travel mid-turn; and run engages at 0.88 and releases at
+0.72 so it cannot chatter.
+
+Look was raw pixels, which means the same gesture turned you a different
+amount on a 390pt screen and a 430pt one. It is normalised now against a
+reference width and tuned so a full swipe across the glass turns about
+135 degrees — enough to spin round in one gesture, not so much that a
+small correction overshoots. A flick keeps gliding for a moment after the
+thumb leaves, because a camera that stops dead feels nailed down. Two
+thumbs on the right pinch the camera in and out.
+
+And the camera helps. On a phone the left thumb walks and the right thumb
+turns, and needing both at once to go anywhere is what makes touch
+third-person feel like work — so when you are moving and not actively
+turning, the camera drifts round behind you by itself. It eases in after
+0.45 seconds of quiet, scales with how far off it is, and gives up the
+instant a thumb touches the right of the screen. On a mouse it is off: a
+whole hand is free and does not want the help.
+
+### Resolution is measured, not guessed
+
+A fixed quality setting is a guess about a phone you have never seen. The
+same build has to run on a three-year-old midrange handset and on this
+year's flagship, and the honest answer to "what resolution should this
+be" is "whatever holds the frame rate".
+
+The internal render targets already scaled off `R.quality` independently
+of the canvas, so resolution can move without touching the layout, the
+HUD, or the pixel ratio the page is laid out at. `R.autoTick` walks that
+number between 1.0 and 0.58 against a rolling frame-time average, and
+only once it has bottomed out does it start giving up effects — AO first,
+then bloom and rays. Two rules keep it from being worse than no
+adaptation at all: a wide dead band, so the common case of sitting
+between the thresholds changes nothing, and a 1.4-second cooldown,
+because a scaler that hunts is more distracting than a low frame rate.
+Choosing a tier by hand turns it off; that is a decision, not a hint.
+
+Writing the probe for it found a real bug: `stepTier` called `applyTier`
+before resetting the scale, and `applyTier` multiplies the tier's quality
+by that scale — so every tier change left the new tier running at the old
+tier's resolution, with `R.auto` reporting a number that was not true.
+
+### Text you can actually read
+
+The legibility check — anything with its own words in it, under nine
+pixels, is a defect — found **twenty-nine** elements on the first run.
+The health readout was at 1.9 pixels. The chat lines were at 2.7. Every
+menu label, every world-card stat, every panel heading.
+
+One cause throughout: sizes written as a fraction of a container that is
+a phone wide. `.chat .ln{font-size:.7cqw}` is nine pixels on a desktop
+and under three on a phone. Two of them could never have worked at all —
+the panel headings were styled as `h3` and are `h2`, and the chat rule
+had been written against `.log` when the size lives on the lines inside
+it.
+
+This is the third time this fault has been found in three different
+places, which is why it is a measured assertion now rather than something
+to look out for.
+
 ### It was not playable on a phone
 
 A screenshot from an actual phone: the HUD half again too big with the

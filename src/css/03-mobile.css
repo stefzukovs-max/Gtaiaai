@@ -421,3 +421,71 @@
 #app.mobile.portrait .getapp{
   top:calc(268px + var(--sat));bottom:auto}
 #app.mobile .getapp .no{width:40px;height:40px;min-width:40px;min-height:40px}
+
+/* A button that does not move when you press it feels like a picture of
+   a button. The transform is on a compositor-friendly property so it
+   costs nothing on a frame that is already tight. */
+.tbtn{transition:transform .07s ease-out,filter .07s ease-out}
+.tbtn.press{transform:scale(.93);filter:brightness(1.22)}
+#app.mobile .mnav .nb{transition:transform .07s ease-out}
+#app.mobile .mnav .nb:active{transform:scale(.92)}
+#app.mobile .slot{transition:transform .08s ease-out}
+#app.mobile .slot:active{transform:scale(.94)}
+
+/* The coach mark is the one thing on screen that is trying to teach you
+   the controls, so it must not be sitting on them. Above the action
+   cluster in portrait, and clear of the hotbar under it. */
+/* Portrait leaves one clear band: below the chat log, above where the
+   walk stick rests. Everything else on this screen is either a control
+   or sitting on one. */
+#app.mobile.portrait .guide{bottom:calc(292px + var(--sab))}
+
+/* A 16%-alpha dashed ring disappears entirely over pale ground, which
+   is most of the plaza. Give it a dark rim of its own so it reads on
+   anything without becoming a fixture you can't ignore. */
+.tsthome{border-color:rgba(232,239,250,.30);
+  box-shadow:0 0 0 2px rgba(6,10,18,.22),inset 0 0 22px rgba(6,10,18,.20)}
+.tsthome>i{background:rgba(232,239,250,.16);
+  border-color:rgba(232,239,250,.30)}
+
+/* Landscape is 390 pixels tall and almost all of it is spoken for:
+   identity and nav top-left, purse top-right, the walk stick bottom-left,
+   the action cluster bottom-right, the hotbar across the bottom. The one
+   clear band is the strip under the nav, so the chat gives up some width
+   and the coach mark takes the middle of it. */
+#app.mobile:not(.portrait) .chat{width:min(32cqw,260px)}
+#app.mobile:not(.portrait) .guide{
+  left:50%;right:auto;transform:translateX(-50%);
+  top:calc(110px + var(--sat));bottom:auto;width:min(36cqw,300px)}
+
+/* The chat's size lives on the lines, not on the log that holds them,
+   so styling .log did nothing: at 390px wide .7cqw is under three
+   pixels. This is the same fault as the front end's, one level down. */
+#app.mobile .chat .ln{font-size:12.5px;line-height:1.42}
+#app.mobile .chat .ln .tag{margin-right:5px}
+#app.mobile .chat .ct{font-size:11.5px;padding:3px 9px}
+#app.mobile .chat .cx{padding:0 8px;font-size:15px}
+
+/* The last of the unclamped cqw text. The health readout was at under
+   two pixels, the menu labels at three: sized as a fraction of a
+   container that is a phone wide, with nothing to stop them. */
+#app.mobile .bar .lbl{font-size:11px;letter-spacing:.02em}
+#app.mobile .hcap{font-size:10px;letter-spacing:.14em}
+#app.mobile .menu .mi .lbl{font-size:13px}
+#app.mobile .online b, #app.mobile .online .n{font-size:12px}
+#app.mobile .pin .lbl{font-size:11px}
+
+/* Everything else the legibility check found. All the same fault: a
+   size written as a fraction of a container that is a phone wide.
+   The panel headings were styled as h3 and are h2, so that override
+   had never applied to anything. */
+#app.mobile .panel h2{font-size:19px;letter-spacing:.04em}
+#app.mobile .guide p{font-size:12.5px;line-height:1.45}
+#app.mobile .menu .mi .kk{display:none}
+#app.mobile .wcard .wn, #app.mobile .wn{font-size:14px}
+#app.mobile .wcard span, #app.mobile .wstat span{font-size:11.5px}
+#app.mobile .wbtn{font-size:13px;min-height:44px;padding:0 16px}
+#app.mobile .setrow span, #app.mobile .setrow b{font-size:12.5px}
+#app.mobile #travel .lbl{font-size:14px;letter-spacing:.16em}
+#app.mobile .stat span, #app.mobile .stat b{font-size:11.5px}
+#app.mobile .cap span, #app.mobile .cap b{font-size:12px}

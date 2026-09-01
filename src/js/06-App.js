@@ -70,6 +70,9 @@ function frame(t){
   if(App.paused)return;
 
   R.time=App.time;
+  /* Measured, not guessed: hold the frame budget by moving the internal
+     resolution, and only give up effects once that has bottomed out. */
+  if(R.autoTick)R.autoTick(dt);
   GL.resetStats();
 
   for(var i=0;i<updaters.length;i++)updaters[i].fn(dt,App.time);
@@ -91,7 +94,15 @@ App.start=function(){
   R.init(cv);
   /* A phone gets the light path by default and can be talked up to the
      full one in Settings; a desktop gets everything. */
-  R.applyTier(LH.Device?LH.Device.tier:3);
+  /* The tier the device looks like it can hold is a starting guess and
+     a ceiling; from here the frame time decides. On a desktop it is left
+     alone — a machine with a fan does not need managing, and a scaler
+     that moves under a mouse is just blur nobody asked for. */
+  var Dv=LH.Device;
+  R.tierCeiling=Dv?Dv.tier:3;
+  R.applyTier(R.tierCeiling);
+  R.auto.on=!!(Dv&&Dv.mobile);
+  R.auto.target=60;
   App.resize();
   requestAnimationFrame(frame);
   return true;

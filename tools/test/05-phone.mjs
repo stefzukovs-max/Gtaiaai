@@ -41,6 +41,22 @@ function survey(min) {
     }
     return false; };
 
+  /* Text too small to read is the same bug as a button too small to
+     press, and this game has had it three times in three different
+     places — an inline cqw size, a rule on the wrong element, a screen
+     with no phone layout at all. So it is measured rather than eyeballed:
+     anything with its own words in it, under nine pixels, is a defect. */
+  const tiny = [];
+  for (const n of document.querySelectorAll('#hud *, #front *, .getapp *')) {
+    if (!vis(n)) continue;
+    let own = '';
+    for (const c of n.childNodes) if (c.nodeType === 3) own += c.textContent.trim();
+    if (own.length < 2) continue;
+    const px = parseFloat(getComputedStyle(n).fontSize);
+    if (px < 9) tiny.push((n.className || n.tagName).toString().slice(0, 26) +
+      ' ' + px.toFixed(1) + 'px "' + own.slice(0, 18) + '"');
+  }
+
   const small = [], off = [];
   for (const n of document.querySelectorAll(
       '#hud button, #hud .nb, #hud .slot, #hud .tbtn, #hud .xbtn, #hud .px,' +
@@ -61,7 +77,7 @@ function survey(min) {
     vw, vh,
     mobile: LH.Device.mobile, touch: LH.Device.touch,
     viewport: meta ? meta.getAttribute('content') : 'NONE',
-    small: small.slice(0, 8), off: off.slice(0, 8),
+    small: small.slice(0, 8), off: off.slice(0, 8), tiny: tiny.slice(0, 40),
     chat, home,
     overlap: !!(chat && home && !(chat[0] + chat[2] < home[0] || home[0] + home[2] < chat[0] ||
                                  chat[1] + chat[3] < home[1] || home[1] + home[3] < chat[1])),
@@ -72,9 +88,18 @@ function survey(min) {
       const q2 = s => { const n = document.querySelector(s); return n && vis(n) ? box(n) : null; };
       const nag = q2('.getapp.on');
       const bad = [];
-      for (const sel of ['#utprimary', '#utjump', '#utact', '.tsthome',
-                         '.hotbar', '.mnav', '.purse', '.idchip'])
+      const controls = ['#utprimary', '#utjump', '#utact', '.tsthome',
+                        '.hotbar', '.mnav', '.purse', '.idchip'];
+      for (const sel of controls)
         if (hit(nag, q2(sel))) bad.push('the install offer covers ' + sel);
+      /* The coach mark is teaching the controls, so it cannot sit on
+         them. Measured by its own class rather than by opacity: it
+         fades, and a fading card is still in the way — reading it as
+         invisible is how this check passed while it was overlapping. */
+      const g = document.querySelector('.guide.on');
+      const tip = g ? box(g) : null;
+      for (const sel of ['#utprimary', '#utjump', '#utact', '.hotbar', '.tsthome'])
+        if (hit(tip, q2(sel))) bad.push('the first-steps card covers ' + sel);
       return bad;
     })(),
     paneScrolls: (() => { const p = document.getElementById('frontpane');
@@ -133,6 +158,8 @@ export async function run(browser) {
            'chat ' + JSON.stringify(game.chat) + ' stick ' + JSON.stringify(game.home));
       t.ok(tag + 'nothing floating sits on a control', game.covers.length === 0,
            game.covers.join(' | '));
+      t.ok(tag + 'the text is big enough to read', game.tiny.length === 0,
+           game.tiny.join(' | '));
       t.ok(tag + 'the tutorial talks about the controls you have',
            !/WASD|mouse|click|Press <b>E/i.test(game.guide), game.guide.slice(0, 90));
     } catch (e) {

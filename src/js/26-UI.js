@@ -471,15 +471,18 @@ U.init=function(){
       e.preventDefault();
       if(b.classList.contains('off'))return;
       LH.Input.touchAction(name,true);
+      b.classList.add('press');
       if(LH.Device)LH.Device.buzz(10);
     }
-    function up(e){e.preventDefault();LH.Input.touchAction(name,false);}
+    function up(e){e.preventDefault();LH.Input.touchAction(name,false);
+      b.classList.remove('press');}
     b.addEventListener('touchstart',dn,{passive:false});
     b.addEventListener('touchend',up,{passive:false});
     b.addEventListener('touchcancel',up,{passive:false});
     b.addEventListener('mousedown',function(){
       if(!b.classList.contains('off'))LH.Input.touchAction(name,true);});
-    b.addEventListener('mouseup',function(){LH.Input.touchAction(name,false);});
+    b.addEventListener('mouseup',function(){LH.Input.touchAction(name,false);
+      b.classList.remove('press');});
   }
   hold('#utprimary','primary');
   hold('#utjump','jump');
@@ -1650,6 +1653,9 @@ function renderMenu(bd){
   var R=LH.Render;
   choiceRow(wrap,'Detail',[[1,'Battery'],[2,'Balanced'],[3,'Full']],
     R.tier,function(t){
+      /* Choosing a tier by hand is a decision, not a hint: stop
+         second-guessing it. */
+      R.auto.on=false;R.auto.scale=1;R.tierCeiling=t;
       U.toast('Graphics: '+R.applyTier(t),'info');
       render('menu');
     });

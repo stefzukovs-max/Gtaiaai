@@ -24,10 +24,21 @@ Cam.far=520;
 Cam.height=1.36;               /* shoulder height above the follow point */
 Cam.shoulder=0.55;             /* lateral offset — over-the-shoulder framing */
 Cam.sensitivity=1.0;
+/* On a phone the left thumb walks and the right thumb turns, and asking
+   for both at once to go anywhere is what makes touch third-person feel
+   like work. So when you are moving and not actively turning, the camera
+   drifts round behind you by itself — slowly enough that it reads as the
+   camera following rather than the camera taking over, and it gives up
+   the moment a thumb touches the right of the screen. */
+Cam.autoAlign=0;          /* 0 off, 1 full. Set from Device on boot. */
+Cam.alignRate=1.5;        /* radians per second at full lean */
+Cam.alignDelay=0.45;      /* quiet seconds before it starts helping */
+var _sinceLook=9;
 Cam.invertY=false;
 Cam.firstPerson=false;
 Cam.collide=true;
 Cam.manual=false;
+Cam.heading=null;         /* where the player is walking, or null */
 
 Cam.view=M.m4();
 Cam.proj=M.m4();
@@ -43,6 +54,7 @@ var _dip=0,_dipV=0;
 Cam.dip=function(amount){_dipV-=Math.min(0.85,amount)*3.4;};
 
 Cam.orbit=function(dx,dy){
+  _sinceLook=0;
   var s=Cam.sensitivity*0.0032;
   Cam.yaw-=dx*s;
   Cam.pitch+=(Cam.invertY?-dy:dy)*s;
@@ -70,6 +82,7 @@ Cam.update=function(dt,followPos,solid){
     LH.Render.setCamera(Cam.view,Cam.proj,Cam.eye);
     return;
   }
+  _sinceLook+=dt;
   M.lerp3(Cam.focus,Cam.focus,followPos,1-Math.pow(0.0008,dt));
   /* Critically-ish damped spring back to level. Stiff enough to settle
      inside a third of a second, soft enough to be felt. */
@@ -78,6 +91,20 @@ Cam.update=function(dt,followPos,solid){
   if(Math.abs(_dip)<0.0004&&Math.abs(_dipV)<0.004){_dip=0;_dipV=0;}
   M.set3(Cam.target,Cam.focus[0],Cam.focus[1]+Cam.height+_dip,Cam.focus[2]);
 
+  /* Swing toward where the player is actually heading. `Cam.headingOf`
+     is set by the game each frame when the player is moving under their
+     own power; when it is null there is nothing to align to. */
+  if(Cam.autoAlign>0&&Cam.heading!==null&&Cam.heading!==undefined&&
+     _sinceLook>Cam.alignDelay){
+    var want=Cam.heading;
+    var d=M.angDelta(Cam.yaw,want);
+    /* Ease in over the first half-second of quiet so it never snaps,
+       and scale by how far off it is so small corrections stay gentle. */
+    var ramp=M.clamp((_sinceLook-Cam.alignDelay)/0.6,0,1);
+    var lean=M.clamp(Math.abs(d)/Math.PI,0,1);
+    var step=d*M.clamp(Cam.alignRate*Cam.autoAlign*ramp*(0.35+lean)*dt,0,1);
+    Cam.yaw+=step;
+  }
   var cp=Math.cos(Cam.pitch),sp=Math.sin(Cam.pitch);
   M.set3(_dir,Math.sin(Cam.yaw)*cp,sp,Math.cos(Cam.yaw)*cp);
   M.norm3(_dir,_dir);

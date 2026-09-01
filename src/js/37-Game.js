@@ -260,6 +260,7 @@ function actPrimary(){
     if(t==='remove'&&!a.ground){
       p.anim.play('mine');
       Net.request('break',{x:a.x,y:a.y,z:a.z,pos:p.pos},function(r){
+        if(r.ok&&LH.Device)LH.Device.buzz(18);
         if(r.ok){UI.sync(r.state);Aud&&Aud.play('break');
           for(var i=0;i<r.drops.length;i++)UI.toastItem(r.drops[i][0],r.drops[i][1]);}
         else UI.toast(r.why,'bad');
@@ -296,6 +297,7 @@ function actPrimary(){
     p.anim.play('build');
     Net.request('place',{x:a.place.x,y:a.place.y,z:a.place.z,
       key:held.key,rot:0,pos:p.pos},function(r){
+        if(r.ok&&LH.Device)LH.Device.buzz(18);
       if(r.ok){UI.sync(r.state);Aud&&Aud.play('place');}
       else UI.toast(r.why,'bad');
     });
@@ -304,6 +306,7 @@ function actPrimary(){
   if(a.hit&&!a.ground){
     p.anim.play('mine');
     Net.request('break',{x:a.x,y:a.y,z:a.z,pos:p.pos},function(r){
+        if(r.ok&&LH.Device)LH.Device.buzz(18);
       if(r.ok){
         UI.sync(r.state);
         for(var i=0;i<r.drops.length;i++)UI.toastItem(r.drops[i][0],r.drops[i][1]);
@@ -800,6 +803,13 @@ App.onUpdate(function(dt,time){
   if(I.zoom)Cam.zoom(I.zoom);
 
   Pl.update(dt);
+  /* Where the player is actually heading, in the camera's own
+     convention (facing + PI), for the auto-align above. Below a walking
+     pace there is no meaningful heading and a nudge should not swing the
+     view, so it hands back null and the camera holds still. */
+  var vx=Pl.vel[0],vz=Pl.vel[2];
+  Cam.heading=(vx*vx+vz*vz>0.6&&!Pl.flying&&!Pl.swimming)
+    ?Math.atan2(vx,vz)+Math.PI:null;
   G.player.ik=true;
   G.player.update(dt);
   if(!Realm.inRealm())updateCrowd(dt);

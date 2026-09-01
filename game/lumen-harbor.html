@@ -1295,6 +1295,74 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 #app.mobile.portrait .getapp{
   top:calc(268px + var(--sat));bottom:auto}
 #app.mobile .getapp .no{width:40px;height:40px;min-width:40px;min-height:40px}
+
+/* A button that does not move when you press it feels like a picture of
+   a button. The transform is on a compositor-friendly property so it
+   costs nothing on a frame that is already tight. */
+.tbtn{transition:transform .07s ease-out,filter .07s ease-out}
+.tbtn.press{transform:scale(.93);filter:brightness(1.22)}
+#app.mobile .mnav .nb{transition:transform .07s ease-out}
+#app.mobile .mnav .nb:active{transform:scale(.92)}
+#app.mobile .slot{transition:transform .08s ease-out}
+#app.mobile .slot:active{transform:scale(.94)}
+
+/* The coach mark is the one thing on screen that is trying to teach you
+   the controls, so it must not be sitting on them. Above the action
+   cluster in portrait, and clear of the hotbar under it. */
+/* Portrait leaves one clear band: below the chat log, above where the
+   walk stick rests. Everything else on this screen is either a control
+   or sitting on one. */
+#app.mobile.portrait .guide{bottom:calc(292px + var(--sab))}
+
+/* A 16%-alpha dashed ring disappears entirely over pale ground, which
+   is most of the plaza. Give it a dark rim of its own so it reads on
+   anything without becoming a fixture you can't ignore. */
+.tsthome{border-color:rgba(232,239,250,.30);
+  box-shadow:0 0 0 2px rgba(6,10,18,.22),inset 0 0 22px rgba(6,10,18,.20)}
+.tsthome>i{background:rgba(232,239,250,.16);
+  border-color:rgba(232,239,250,.30)}
+
+/* Landscape is 390 pixels tall and almost all of it is spoken for:
+   identity and nav top-left, purse top-right, the walk stick bottom-left,
+   the action cluster bottom-right, the hotbar across the bottom. The one
+   clear band is the strip under the nav, so the chat gives up some width
+   and the coach mark takes the middle of it. */
+#app.mobile:not(.portrait) .chat{width:min(32cqw,260px)}
+#app.mobile:not(.portrait) .guide{
+  left:50%;right:auto;transform:translateX(-50%);
+  top:calc(110px + var(--sat));bottom:auto;width:min(36cqw,300px)}
+
+/* The chat's size lives on the lines, not on the log that holds them,
+   so styling .log did nothing: at 390px wide .7cqw is under three
+   pixels. This is the same fault as the front end's, one level down. */
+#app.mobile .chat .ln{font-size:12.5px;line-height:1.42}
+#app.mobile .chat .ln .tag{margin-right:5px}
+#app.mobile .chat .ct{font-size:11.5px;padding:3px 9px}
+#app.mobile .chat .cx{padding:0 8px;font-size:15px}
+
+/* The last of the unclamped cqw text. The health readout was at under
+   two pixels, the menu labels at three: sized as a fraction of a
+   container that is a phone wide, with nothing to stop them. */
+#app.mobile .bar .lbl{font-size:11px;letter-spacing:.02em}
+#app.mobile .hcap{font-size:10px;letter-spacing:.14em}
+#app.mobile .menu .mi .lbl{font-size:13px}
+#app.mobile .online b, #app.mobile .online .n{font-size:12px}
+#app.mobile .pin .lbl{font-size:11px}
+
+/* Everything else the legibility check found. All the same fault: a
+   size written as a fraction of a container that is a phone wide.
+   The panel headings were styled as h3 and are h2, so that override
+   had never applied to anything. */
+#app.mobile .panel h2{font-size:19px;letter-spacing:.04em}
+#app.mobile .guide p{font-size:12.5px;line-height:1.45}
+#app.mobile .menu .mi .kk{display:none}
+#app.mobile .wcard .wn, #app.mobile .wn{font-size:14px}
+#app.mobile .wcard span, #app.mobile .wstat span{font-size:11.5px}
+#app.mobile .wbtn{font-size:13px;min-height:44px;padding:0 16px}
+#app.mobile .setrow span, #app.mobile .setrow b{font-size:12.5px}
+#app.mobile #travel .lbl{font-size:14px;letter-spacing:.16em}
+#app.mobile .stat span, #app.mobile .stat b{font-size:11.5px}
+#app.mobile .cap span, #app.mobile .cap b{font-size:12px}
 </style>
 </head>
 <body>
@@ -4830,10 +4898,78 @@ R.TIERS={
      shadowSoft:2.0,bump:0.10}
 };
 R.tier=3;
+
+/* ---------------- adaptive resolution ----------------
+   A fixed quality setting is a guess about a phone you have never seen.
+   The same build has to run on a three-year-old midrange handset and on
+   this year's flagship, and the honest answer to "what resolution should
+   this be" is "whatever holds the frame rate".
+
+   So it is measured. The internal render targets already scale off
+   R.quality independently of the canvas, which means resolution can move
+   without touching the layout, the HUD, or the pixel ratio the page is
+   laid out at. This walks that number up and down to keep the frame
+   inside its budget, and only after resolution has bottomed out does it
+   start giving up effects.
+
+   The two rules that keep it from being worse than no adaptation at all:
+   a wide dead band, so the common case of sitting between the thresholds
+   changes nothing, and a cooldown, so it cannot oscillate — a scaler
+   that hunts is more distracting than a low frame rate. */
+R.auto={
+  on:false,
+  target:60,
+  min:0.58,          /* below this it looks soft enough to notice   */
+  ceiling:1.0,       /* the tier's own quality, set by applyTier    */
+  cool:0,            /* seconds before the next change is allowed   */
+  acc:0,n:0,         /* frame-time accumulator                      */
+  scale:1.0
+};
+R.autoTick=function(dt){
+  var A=R.auto;
+  if(!A.on||!dt)return;
+  if(A.cool>0)A.cool-=dt;
+  A.acc+=dt;A.n++;
+  if(A.acc<0.6)return;
+  var ms=(A.acc/A.n)*1000;
+  A.acc=0;A.n=0;
+  A.ms=ms;
+  if(A.cool>0)return;
+  var budget=1000/A.target;
+  /* Slower than 50fps: give something up. Faster than 72 with headroom
+     to spare: take something back. Between the two, leave it alone. */
+  var slow=ms>budget*1.20, fast=ms<budget*0.84;
+  if(!slow&&!fast)return;
+  var was=A.scale;
+  if(slow){
+    if(A.scale>A.min+0.001)A.scale=Math.max(A.min,A.scale-0.10);
+    else if(R.tier>1)return R.stepTier(R.tier-1);
+  }else{
+    if(A.scale<0.999)A.scale=Math.min(1,A.scale+0.06);
+    else if(R.tier<3&&R.tierCeiling>R.tier)return R.stepTier(R.tier+1);
+  }
+  if(A.scale===was)return;
+  A.cool=1.4;
+  R.quality=A.ceiling*A.scale;
+  if(R.resized)R.resized();
+};
+/* Changing tier resets the scale, because the new tier has a different
+   cost and the old scale was measured against the old one. */
+R.tierCeiling=3;
+R.stepTier=function(t){
+  /* Reset the scale FIRST: applyTier multiplies the tier's quality by
+     it, so doing this the other way round leaves the new tier running at
+     the old tier's scale and the number in R.auto lying about it. */
+  R.auto.scale=1.0;
+  R.applyTier(t);
+  R.auto.cool=2.4;
+};
+
 R.applyTier=function(t){
   var T=R.TIERS[t]||R.TIERS[3];
   R.tier=t;
-  R.quality=T.quality;
+  R.auto.ceiling=T.quality;
+  R.quality=T.quality*R.auto.scale;
   R.scene.ao=T.ao;
   R.scene.bloom=T.bloom;
   R.scene.rays=T.rays;
@@ -5294,6 +5430,9 @@ D.apply=function(){
   a.classList.toggle('touchdev',D.touch);
   a.classList.toggle('standalone',D.standalone);
   a.classList.toggle('portrait',D.portrait);
+  /* Two thumbs, one of which is busy walking: the camera helps out.
+     A mouse has a whole hand free and does not want the help. */
+  if(LH.Cam)LH.Cam.autoAlign=D.touch?1:0;
 };
 
 /* ---------------- fullscreen ----------------
@@ -5555,6 +5694,9 @@ function frame(t){
   if(App.paused)return;
 
   R.time=App.time;
+  /* Measured, not guessed: hold the frame budget by moving the internal
+     resolution, and only give up effects once that has bottomed out. */
+  if(R.autoTick)R.autoTick(dt);
   GL.resetStats();
 
   for(var i=0;i<updaters.length;i++)updaters[i].fn(dt,App.time);
@@ -5576,7 +5718,15 @@ App.start=function(){
   R.init(cv);
   /* A phone gets the light path by default and can be talked up to the
      full one in Settings; a desktop gets everything. */
-  R.applyTier(LH.Device?LH.Device.tier:3);
+  /* The tier the device looks like it can hold is a starting guess and
+     a ceiling; from here the frame time decides. On a desktop it is left
+     alone — a machine with a fan does not need managing, and a scaler
+     that moves under a mouse is just blur nobody asked for. */
+  var Dv=LH.Device;
+  R.tierCeiling=Dv?Dv.tier:3;
+  R.applyTier(R.tierCeiling);
+  R.auto.on=!!(Dv&&Dv.mobile);
+  R.auto.target=60;
   App.resize();
   requestAnimationFrame(frame);
   return true;
@@ -5652,10 +5802,21 @@ Cam.far=520;
 Cam.height=1.36;               /* shoulder height above the follow point */
 Cam.shoulder=0.55;             /* lateral offset — over-the-shoulder framing */
 Cam.sensitivity=1.0;
+/* On a phone the left thumb walks and the right thumb turns, and asking
+   for both at once to go anywhere is what makes touch third-person feel
+   like work. So when you are moving and not actively turning, the camera
+   drifts round behind you by itself — slowly enough that it reads as the
+   camera following rather than the camera taking over, and it gives up
+   the moment a thumb touches the right of the screen. */
+Cam.autoAlign=0;          /* 0 off, 1 full. Set from Device on boot. */
+Cam.alignRate=1.5;        /* radians per second at full lean */
+Cam.alignDelay=0.45;      /* quiet seconds before it starts helping */
+var _sinceLook=9;
 Cam.invertY=false;
 Cam.firstPerson=false;
 Cam.collide=true;
 Cam.manual=false;
+Cam.heading=null;         /* where the player is walking, or null */
 
 Cam.view=M.m4();
 Cam.proj=M.m4();
@@ -5671,6 +5832,7 @@ var _dip=0,_dipV=0;
 Cam.dip=function(amount){_dipV-=Math.min(0.85,amount)*3.4;};
 
 Cam.orbit=function(dx,dy){
+  _sinceLook=0;
   var s=Cam.sensitivity*0.0032;
   Cam.yaw-=dx*s;
   Cam.pitch+=(Cam.invertY?-dy:dy)*s;
@@ -5698,6 +5860,7 @@ Cam.update=function(dt,followPos,solid){
     LH.Render.setCamera(Cam.view,Cam.proj,Cam.eye);
     return;
   }
+  _sinceLook+=dt;
   M.lerp3(Cam.focus,Cam.focus,followPos,1-Math.pow(0.0008,dt));
   /* Critically-ish damped spring back to level. Stiff enough to settle
      inside a third of a second, soft enough to be felt. */
@@ -5706,6 +5869,20 @@ Cam.update=function(dt,followPos,solid){
   if(Math.abs(_dip)<0.0004&&Math.abs(_dipV)<0.004){_dip=0;_dipV=0;}
   M.set3(Cam.target,Cam.focus[0],Cam.focus[1]+Cam.height+_dip,Cam.focus[2]);
 
+  /* Swing toward where the player is actually heading. `Cam.headingOf`
+     is set by the game each frame when the player is moving under their
+     own power; when it is null there is nothing to align to. */
+  if(Cam.autoAlign>0&&Cam.heading!==null&&Cam.heading!==undefined&&
+     _sinceLook>Cam.alignDelay){
+    var want=Cam.heading;
+    var d=M.angDelta(Cam.yaw,want);
+    /* Ease in over the first half-second of quiet so it never snaps,
+       and scale by how far off it is so small corrections stay gentle. */
+    var ramp=M.clamp((_sinceLook-Cam.alignDelay)/0.6,0,1);
+    var lean=M.clamp(Math.abs(d)/Math.PI,0,1);
+    var step=d*M.clamp(Cam.alignRate*Cam.autoAlign*ramp*(0.35+lean)*dt,0,1);
+    Cam.yaw+=step;
+  }
   var cp=Math.cos(Cam.pitch),sp=Math.sin(Cam.pitch);
   M.set3(_dir,Math.sin(Cam.yaw)*cp,sp,Math.cos(Cam.yaw)*cp);
   M.norm3(_dir,_dir);
@@ -14880,53 +15057,131 @@ I.attach=function(el){
   I.requestLock=function(){el.requestPointerLock&&el.requestPointerLock();};
   I.releaseLock=function(){document.exitPointerLock&&document.exitPointerLock();};
 
-  /* Touch: left half is a virtual stick, right half is look. Both are
-     tracked by pointer id so two thumbs never interfere. */
-  var stickId=null,stickOX=0,stickOY=0;
+  /* Touch: the left third is a walk stick, the rest is look. Both are
+     tracked by pointer id so two thumbs never interfere.
+
+     The first version of this read the raw offset from where the thumb
+     landed, divided by a radius, and passed it straight through. That
+     walks, but it does not feel like anything: there is no dead zone, so
+     a thumb resting on the glass drifts; the response is linear, so
+     lining a jump up is as coarse as sprinting; the origin is pinned to
+     the touch-down point, so a long turn runs into the edge of the ring
+     and stops; and the run threshold has no hysteresis, so holding near
+     it flickers between walking and running several times a second. */
+  var stickId=null,stickOX=0,stickOY=0,stickDX=0,stickDY=0;
   var lookId=null,lookX=0,lookY=0;
-  I.stick={active:false,ox:0,oy:0,x:0,y:0};
+  var pinch=null,pinchWas=0;
+  var lookVX=0,lookVY=0;             /* glide after the thumb leaves */
+  I.stick={active:false,ox:0,oy:0,x:0,y:0,mag:0};
+  I.stickDead=0.12;                  /* of the ring, ignored entirely */
+  I.lookSens=1.0;
+
+  function ring(){return Math.min(96,Math.max(58,window.innerHeight*0.17));}
+
+  function aim(dx,dy){
+    var R=ring(),d=Math.hypot(dx,dy);
+    /* Past the ring the origin follows the thumb rather than clamping,
+       so the stick never runs out of travel in the middle of a turn.
+       Push further and it keeps giving, which is what a stick does. */
+    if(d>R){
+      var pull=(d-R)/d;
+      stickOX+=dx*pull;stickOY+=dy*pull;
+      dx-=dx*pull;dy-=dy*pull;d=R;
+    }
+    stickDX=dx;stickDY=dy;
+    var t=d/R;
+    t=t<I.stickDead?0:(t-I.stickDead)/(1-I.stickDead);
+    /* Fine at the bottom where you are placing a block, full at the top.
+       Linear gives you neither end well. */
+    var m=t*(0.30+0.70*t);
+    if(d>0.0001){I.move.x=(dx/d)*m;I.move.y=-(dy/d)*m;}
+    else{I.move.x=0;I.move.y=0;}
+    I.stick.mag=m;
+    /* Hysteresis, or holding near the line flickers. */
+    if(t>0.88)I.run=true;else if(t<0.72)I.run=false;
+    I.stick.ox=stickOX;I.stick.oy=stickOY;
+    I.stick.x=stickOX+dx;I.stick.y=stickOY+dy;
+  }
+
+  /* A swipe across the screen should turn the same amount on every
+     phone. Raw pixels do not: the same gesture on a 390pt screen and a
+     430pt one turns you different distances. */
+  /* Tuned so a full swipe across the screen turns about 135 degrees:
+     enough to spin round in one gesture, not so much that a small
+     correction overshoots. The 900 is the reference width the constant
+     was measured at; the division is what makes it the same gesture on
+     a small phone and a large one. */
+  var LOOK_K=0.82;
+  function lookScale(){return 900/Math.max(320,window.innerWidth);}
+
   el.addEventListener('touchstart',function(e){
     I.lastKind='touch';
     for(var i=0;i<e.changedTouches.length;i++){
       var t=e.changedTouches[i];
       if(t.clientX<window.innerWidth*0.42&&stickId===null){
         stickId=t.identifier;stickOX=t.clientX;stickOY=t.clientY;
+        stickDX=0;stickDY=0;
         I.stick.active=true;I.stick.ox=stickOX;I.stick.oy=stickOY;
-        I.stick.x=stickOX;I.stick.y=stickOY;
+        I.stick.x=stickOX;I.stick.y=stickOY;I.stick.mag=0;
       }else if(lookId===null){
         lookId=t.identifier;lookX=t.clientX;lookY=t.clientY;
+        lookVX=0;lookVY=0;           /* a new touch stops the glide */
+      }else if(pinch===null&&t.identifier!==stickId){
+        pinch=t.identifier;
+        var a=lookX-t.clientX,b=lookY-t.clientY;
+        pinchWas=Math.hypot(a,b);
       }
     }
     e.preventDefault();
   },{passive:false});
+
   el.addEventListener('touchmove',function(e){
+    var px=null,py=null;
     for(var i=0;i<e.changedTouches.length;i++){
       var t=e.changedTouches[i];
       if(t.identifier===stickId){
-        var dx=t.clientX-stickOX,dy=t.clientY-stickOY;
-        var R=Math.min(90,window.innerHeight*0.16);
-        var d=Math.hypot(dx,dy);
-        if(d>R){dx*=R/d;dy*=R/d;}
-        I.move.x=dx/R;I.move.y=-dy/R;
-        I.run=d>R*0.82;
-        I.stick.x=stickOX+dx;I.stick.y=stickOY+dy;
+        aim(t.clientX-stickOX,t.clientY-stickOY);
       }else if(t.identifier===lookId){
-        I.look.x+=t.clientX-lookX;I.look.y+=t.clientY-lookY;
+        var k=lookScale()*I.lookSens*LOOK_K;
+        var dx=(t.clientX-lookX)*k,dy=(t.clientY-lookY)*k;
+        if(pinch===null){
+          I.look.x+=dx;I.look.y+=dy;
+          /* remember the speed so a flick keeps gliding when it ends */
+          lookVX=lookVX*0.65+dx*0.35;lookVY=lookVY*0.65+dy*0.35;
+        }
         lookX=t.clientX;lookY=t.clientY;
-      }
+      }else if(t.identifier===pinch){px=t.clientX;py=t.clientY;}
+    }
+    /* Two thumbs on the right pull the camera in and out. */
+    if(pinch!==null&&px!==null){
+      var d=Math.hypot(lookX-px,lookY-py);
+      if(pinchWas)I.zoom+=(pinchWas-d)*0.016;
+      pinchWas=d;
     }
     e.preventDefault();
   },{passive:false});
+
   function endTouch(e){
     for(var i=0;i<e.changedTouches.length;i++){
       var t=e.changedTouches[i];
       if(t.identifier===stickId){
-        stickId=null;I.move.x=0;I.move.y=0;I.run=false;I.stick.active=false;
-      }else if(t.identifier===lookId)lookId=null;
+        stickId=null;I.move.x=0;I.move.y=0;I.run=false;
+        I.stick.active=false;I.stick.mag=0;
+      }else if(t.identifier===lookId){lookId=null;pinch=null;}
+      else if(t.identifier===pinch){pinch=null;pinchWas=0;}
     }
   }
   el.addEventListener('touchend',endTouch);
   el.addEventListener('touchcancel',endTouch);
+
+  /* The glide. A camera that stops dead the instant a thumb lifts feels
+     nailed down; one that coasts a little and settles feels held. */
+  I.lookGlide=function(){
+    if(lookId!==null)return;
+    if(Math.abs(lookVX)<0.02&&Math.abs(lookVY)<0.02){lookVX=0;lookVY=0;return;}
+    I.look.x+=lookVX;I.look.y+=lookVY;
+    lookVX*=0.86;lookVY*=0.86;
+  };
 };
 
 /* Gamepad is polled, not evented, so it is read at the top of the
@@ -14956,6 +15211,7 @@ function pollPad(){
 /* Called once at the top of each frame, before anything reads input. */
 I.begin=function(){
   pollPad();
+  if(I.lookGlide)I.lookGlide();
   if(I.lastKind==='kb'){
     var mx=(keys.right?1:0)-(keys.left?1:0);
     var my=(keys.fwd?1:0)-(keys.back?1:0);
@@ -18175,15 +18431,18 @@ U.init=function(){
       e.preventDefault();
       if(b.classList.contains('off'))return;
       LH.Input.touchAction(name,true);
+      b.classList.add('press');
       if(LH.Device)LH.Device.buzz(10);
     }
-    function up(e){e.preventDefault();LH.Input.touchAction(name,false);}
+    function up(e){e.preventDefault();LH.Input.touchAction(name,false);
+      b.classList.remove('press');}
     b.addEventListener('touchstart',dn,{passive:false});
     b.addEventListener('touchend',up,{passive:false});
     b.addEventListener('touchcancel',up,{passive:false});
     b.addEventListener('mousedown',function(){
       if(!b.classList.contains('off'))LH.Input.touchAction(name,true);});
-    b.addEventListener('mouseup',function(){LH.Input.touchAction(name,false);});
+    b.addEventListener('mouseup',function(){LH.Input.touchAction(name,false);
+      b.classList.remove('press');});
   }
   hold('#utprimary','primary');
   hold('#utjump','jump');
@@ -19354,6 +19613,9 @@ function renderMenu(bd){
   var R=LH.Render;
   choiceRow(wrap,'Detail',[[1,'Battery'],[2,'Balanced'],[3,'Full']],
     R.tier,function(t){
+      /* Choosing a tier by hand is a decision, not a hint: stop
+         second-guessing it. */
+      R.auto.on=false;R.auto.scale=1;R.tierCeiling=t;
       U.toast('Graphics: '+R.applyTier(t),'info');
       render('menu');
     });
@@ -22188,6 +22450,7 @@ function actPrimary(){
     if(t==='remove'&&!a.ground){
       p.anim.play('mine');
       Net.request('break',{x:a.x,y:a.y,z:a.z,pos:p.pos},function(r){
+        if(r.ok&&LH.Device)LH.Device.buzz(18);
         if(r.ok){UI.sync(r.state);Aud&&Aud.play('break');
           for(var i=0;i<r.drops.length;i++)UI.toastItem(r.drops[i][0],r.drops[i][1]);}
         else UI.toast(r.why,'bad');
@@ -22224,6 +22487,7 @@ function actPrimary(){
     p.anim.play('build');
     Net.request('place',{x:a.place.x,y:a.place.y,z:a.place.z,
       key:held.key,rot:0,pos:p.pos},function(r){
+        if(r.ok&&LH.Device)LH.Device.buzz(18);
       if(r.ok){UI.sync(r.state);Aud&&Aud.play('place');}
       else UI.toast(r.why,'bad');
     });
@@ -22232,6 +22496,7 @@ function actPrimary(){
   if(a.hit&&!a.ground){
     p.anim.play('mine');
     Net.request('break',{x:a.x,y:a.y,z:a.z,pos:p.pos},function(r){
+        if(r.ok&&LH.Device)LH.Device.buzz(18);
       if(r.ok){
         UI.sync(r.state);
         for(var i=0;i<r.drops.length;i++)UI.toastItem(r.drops[i][0],r.drops[i][1]);
@@ -22728,6 +22993,13 @@ App.onUpdate(function(dt,time){
   if(I.zoom)Cam.zoom(I.zoom);
 
   Pl.update(dt);
+  /* Where the player is actually heading, in the camera's own
+     convention (facing + PI), for the auto-align above. Below a walking
+     pace there is no meaningful heading and a nudge should not swing the
+     view, so it hands back null and the camera holds still. */
+  var vx=Pl.vel[0],vz=Pl.vel[2];
+  Cam.heading=(vx*vx+vz*vz>0.6&&!Pl.flying&&!Pl.swimming)
+    ?Math.atan2(vx,vz)+Math.PI:null;
   G.player.ik=true;
   G.player.update(dt);
   if(!Realm.inRealm())updateCrowd(dt);

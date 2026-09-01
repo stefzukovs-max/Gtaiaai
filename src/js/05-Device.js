@@ -67,6 +67,9 @@ D.apply=function(){
   a.classList.toggle('touchdev',D.touch);
   a.classList.toggle('standalone',D.standalone);
   a.classList.toggle('portrait',D.portrait);
+  /* Two thumbs, one of which is busy walking: the camera helps out.
+     A mouse has a whole hand free and does not want the help. */
+  if(LH.Cam)LH.Cam.autoAlign=D.touch?1:0;
 };
 
 /* ---------------- fullscreen ----------------

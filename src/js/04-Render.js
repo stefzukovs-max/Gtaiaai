@@ -1213,10 +1213,78 @@ R.TIERS={
      shadowSoft:2.0,bump:0.10}
 };
 R.tier=3;
+
+/* ---------------- adaptive resolution ----------------
+   A fixed quality setting is a guess about a phone you have never seen.
+   The same build has to run on a three-year-old midrange handset and on
+   this year's flagship, and the honest answer to "what resolution should
+   this be" is "whatever holds the frame rate".
+
+   So it is measured. The internal render targets already scale off
+   R.quality independently of the canvas, which means resolution can move
+   without touching the layout, the HUD, or the pixel ratio the page is
+   laid out at. This walks that number up and down to keep the frame
+   inside its budget, and only after resolution has bottomed out does it
+   start giving up effects.
+
+   The two rules that keep it from being worse than no adaptation at all:
+   a wide dead band, so the common case of sitting between the thresholds
+   changes nothing, and a cooldown, so it cannot oscillate — a scaler
+   that hunts is more distracting than a low frame rate. */
+R.auto={
+  on:false,
+  target:60,
+  min:0.58,          /* below this it looks soft enough to notice   */
+  ceiling:1.0,       /* the tier's own quality, set by applyTier    */
+  cool:0,            /* seconds before the next change is allowed   */
+  acc:0,n:0,         /* frame-time accumulator                      */
+  scale:1.0
+};
+R.autoTick=function(dt){
+  var A=R.auto;
+  if(!A.on||!dt)return;
+  if(A.cool>0)A.cool-=dt;
+  A.acc+=dt;A.n++;
+  if(A.acc<0.6)return;
+  var ms=(A.acc/A.n)*1000;
+  A.acc=0;A.n=0;
+  A.ms=ms;
+  if(A.cool>0)return;
+  var budget=1000/A.target;
+  /* Slower than 50fps: give something up. Faster than 72 with headroom
+     to spare: take something back. Between the two, leave it alone. */
+  var slow=ms>budget*1.20, fast=ms<budget*0.84;
+  if(!slow&&!fast)return;
+  var was=A.scale;
+  if(slow){
+    if(A.scale>A.min+0.001)A.scale=Math.max(A.min,A.scale-0.10);
+    else if(R.tier>1)return R.stepTier(R.tier-1);
+  }else{
+    if(A.scale<0.999)A.scale=Math.min(1,A.scale+0.06);
+    else if(R.tier<3&&R.tierCeiling>R.tier)return R.stepTier(R.tier+1);
+  }
+  if(A.scale===was)return;
+  A.cool=1.4;
+  R.quality=A.ceiling*A.scale;
+  if(R.resized)R.resized();
+};
+/* Changing tier resets the scale, because the new tier has a different
+   cost and the old scale was measured against the old one. */
+R.tierCeiling=3;
+R.stepTier=function(t){
+  /* Reset the scale FIRST: applyTier multiplies the tier's quality by
+     it, so doing this the other way round leaves the new tier running at
+     the old tier's scale and the number in R.auto lying about it. */
+  R.auto.scale=1.0;
+  R.applyTier(t);
+  R.auto.cool=2.4;
+};
+
 R.applyTier=function(t){
   var T=R.TIERS[t]||R.TIERS[3];
   R.tier=t;
-  R.quality=T.quality;
+  R.auto.ceiling=T.quality;
+  R.quality=T.quality*R.auto.scale;
   R.scene.ao=T.ao;
   R.scene.bloom=T.bloom;
   R.scene.rays=T.rays;
