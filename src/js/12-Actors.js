@@ -419,7 +419,8 @@ A.submit=function(actor){
        lighter, it is further from the pivot, and it answers to the
        head turning as well as to the body moving. */
     var hr=actor.hair||lag;
-    P(Body.hair(k.hair.style),'head',headOff,Geo.col3(k.hair.color),0,
+    P(Body.hair(k.hair.style,k.hat&&k.hat.style!=='none'),
+      'head',headOff,Geo.col3(k.hair.color),0,
       [-hr[0]*0.42,hr[1]*0.20,hr[1]*0.46]);
   }
   if(k.hat.style!=='none')

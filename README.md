@@ -1274,6 +1274,47 @@ corners.
 
 ---
 
+### The wizard
+
+A screenshot of a wizard, sent from a phone, with four things wrong with
+it in one frame. This is the pass that fixed three of them, and the
+renderer that made it possible is `tools/shot.mjs` — a row of figures on
+the jetty in a fixed pose under a fixed light, committed this time rather
+than rewritten from memory.
+
+**The brim was a blindfold.** `Body.hat` carries a comment saying every
+hat in the file was authored with its band at y 0.02, which on this skull
+is the eyeline, and that the band belongs at the hairline five and a half
+centimetres up. The code lifted it 2.6 — less than half — and on the
+wizard the brim landed straight across the eyes. It goes to 0.062 now,
+with a small table for the ones that are meant to sit low: a beanie
+covers the ears, a headwrap crosses the brow on purpose. Rendering the
+same eight hats at the old height and the new one side by side is what
+settled it — at 0.026 every brim cuts the eyebrow.
+
+**The beard was cauliflower.** The `bushy` mass was a decent lofted
+shape, and then twenty-eight spheres of 14 to 22 millimetres were
+scattered over it "so it is not a smooth shell". On a head 150mm across
+that is not wool, it is a bunch of grapes. The texture comes from the
+silhouette now — each ring's radius wobbles with azimuth so the outline
+breaks up on its own — plus the same fine whiskers the plain beard has
+always used. It costs three draw calls and 46,000 triangles, the same as
+the beard beside it.
+
+Then the taper. Eleven separate locks were hung off the bottom edge and
+came out as a neat row of even little cones: the cauliflower problem
+again with a different shape. Two more clumped rings do the same job as
+one continuous surface.
+
+**The hair was a helmet, and the fix for that was worse.** Pressing the
+crown flat under a hat left a ring of hair with bare scalp above it,
+because most crowns here are narrower than the skull — the wizard's cone
+is 104mm on a head of 150 — so the hair is what covers the head around
+them. It tucks in two millimetres now and nothing else.
+
+Still open: the hats sit slightly back on the skull. That is visible at
+both heights, so it is not from this pass, and it wants its own.
+
 ### Sideways, and only sideways
 
 A web page cannot make a phone rotate. That is the whole problem, and any

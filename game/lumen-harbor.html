@@ -9265,15 +9265,23 @@ Body.HAIR=Object.keys(HAIR_BUILD);
    scaled to fit it, and now also by the cartoon head scale, so growing
    the head does not bury every hairstyle inside it. */
 var HEAD_FIT=[1.085*P.headScale,1.060*P.headScale,1.085*P.headScale];
-Body.hair=function(style){
+/* `capped` is hair worn under a hat, and it does less than it sounds
+   like it should. Pressing the crown flat was tried and looked worse
+   than the problem: most crowns here are narrower than the skull — the
+   wizard's cone is 104mm on a head of 150 — so the hair is what covers
+   the scalp around them, and flattening it left a ring of hair with
+   bare head above it. All it does now is tuck the shell in a couple of
+   millimetres so the band grips it instead of floating over it. */
+Body.hair=function(style,capped){
   style=HAIR_BUILD[style]?style:'crop';
-  return part('hair:'+style,function(b){
+  return part('hair:'+style+(capped?':cap':''),function(b){
     b.mat('hair');
     /* Hats keep the 1.085 stand-off because they were authored against
        a reference skull. Hair does not: every card here is placed on
        the skull ellipsoid itself, so scaling it out again would lift
        the whole head of hair off the scalp by seven millimetres. */
     b.push();b.scale(P.headScale,P.headScale,P.headScale);
+    if(capped)b.scale(0.972,0.985,0.972);
     HAIR_BUILD[style](b);
     b.pop();
   },160);
@@ -9939,6 +9947,11 @@ var HAT_BUILD={
   },
   none:function(b){}
 };
+/* How far up the skull each hat's band belongs, in head space. The
+   default is the hairline; these are the ones that are meant to sit on
+   or below the brow. */
+var HAT_SIT={beanie:0.030,headwrap:0.026,visor:0.040,hardhat:0.040,
+             halo:0.086,crown:0.058,viking:0.038,knight:0.030};
 Body.HATS=Object.keys(HAT_BUILD);
 Body.hat=function(style){
   style=HAT_BUILD[style]?style:'none';
@@ -9955,7 +9968,13 @@ Body.hat=function(style){
        it — which reads as broken long before it reads as loose. 0.76
        is snug: the band grips the skull and the brim still oversails
        it. */
-    b.push();b.translate(0,0.026,0);
+    /* 0.026 was half the lift the comment above asks for, and it
+       showed: on the wizard the brim landed straight across the eyes,
+       which is the blindfold the comment was written to prevent. The
+       band goes to the hairline. A few hats belong lower — a beanie
+       covers the ears, a headwrap crosses the brow on purpose — so they
+       say so rather than dragging the rest down with them. */
+    b.push();b.translate(0,HAT_SIT[style]===undefined?0.062:HAT_SIT[style],0);
     b.scale(HEAD_FIT[0]*0.76,HEAD_FIT[1]*0.80,HEAD_FIT[2]*0.76);
     HAT_BUILD[style](b);
     b.pop();
@@ -10023,6 +10042,20 @@ function whiskers(b,cfg){
   }
 }
 
+/* A head section with a clumped outline: the radius wobbles with
+   azimuth so a lofted mass reads as hair rather than as a smooth
+   pudding. Amplitude is a fraction of the radius, `teeth` is how many
+   clumps go round, `ph` rotates them so stacked rings interlock. */
+function clump(hw,hf,hb,ex,amp,teeth,ph){
+  var pts=headSect(hw,hf,hb,26,ex);
+  for(var i=0;i<pts.length;i++){
+    var a=i/pts.length*M.TAU;
+    var k=1+amp*(0.5+0.5*Math.cos(a*teeth+ph));
+    pts[i][0]*=k;pts[i][1]*=k;
+  }
+  return pts;
+}
+
 var FACE_BUILD={
   stubble:function(b){
     whiskers(b,{seed:17,count:260,az0:-1.50,az1:1.50,y0:-0.118,y1:-0.030,
@@ -10082,22 +10115,37 @@ var FACE_BUILD={
     b.chamfer(0,0,0,0.050,0.005,0.008,MID,0.002,{noBand:true});b.pop();
   },
   bushy:function(b){
-    /* A full beard as one mass with a jaw-shaped lower edge. */
+    /* A full beard as one mass with a jaw-shaped lower edge.
+
+       The mass was right; what sat on it was not. Twenty-eight spheres
+       of 14 to 22 millimetres were scattered over it "so it is not a
+       smooth shell", and on a head 150mm across that is not wool, it is
+       a bunch of grapes — the beard read as cauliflower from any
+       distance. The texture comes from the silhouette now: the rings
+       are clumped rather than round, so the outline breaks up on its
+       own, and the surface gets the same fine whiskers the plain beard
+       already uses. */
     b.push();b.translate(0,-0.062,0.006);
-    b.loft([{y:-0.076,pts:headSect(0.046,0.058,0.040,18,2.6)},
-            {y:-0.036,pts:headSect(0.070,0.086,0.062,18,2.6)},
-            {y: 0.004,pts:headSect(0.086,0.098,0.080,18,2.5)},
-            {y: 0.030,pts:headSect(0.090,0.100,0.086,18,2.4)}],LIT,
+    /* The point tapers out of the mass rather than hanging off it.
+       Eleven separate locks were tried and came out as a neat row of
+       even little cones — a fringe of teeth, which is the cauliflower
+       problem again with a different shape. Two more rings, narrower
+       and clumped harder, do the same job as one continuous surface. */
+    b.loft([{y:-0.134,pts:clump(0.019,0.025,0.017,2.6,0.34,7,5.1)},
+            {y:-0.108,pts:clump(0.032,0.040,0.027,2.6,0.26,6,4.2)},
+            {y:-0.076,pts:clump(0.046,0.058,0.040,2.6,0.16,5,0.0)},
+            {y:-0.048,pts:clump(0.060,0.074,0.052,2.6,0.14,5,0.9)},
+            {y:-0.036,pts:clump(0.070,0.086,0.062,2.6,0.11,6,1.7)},
+            {y:-0.014,pts:clump(0.079,0.092,0.072,2.5,0.09,6,2.6)},
+            {y: 0.004,pts:clump(0.086,0.098,0.080,2.5,0.07,7,3.4)},
+            {y: 0.030,pts:clump(0.090,0.100,0.086,2.4,0.04,7,4.1)}],LIT,
            {openTop:true,openBottom:true});
     b.pop();
-    /* the wool: beads over the mass so it is not a smooth shell */
-    var rng=M.rng(41);
-    for(var i=0;i<28;i++){
-      var a=(rng()-0.5)*2.3, yy=-0.110+rng()*0.090;
-      b.push();
-      b.translate(Math.sin(a)*0.082,yy,0.030+Math.cos(a)*0.070);
-      b.sphere(0,0,0,0.014+rng()*0.008,8,6,rng()<0.5?LIT:MID);b.pop();
-    }
+    /* and the fine stuff over the top, as the plain beard does */
+    whiskers(b,{seed:41,count:360,az0:-1.36,az1:1.36,y0:-0.140,y1:-0.030,
+      len:0.016,w:0.0024,droop:1.05,
+      lenAt:function(az,y){return 0.6+1.0*(1-Math.abs(az)/1.5);},
+      mask:function(az,y){return !(y>-0.052&&Math.abs(az)<0.40);}});
     b.push();b.translate(0,-0.040,0.086);
     b.chamfer(0,0,0,0.048,0.008,0.010,MID,0.003,{noBand:true});b.pop();
   },
@@ -12150,7 +12198,8 @@ A.submit=function(actor){
        lighter, it is further from the pivot, and it answers to the
        head turning as well as to the body moving. */
     var hr=actor.hair||lag;
-    P(Body.hair(k.hair.style),'head',headOff,Geo.col3(k.hair.color),0,
+    P(Body.hair(k.hair.style,k.hat&&k.hat.style!=='none'),
+      'head',headOff,Geo.col3(k.hair.color),0,
       [-hr[0]*0.42,hr[1]*0.20,hr[1]*0.46]);
   }
   if(k.hat.style!=='none')
