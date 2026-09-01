@@ -221,8 +221,22 @@ U.offerApp=function(){
 U.init=function(){
   hud=document.getElementById('hud');
   clear(hud);
+  /* "Play in portrait" is a mouse affordance: a narrow desktop window is
+     a window, not an orientation. On a touchscreen the only way past
+     this screen is to turn the phone. */
   var rok=document.getElementById('rotateok');
   if(rok)rok.addEventListener('click',function(){LH.App.dismissRotate();});
+  var rgo=document.getElementById('rotatego');
+  if(rgo){
+    /* Fullscreen is the one lever that sometimes buys a real orientation
+       lock in a browser tab. Where it does not exist, do not offer it. */
+    if(!(LH.Device&&LH.Device.canFullscreen()))rgo.style.display='none';
+    rgo.addEventListener('click',function(){
+      if(!LH.Device)return;
+      LH.Device.fullscreen();
+      LH.Device.lockLandscape();
+    });
+  }
 
   /* ---- identity ---- */
   var id=el('div','idchip hp');

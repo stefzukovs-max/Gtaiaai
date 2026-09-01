@@ -1434,6 +1434,16 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 /* The log is for glancing at, not reading a novel in. Four lines. */
 #app.mobile.portrait .chat{height:80px}
 #app.mobile:not(.portrait) .chat{height:74px}
+
+/* ---- landscape only ----
+   The overlay is the whole screen while a touch device is upright, and
+   LH.App stops the frame loop behind it. It has no way out except
+   turning the phone: the portrait escape hatch belongs to a mouse. */
+#rotate .rtitle{font-family:var(--disp);letter-spacing:.2em;font-size:18px}
+#rotate .rsub{color:var(--ink3);font-size:13.5px;max-width:280px;line-height:1.5}
+#rotate .dismiss.ghost{background:transparent;border-color:transparent;
+  color:var(--ink3);font-size:12.5px;letter-spacing:.06em;padding:8px 12px}
+#app.touchdev #rotate .dismiss.ghost{display:none}
 </style>
 
 
@@ -1450,11 +1460,16 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 
   <div id="front"><div class="veil"></div><div class="pane" id="frontpane"></div></div>
 
+  <!-- Landscape is not a preference here, it is the only way the game
+       is played. Where the platform lets a page lock the orientation we
+       lock it and this is never seen; where it does not — an iPhone in
+       Safari, a page inside an iframe — this is the whole screen until
+       the phone is turned, and the frame loop is stopped behind it. -->
   <div id="rotate"><div class="ph"></div>
-    <div style="font-family:var(--disp);letter-spacing:.2em;font-size:18px">TURN YOUR DEVICE</div>
-    <div style="color:var(--ink3);font-size:13px;max-width:280px">Lumen Harbor has more
-      room in landscape — but it plays either way.</div>
-    <div class="dismiss" id="rotateok">Play in portrait</div>
+    <div class="rtitle">TURN YOUR PHONE</div>
+    <div class="rsub">Lumen Harbor is played sideways.</div>
+    <div class="dismiss" id="rotatego">Go full screen</div>
+    <div class="dismiss ghost" id="rotateok">Play in portrait</div>
   </div>
 
   <!-- Offered on a phone once, and never again after it is answered:
@@ -5535,11 +5550,38 @@ D.fullscreen=function(on){
     }
   }catch(err){}
 };
+/* Asking for the lock is cheap and refusal is normal, so it is asked
+   for at every moment a browser might say yes: at boot, on the first
+   real gesture, after going fullscreen, and whenever the orientation
+   changes under us. Installed to a home screen the manifest has usually
+   settled it already; in a tab, Android may allow it once fullscreen and
+   iOS Safari never will — which is what the gate in LH.App is for. */
+D.orientationLocked=false;
 D.lockLandscape=function(){
   try{
     var o=screen.orientation;
-    if(o&&o.lock)o.lock('landscape').catch(function(){});
+    if(!o||!o.lock)return;
+    o.lock('landscape').then(function(){D.orientationLocked=true;},
+                             function(){});
   }catch(err){}
+};
+D.watchOrientation=function(){
+  D.lockLandscape();
+  try{
+    if(screen.orientation&&screen.orientation.addEventListener)
+      screen.orientation.addEventListener('change',function(){
+        if(!D.orientationLocked)D.lockLandscape();
+      });
+  }catch(err){}
+  /* The first touch or click is the first moment a gesture-gated API
+     will listen. One shot, then it stops asking. */
+  var once=function(){
+    D.lockLandscape();
+    window.removeEventListener('touchend',once,true);
+    window.removeEventListener('mouseup',once,true);
+  };
+  window.addEventListener('touchend',once,true);
+  window.addEventListener('mouseup',once,true);
 };
 
 /* ---------------- screen wake ----------------
@@ -5674,6 +5716,7 @@ D.viewport=function(){
 };
 
 D.init=function(){
+  D.watchOrientation();
   D.viewport();
   D.apply();
   D.manifest();
@@ -5705,6 +5748,7 @@ App.canvas=null;
 App.w=0;App.h=0;App.dpr=1;
 App.time=0;App.dt=0;App.frame=0;
 App.paused=false;
+App.blocked=false;
 var _last=0,_acc=0,_fpsT=0,_fpsN=0;
 App.fps=60;
 
@@ -5734,8 +5778,17 @@ App.resize=function(){
   var w=Math.max(2,Math.round(r.width*dpr)),h=Math.max(2,Math.round(r.height*dpr));
   var portrait=r.height>r.width*1.02;
   if(Dv&&portrait!==Dv.portrait){Dv.portrait=portrait;Dv.apply();}
+  /* On anything with a touchscreen, portrait is not a layout — it is a
+     stop. The game is landscape-only: the manifest asks for it, the
+     Screen Orientation API is asked for it wherever that is allowed, and
+     where neither can be honoured this overlay is the whole screen and
+     the frame loop below does not run. A mouse gets the old behaviour,
+     because a narrow desktop window is a window, not an orientation. */
+  var touch=!!(Dv&&Dv.touch);
+  App.blocked=portrait&&touch;
   var rot=document.getElementById('rotate');
-  if(rot)rot.style.display=(portrait&&!rotateHidden&&!(Dv&&Dv.mobile))?'flex':'none';
+  if(rot)rot.style.display=
+    (portrait&&(touch||!rotateHidden))?'flex':'none';
   if(w===App.w&&h===App.h)return;
   cv.width=w;cv.height=h;
   App.w=w;App.h=h;App.dpr=dpr;
@@ -5761,7 +5814,10 @@ function frame(t){
   if(_fpsT>=0.5){App.fps=_fpsN/_fpsT;_fpsN=0;_fpsT=0;}
 
   App.resize();
-  if(App.paused)return;
+  /* Blocked is not paused: paused is a menu, blocked is a phone held the
+     wrong way round. Resize still runs above, which is what notices the
+     moment it is turned back. */
+  if(App.blocked||App.paused)return;
 
   R.time=App.time;
   /* Measured, not guessed: hold the frame budget by moving the internal
@@ -18251,8 +18307,22 @@ U.offerApp=function(){
 U.init=function(){
   hud=document.getElementById('hud');
   clear(hud);
+  /* "Play in portrait" is a mouse affordance: a narrow desktop window is
+     a window, not an orientation. On a touchscreen the only way past
+     this screen is to turn the phone. */
   var rok=document.getElementById('rotateok');
   if(rok)rok.addEventListener('click',function(){LH.App.dismissRotate();});
+  var rgo=document.getElementById('rotatego');
+  if(rgo){
+    /* Fullscreen is the one lever that sometimes buys a real orientation
+       lock in a browser tab. Where it does not exist, do not offer it. */
+    if(!(LH.Device&&LH.Device.canFullscreen()))rgo.style.display='none';
+    rgo.addEventListener('click',function(){
+      if(!LH.Device)return;
+      LH.Device.fullscreen();
+      LH.Device.lockLandscape();
+    });
+  }
 
   /* ---- identity ---- */
   var id=el('div','idchip hp');

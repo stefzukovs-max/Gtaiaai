@@ -102,11 +102,38 @@ D.fullscreen=function(on){
     }
   }catch(err){}
 };
+/* Asking for the lock is cheap and refusal is normal, so it is asked
+   for at every moment a browser might say yes: at boot, on the first
+   real gesture, after going fullscreen, and whenever the orientation
+   changes under us. Installed to a home screen the manifest has usually
+   settled it already; in a tab, Android may allow it once fullscreen and
+   iOS Safari never will — which is what the gate in LH.App is for. */
+D.orientationLocked=false;
 D.lockLandscape=function(){
   try{
     var o=screen.orientation;
-    if(o&&o.lock)o.lock('landscape').catch(function(){});
+    if(!o||!o.lock)return;
+    o.lock('landscape').then(function(){D.orientationLocked=true;},
+                             function(){});
   }catch(err){}
+};
+D.watchOrientation=function(){
+  D.lockLandscape();
+  try{
+    if(screen.orientation&&screen.orientation.addEventListener)
+      screen.orientation.addEventListener('change',function(){
+        if(!D.orientationLocked)D.lockLandscape();
+      });
+  }catch(err){}
+  /* The first touch or click is the first moment a gesture-gated API
+     will listen. One shot, then it stops asking. */
+  var once=function(){
+    D.lockLandscape();
+    window.removeEventListener('touchend',once,true);
+    window.removeEventListener('mouseup',once,true);
+  };
+  window.addEventListener('touchend',once,true);
+  window.addEventListener('mouseup',once,true);
 };
 
 /* ---------------- screen wake ----------------
@@ -241,6 +268,7 @@ D.viewport=function(){
 };
 
 D.init=function(){
+  D.watchOrientation();
   D.viewport();
   D.apply();
   D.manifest();

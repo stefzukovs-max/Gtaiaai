@@ -1274,6 +1274,44 @@ corners.
 
 ---
 
+### Sideways, and only sideways
+
+A web page cannot make a phone rotate. That is the whole problem, and any
+claim to the contrary is a claim about one browser on one platform. So
+this is done in two layers, and the second one is what actually holds.
+
+**Ask.** The manifest declares `"orientation": "landscape"`, which an
+installed home-screen copy obeys outright. In a tab, `screen.orientation
+.lock('landscape')` is asked for at every moment a browser might say yes
+— at boot, on the first real gesture, after going fullscreen, and again
+whenever the orientation changes under us. Android Chrome will usually
+grant it once fullscreen. **iOS Safari never will**, and no amount of
+code changes that.
+
+**Stop.** Where the ask is refused, portrait is not a layout to reflow
+into — it is a stop. `#rotate` becomes the whole screen at z-index 120,
+above the title card and everything else, and `LH.App` returns out of the
+frame before `R.time` is written, so nothing is simulated and nothing is
+drawn behind it. There is no dismiss button on a touchscreen. The only
+way past it is to turn the phone.
+
+`requestAnimationFrame` keeps running, because something has to notice
+when the phone comes back — which is why the test asserts on `R.time`
+rather than the frame counter. The frame counter moves while blocked;
+the world clock does not.
+
+This reverses an earlier decision, on purpose. The rotate screen used to
+be a hard gate, was softened to a dismissible hint because a tablet in
+portrait could never start, and is a gate again because the game is meant
+to be played one way. A mouse keeps the escape hatch: a narrow desktop
+window is a window, not an orientation.
+
+The phone probe now asks the two orientations different questions —
+portrait that the stop is up, covering, above everything, without a way
+out, and with the world clock frozen; landscape the whole playability
+battery — plus one that turns the phone mid-run and checks the game
+starts.
+
 ### Then smaller
 
 The first mobile pass sized everything for certainty — an 82px USE

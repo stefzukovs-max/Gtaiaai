@@ -15,11 +15,16 @@
 
   <div id="front"><div class="veil"></div><div class="pane" id="frontpane"></div></div>
 
+  <!-- Landscape is not a preference here, it is the only way the game
+       is played. Where the platform lets a page lock the orientation we
+       lock it and this is never seen; where it does not — an iPhone in
+       Safari, a page inside an iframe — this is the whole screen until
+       the phone is turned, and the frame loop is stopped behind it. -->
   <div id="rotate"><div class="ph"></div>
-    <div style="font-family:var(--disp);letter-spacing:.2em;font-size:18px">TURN YOUR DEVICE</div>
-    <div style="color:var(--ink3);font-size:13px;max-width:280px">Lumen Harbor has more
-      room in landscape — but it plays either way.</div>
-    <div class="dismiss" id="rotateok">Play in portrait</div>
+    <div class="rtitle">TURN YOUR PHONE</div>
+    <div class="rsub">Lumen Harbor is played sideways.</div>
+    <div class="dismiss" id="rotatego">Go full screen</div>
+    <div class="dismiss ghost" id="rotateok">Play in portrait</div>
   </div>
 
   <!-- Offered on a phone once, and never again after it is answered:

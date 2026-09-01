@@ -11,6 +11,7 @@ App.canvas=null;
 App.w=0;App.h=0;App.dpr=1;
 App.time=0;App.dt=0;App.frame=0;
 App.paused=false;
+App.blocked=false;
 var _last=0,_acc=0,_fpsT=0,_fpsN=0;
 App.fps=60;
 
@@ -40,8 +41,17 @@ App.resize=function(){
   var w=Math.max(2,Math.round(r.width*dpr)),h=Math.max(2,Math.round(r.height*dpr));
   var portrait=r.height>r.width*1.02;
   if(Dv&&portrait!==Dv.portrait){Dv.portrait=portrait;Dv.apply();}
+  /* On anything with a touchscreen, portrait is not a layout — it is a
+     stop. The game is landscape-only: the manifest asks for it, the
+     Screen Orientation API is asked for it wherever that is allowed, and
+     where neither can be honoured this overlay is the whole screen and
+     the frame loop below does not run. A mouse gets the old behaviour,
+     because a narrow desktop window is a window, not an orientation. */
+  var touch=!!(Dv&&Dv.touch);
+  App.blocked=portrait&&touch;
   var rot=document.getElementById('rotate');
-  if(rot)rot.style.display=(portrait&&!rotateHidden&&!(Dv&&Dv.mobile))?'flex':'none';
+  if(rot)rot.style.display=
+    (portrait&&(touch||!rotateHidden))?'flex':'none';
   if(w===App.w&&h===App.h)return;
   cv.width=w;cv.height=h;
   App.w=w;App.h=h;App.dpr=dpr;
@@ -67,7 +77,10 @@ function frame(t){
   if(_fpsT>=0.5){App.fps=_fpsN/_fpsT;_fpsN=0;_fpsT=0;}
 
   App.resize();
-  if(App.paused)return;
+  /* Blocked is not paused: paused is a menu, blocked is a phone held the
+     wrong way round. Resize still runs above, which is what notices the
+     moment it is turned back. */
+  if(App.blocked||App.paused)return;
 
   R.time=App.time;
   /* Measured, not guessed: hold the frame budget by moving the internal

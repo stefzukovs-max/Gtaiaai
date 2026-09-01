@@ -11,7 +11,7 @@ export const name = 'feel';
 export async function run(browser) {
   const t = checks();
   const { page, ctx, errors } = await openGame(browser,
-    { viewport: { width: 390, height: 750 } });
+    { viewport: { width: 844, height: 390 } });
   await page.evaluate(() => { LH.Front.go('done'); LH.Device.touch = true; });
   await page.waitForTimeout(1500);
 
@@ -60,6 +60,8 @@ export async function run(browser) {
   /* --- look, and that it is the same gesture on any screen ------- */
   const look = await page.evaluate(async () => {
     const cv = document.getElementById('gl');
+    /* Start well inside the look half: the left 42% of the screen is the
+       walk stick, and at 844px wide that is everything left of 354. */
     const swipe = (from, to) => {
       const mk = x => new Touch({ identifier: 7, target: cv, clientX: x, clientY: 400 });
       cv.dispatchEvent(new TouchEvent('touchstart', { touches: [mk(from)],
@@ -72,9 +74,10 @@ export async function run(browser) {
       LH.Input.look.x = 0; LH.Input.look.y = 0;
       return dx;
     };
-    const quarter = swipe(200, 200 + Math.round(innerWidth * 0.25));
+    const x0 = Math.round(innerWidth * 0.55);
+    const quarter = swipe(x0, x0 + Math.round(innerWidth * 0.25));
     /* a flick should still be moving the frame after the thumb leaves */
-    swipe(200, 320);
+    swipe(x0, x0 + 120);
     LH.Input.look.x = 0;
     LH.Input.begin();
     const glide = LH.Input.look.x;

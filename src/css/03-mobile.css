@@ -561,3 +561,13 @@
 /* The log is for glancing at, not reading a novel in. Four lines. */
 #app.mobile.portrait .chat{height:80px}
 #app.mobile:not(.portrait) .chat{height:74px}
+
+/* ---- landscape only ----
+   The overlay is the whole screen while a touch device is upright, and
+   LH.App stops the frame loop behind it. It has no way out except
+   turning the phone: the portrait escape hatch belongs to a mouse. */
+#rotate .rtitle{font-family:var(--disp);letter-spacing:.2em;font-size:18px}
+#rotate .rsub{color:var(--ink3);font-size:13.5px;max-width:280px;line-height:1.5}
+#rotate .dismiss.ghost{background:transparent;border-color:transparent;
+  color:var(--ink3);font-size:12.5px;letter-spacing:.06em;padding:8px 12px}
+#app.touchdev #rotate .dismiss.ghost{display:none}
