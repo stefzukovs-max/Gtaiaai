@@ -18,3 +18,4 @@ sizes, counts, positions and pixels.
   04-preview    site/preview.html over http in a sandboxed iframe
   05-phone      the game at 390x750 and 844x390, with touch
   06-feel       stick curve, look speed, camera help, the quality scaler
+  07-perf       one frame's triangle and draw budget on a phone

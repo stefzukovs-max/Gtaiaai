@@ -70,10 +70,19 @@ function frame(t){
   var dt=(t-_last)/1000;_last=t;
   /* Clamp: a backgrounded tab returns with a multi-second delta and
      every integrator in the game would explode on it. */
+  /* The raw wall-clock step, kept before the clamp. Everything that
+     integrates the world wants the clamped one — a backgrounded tab
+     comes back with a multi-second delta and every integrator in the
+     game would explode on it. Everything that MEASURES the frame wants
+     the real one: with only the clamped value to look at, the frame
+     rate could never read worse than ten, and the quality scaler could
+     never see a frame worse than 100ms however bad it got. It sat at
+     its mildest setting insisting things were fine. */
+  var raw=dt;
   if(dt>0.1)dt=0.1;
-  App.dt=dt;App.time+=dt;App.frame++;
+  App.dt=dt;App.raw=raw;App.time+=dt;App.frame++;
 
-  _fpsN++;_fpsT+=dt;
+  _fpsN++;_fpsT+=raw;
   if(_fpsT>=0.5){App.fps=_fpsN/_fpsT;_fpsN=0;_fpsT=0;}
 
   App.resize();
@@ -85,7 +94,7 @@ function frame(t){
   R.time=App.time;
   /* Measured, not guessed: hold the frame budget by moving the internal
      resolution, and only give up effects once that has bottomed out. */
-  if(R.autoTick)R.autoTick(dt);
+  if(R.autoTick)R.autoTick(raw);
   GL.resetStats();
 
   for(var i=0;i<updaters.length;i++)updaters[i].fn(dt,App.time);

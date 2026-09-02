@@ -111,8 +111,8 @@ P.tree=function(kind,variant){
       b.mat('foliage');
       /* stacked skirts, each smaller and rotated, so the silhouette
          is ragged rather than a smooth cone */
-      for(var i=0;i<7;i++){
-        var t=i/6;
+      for(var i=0;i<5;i++){
+        var t=i/4;
         var y=h*(0.20+t*0.74);
         var r=(2.7-t*2.15)*scale;
         b.push();b.translate((rng()-0.5)*0.26,y,(rng()-0.5)*0.26);
@@ -120,7 +120,7 @@ P.tree=function(kind,variant){
         /* A ragged ring rather than a clean circle: a cone of perfect
            circles is a Christmas-tree decoration, and the whole read of
            a conifer is the broken edge where the branches end. */
-        var n2=11,pts=[];
+        var n2=9,pts=[];
         for(var q2=0;q2<n2;q2++){
           var a2=q2/n2*M.TAU;
           var rr=r*(0.76+((q2*7919)%13)/13*0.38);
@@ -200,7 +200,14 @@ P.tree=function(kind,variant){
       function cluster(bb,r2,sz){
         sz=sz||1;
         bb.mat(leafMat);
-        var lob=3;
+        /* Two lobes, not three. The comment below used to say a complex
+           mesh "costs nothing at all in draw calls, because a species is
+           one instanced mesh however complicated it is inside", and that
+           is true of draw calls and badly false of everything else: this
+           tree is drawn 219 times, so every triangle in it is 219
+           triangles in the frame. At 4,400 apiece the two broadleaf
+           species alone were 1.9 million triangles a frame. */
+        var lob=2;
         for(var q=0;q<lob;q++){
           bb.push();
           bb.translate((r2()-0.5)*1.25*sz*scale,
@@ -217,7 +224,7 @@ P.tree=function(kind,variant){
              crown to the inside, and five steps of it read as depth
              where two read as a decal. */
           var LOBE=['#FFFFFF','#F0F0F0','#DEDEDE','#CACACA','#B6B6B6'];
-          bb.sphere(0,0,0,(0.66+r2()*0.46)*sz*scale,6,5,
+          bb.sphere(0,0,0,(0.72+r2()*0.50)*sz*scale,5,4,
             LOBE[(r2()*LOBE.length)|0],{squash:0.78+r2()*0.28});
           bb.pop();
         }

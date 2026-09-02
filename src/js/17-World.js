@@ -182,17 +182,34 @@ W.commitProps=commitProps;
    island carries about five thousand props; drawing all of them every
    frame is four million triangles for a view that can see a fraction
    of them. Rebuilding the buffers costs a fraction of a millisecond. */
-W.cullProps=function(cx,cz,scale){
+W.cullProps=function(cx,cz,scale,nearR){
   scale=scale||1;
+  var near2=(nearR||0)*(nearR||0);
   for(var g=0;g<groups.length;g++){
     var G2=groups[g],mesh=G2.mesh,d=mesh.idata,src=G2.packed;
     var cull=G2.cull*scale, cull2=cull*cull;
-    var n=0,max=mesh.maxInstances;
-    for(var i=0;i<G2.count&&n<max;i++){
-      var dx=G2.xs[i]-cx, dz=G2.zs[i]-cz;
-      if(dx*dx+dz*dz>cull2)continue;
-      var so=i*GL.ISTRIDE, dof=n*GL.ISTRIDE;
-      for(var q=0;q<GL.ISTRIDE;q++)d[dof+q]=src[so+q];
+    var n=0,max=mesh.maxInstances,i,dx,dz,d2,so,dof,q;
+    /* Two passes, near first, so the packed buffer is ordered by
+       distance and a prefix of it is a valid "everything close" draw.
+       That is what lets the shadow cascades draw a fraction of the
+       props without a second buffer: they take the prefix.
+
+       Without it the whole island's props were drawn into a thirteen
+       metre shadow box, three times a frame — sixteen million triangles
+       of which the shadow passes could use almost none. */
+    for(i=0;i<G2.count&&n<max;i++){
+      dx=G2.xs[i]-cx; dz=G2.zs[i]-cz; d2=dx*dx+dz*dz;
+      if(d2>near2)continue;
+      so=i*GL.ISTRIDE; dof=n*GL.ISTRIDE;
+      for(q=0;q<GL.ISTRIDE;q++)d[dof+q]=src[so+q];
+      n++;
+    }
+    mesh.nearInstances=n;
+    for(i=0;i<G2.count&&n<max;i++){
+      dx=G2.xs[i]-cx; dz=G2.zs[i]-cz; d2=dx*dx+dz*dz;
+      if(d2<=near2||d2>cull2)continue;
+      so=i*GL.ISTRIDE; dof=n*GL.ISTRIDE;
+      for(q=0;q<GL.ISTRIDE;q++)d[dof+q]=src[so+q];
       n++;
     }
     mesh.instances=n;

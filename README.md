@@ -1274,6 +1274,64 @@ corners.
 
 ---
 
+### The frame was eighteen million triangles
+
+"Make it faster" is a guess until something is measured, so the first
+thing was a profiler that wraps each draw category and reads the delta in
+`GL.stats`. It came back with one number that made the rest of the
+question moot: **18.4 million triangles a frame**, of which **16 million
+were props**.
+
+`W.drawProps` drew every instanced prop in the world, with no culling of
+any kind, and it is called three times a frame — once for the image and
+once for each shadow cascade. An entire island of trees was being
+rasterised into a thirteen-metre shadow box, twice.
+
+`W.cullProps` already existed and was already being called; its comment
+even says "drawing all of them every frame is four million triangles".
+What it could not do was tell the passes apart: one culled buffer served
+all three, so the shadow cascades got the camera's radius. It packs in
+two tiers now — everything within 54 metres first, the rest after — so
+the buffer is ordered by distance and a prefix of it is a valid "only
+what is close" draw. The cascades take the prefix: 658 prop instances
+instead of 3,257.
+
+That halved it. The other half was the trees themselves, at 4,400
+triangles each with 219 instances, and the comment above them explains
+why: the canopy was built as "a real branching structure with leaf
+clusters hung on the ends, which costs about two thousand vertices per
+variant and nothing at all in draw calls, because a species is one
+instanced mesh however complicated it is inside." True of draw calls,
+badly false of everything else — every triangle in that mesh is 219
+triangles in the frame. Two lobes per cluster instead of three, five
+segments instead of six, five pine skirts instead of seven.
+
+    18,430k  ->  9,272k   shadow cascades take the near tier
+     9,272k  ->  6,371k   canopies thinned
+
+A 65% cut, and the woods still read as woods.
+
+### The scaler was blind
+
+Found on the way: `dt` is clamped to 100ms before anything sees it,
+because a backgrounded tab returns with a multi-second delta and every
+integrator in the game would explode on it. But the frame-rate counter
+and the quality scaler read that same clamped number — so the measured
+frame time could never exceed 100ms, the frame rate could never read
+below ten, and the adaptive scaler shipped last week could never see a
+frame worse than 10fps however bad it actually got. It sat near its
+mildest setting insisting things were fine.
+
+The raw step is kept alongside the clamped one now. Everything that
+integrates the world uses the clamp; everything that measures the frame
+uses the truth. The difference is visible immediately: on the same phone
+context the scaler now settles at 0.42 where it used to stop at 0.65.
+
+`tools/test/07-perf.mjs` holds the line — a triangle budget, a draw
+budget, a check that the cascades draw fewer props than the image, a cap
+on any single prop mesh, and a check that `App.raw` still exists, because
+losing it would silently blind the scaler again.
+
 ### The wizard
 
 A screenshot of a wizard, sent from a phone, with four things wrong with

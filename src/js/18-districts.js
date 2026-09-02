@@ -143,11 +143,16 @@ W.mapUV=function(x,z){
 };
 W.mapReset=function(){mapCv=null;};
 
-W.drawProps=function(prog){
+/* `near` draws only the prefix of the instance buffer that W.cullProps
+   packed closest to the camera. The shadow cascades want it: a tree
+   eighty metres away cannot cast into a box thirteen metres across, and
+   drawing it there was most of the frame. */
+W.drawProps=function(prog,near){
   GL.u1i(prog,'uInstanced',1);
   for(var i=0;i<W.instanced.length;i++){
     var m=W.instanced[i];
-    if(m.instances)GL.drawInstanced(m,m.instances);
+    var n=near?(m.nearInstances||0):m.instances;
+    if(n)GL.drawInstanced(m,n);
   }
   GL.u1i(prog,'uInstanced',0);
 };

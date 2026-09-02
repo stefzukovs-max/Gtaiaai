@@ -721,7 +721,7 @@ App.onUpdate(function(dt,time){
     R.updateLight(G.player.pos,44);
     T.extractFrustum(R.vp);
     W.refreshClutter(Cam.target[0],Cam.target[2]);
-  W.cullProps(Cam.target[0],Cam.target[2],1.3);
+  W.cullProps(Cam.target[0],Cam.target[2],Math.min(1.3,PROP_SCALE_MAX),SHADOW_PROPS);
     I.end();
     return;
   }
@@ -793,7 +793,8 @@ App.onUpdate(function(dt,time){
     R.updateLight(G.player.pos,44);
     T.extractFrustum(R.vp);
     W.refreshClutter(Cam.target[0],Cam.target[2]);
-  W.cullProps(Cam.target[0],Cam.target[2],Math.min(1.7,1+Cam.dist*0.030));
+  W.cullProps(Cam.target[0],Cam.target[2],
+    Math.min(PROP_SCALE_MAX,1+Cam.dist*0.030),SHADOW_PROPS);
     V.update(2);
     return;
   }
@@ -915,7 +916,8 @@ App.onUpdate(function(dt,time){
   /* Capped: a very wide orbit would otherwise open the radius far
      enough to draw every prop on the island. */
   W.refreshClutter(Cam.target[0],Cam.target[2]);
-  W.cullProps(Cam.target[0],Cam.target[2],Math.min(1.7,1+Cam.dist*0.030));
+  W.cullProps(Cam.target[0],Cam.target[2],
+    Math.min(PROP_SCALE_MAX,1+Cam.dist*0.030),SHADOW_PROPS);
 
   I.end();
 });
@@ -1018,6 +1020,13 @@ function camSolid(x,y,z){
 
 /* ---------------- draw ---------------- */
 var _id=M.m4();
+/* How far props are drawn, and how far of that the shadow cascades
+   bother with. The far cascade is 48 metres, so 54 covers it with a
+   margin and nothing beyond it can cast into the frame. A phone also
+   gets a tighter skirt of distant props than a desktop: they are a
+   handful of pixels each and they were costing millions of triangles. */
+var SHADOW_PROPS=54;
+var PROP_SCALE_MAX=(LH.Device&&LH.Device.mobile)?1.12:1.7;
 App.onDraw(function(dt,time){
   if(!G.ready)return;
   M.ident(_id);
@@ -1055,7 +1064,7 @@ App.onDraw(function(dt,time){
   W.drawStatics();
   V.drawNear(G.player.pos[0],G.player.pos[2],48);
   GL.u1i(dp,'uInstanced',1);
-  W.drawProps(dp);
+  W.drawProps(dp,true);
   Act.flushShadow(dp);
   R.endShadow();
 
@@ -1065,7 +1074,7 @@ App.onDraw(function(dt,time){
   T.drawChunksNear(G.player.pos[0],G.player.pos[2],20);
   V.drawNear(G.player.pos[0],G.player.pos[2],20);
   GL.u1i(dpn,'uInstanced',1);
-  W.drawProps(dpn);
+  W.drawProps(dpn,true);
   Act.flushShadow(dpn);
   R.endShadow();
 

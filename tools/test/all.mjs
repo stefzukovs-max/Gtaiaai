@@ -4,7 +4,7 @@
 import { launch } from './lib.mjs';
 
 const PROBES = ['./00-boot.mjs', './01-golden.mjs', './02-cosmetics.mjs',
-                './03-items.mjs', './04-preview.mjs', './05-phone.mjs', './06-feel.mjs'];
+                './03-items.mjs', './04-preview.mjs', './05-phone.mjs', './06-feel.mjs', './07-perf.mjs'];
 const only = process.argv.slice(2);
 const browser = await launch();
 let failed = 0, ran = 0;
